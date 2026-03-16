@@ -730,8 +730,6 @@ export class Renderer {
 
   private drawJoints(world: planck.World, camera: Camera) {
     const ctx = this.ctx;
-    ctx.strokeStyle = "rgba(150,200,255,0.4)";
-    ctx.lineWidth = 1;
 
     for (let joint = world.getJointList(); joint; joint = joint.getNext()) {
       const a = joint.getAnchorA();
@@ -739,10 +737,16 @@ export class Renderer {
       const sa = camera.toScreen(a.x, a.y, this.canvas);
       const sb = camera.toScreen(b.x, b.y, this.canvas);
 
-      ctx.beginPath();
-      ctx.moveTo(sa.x, sa.y);
-      ctx.lineTo(sb.x, sb.y);
-      ctx.stroke();
+      if (joint.getType() === "distance-joint") {
+        this.drawSpringCoil(sa, sb, camera.zoom);
+      } else {
+        ctx.strokeStyle = "rgba(150,200,255,0.4)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(sa.x, sa.y);
+        ctx.lineTo(sb.x, sb.y);
+        ctx.stroke();
+      }
 
       // Anchor dots (scale with zoom, 0.1m world radius)
       const r = Math.max(0.1 * camera.zoom, 1);
@@ -754,6 +758,37 @@ export class Renderer {
       ctx.arc(sb.x, sb.y, r, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
+
+  private drawSpringCoil(sa: { x: number; y: number }, sb: { x: number; y: number }, zoom: number) {
+    const ctx = this.ctx;
+    const dx = sb.x - sa.x;
+    const dy = sb.y - sa.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1) return;
+
+    const coils = 12;
+    const amplitude = Math.max(4, 0.15 * zoom); // screen pixels
+    const nx = -dy / len; // normal perpendicular to spring axis
+    const ny = dx / len;
+
+    ctx.strokeStyle = "rgba(200,220,255,0.7)";
+    ctx.lineWidth = Math.max(1, 0.05 * zoom);
+    ctx.beginPath();
+    ctx.moveTo(sa.x, sa.y);
+
+    for (let i = 1; i <= coils * 2; i++) {
+      const t = i / (coils * 2 + 1);
+      const x = sa.x + dx * t;
+      const y = sa.y + dy * t;
+      const side = i % 2 === 1 ? 1 : -1;
+      ctx.lineTo(x + nx * amplitude * side, y + ny * amplitude * side);
+    }
+
+    const tEnd = (coils * 2 + 1) / (coils * 2 + 1);
+    ctx.lineTo(sa.x + dx * tEnd, sa.y + dy * tEnd);
+    ctx.lineTo(sb.x, sb.y);
+    ctx.stroke();
   }
 
   private bodyColor(body: planck.Body): string {

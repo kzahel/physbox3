@@ -150,6 +150,27 @@ export class Game {
     return createRopeBetween(this.world, x1, y1, x2, y2, bodyA, bodyB);
   }
 
+  addSpring(x1: number, y1: number, x2: number, y2: number, bodyA: planck.Body | null, bodyB: planck.Body | null) {
+    // Use ground body for null endpoints
+    const ground = this.world.getBodyList()!;
+    const a = bodyA ?? ground;
+    const b = bodyB ?? ground;
+    if (a === b) return;
+    const anchorA = planck.Vec2(x1, y1);
+    const anchorB = planck.Vec2(x2, y2);
+    const dist = planck.Vec2.lengthOf(planck.Vec2.sub(anchorA, anchorB));
+    const localA = a.getLocalPoint(anchorA);
+    const localB = b.getLocalPoint(anchorB);
+    const joint = planck.DistanceJoint({
+      frequencyHz: 3,
+      dampingRatio: 0.3,
+      length: dist,
+    }, a, b, anchorA, anchorB);
+    (joint as any).m_localAnchorA = localA;
+    (joint as any).m_localAnchorB = localB;
+    this.world.createJoint(joint);
+  }
+
   addSpringBall(x: number, y: number) {
     return createSpringBall(this.world, x, y);
   }

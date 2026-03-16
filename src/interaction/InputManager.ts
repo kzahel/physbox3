@@ -723,9 +723,8 @@ export class InputManager {
       this.ropePending = { body, x: wx, y: wy };
     } else {
       const a = this.ropePending;
-      // Don't rope a body to itself
       if (!(a.body && a.body === body)) {
-        this.game.addRopeBetween(a.x, a.y, wx, wy, a.body, body);
+        this.game.addSpring(a.x, a.y, wx, wy, a.body, body);
       }
       this.ropePending = null;
     }
