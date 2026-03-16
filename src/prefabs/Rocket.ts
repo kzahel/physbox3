@@ -1,8 +1,8 @@
 import * as planck from "planck";
 import type { Renderer } from "../engine/Renderer";
 
-export function createRocket(world: planck.World, x: number, y: number): planck.Body {
-  const body = world.createBody({ type: "dynamic", position: planck.Vec2(x, y) });
+export function createRocket(world: planck.World, x: number, y: number, angle = 0): planck.Body {
+  const body = world.createBody({ type: "dynamic", position: planck.Vec2(x, y), angle });
   body.createFixture({ shape: planck.Box(0.3, 0.8), density: 1.5, friction: 0.3 });
   body.createFixture({
     shape: planck.Polygon([planck.Vec2(-0.3, 0.8), planck.Vec2(0.3, 0.8), planck.Vec2(0, 1.4)]),

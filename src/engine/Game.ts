@@ -155,8 +155,8 @@ export class Game {
     return createSeesaw(this.world, x, y);
   }
 
-  addRocket(x: number, y: number) {
-    return createRocket(this.world, x, y);
+  addRocket(x: number, y: number, angle = 0) {
+    return createRocket(this.world, x, y, angle);
   }
 
   addBalloon(x: number, y: number) {

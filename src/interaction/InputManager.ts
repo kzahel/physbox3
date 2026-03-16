@@ -156,8 +156,6 @@ export class InputManager {
         this.game.addSeesaw(world.x, world.y);
         break;
       case "rocket":
-        this.game.addRocket(world.x, world.y);
-        break;
       case "balloon":
         this.game.addBalloon(world.x, world.y);
         break;
@@ -167,6 +165,7 @@ export class InputManager {
       case "conveyor":
       case "fan":
       case "cannon":
+      case "rocket":
         this.platformDraw = { start: { x: world.x, y: world.y }, end: { x: world.x, y: world.y } };
         break;
       case "dynamite":
@@ -321,7 +320,8 @@ export class InputManager {
         this.tool === "platform" ||
         this.tool === "conveyor" ||
         this.tool === "fan" ||
-        this.tool === "cannon"
+        this.tool === "cannon" ||
+        this.tool === "rocket"
       ) {
         const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.canvas);
         this.platformDraw = { start: { x: world.x, y: world.y }, end: { x: world.x, y: world.y } };
@@ -436,9 +436,6 @@ export class InputManager {
         case "seesaw":
           this.game.addSeesaw(world.x, world.y);
           break;
-        case "rocket":
-          this.game.addRocket(world.x, world.y);
-          break;
         case "balloon":
           this.game.addBalloon(world.x, world.y);
           break;
@@ -529,6 +526,10 @@ export class InputManager {
         this.game.addFan(start.x, start.y, angle);
       } else if (this.tool === "cannon") {
         this.game.addCannon(start.x, start.y, angle);
+      } else if (this.tool === "rocket") {
+        // Rocket angle: drag direction maps to thrust direction (rocket's "up")
+        // The rocket's "up" is at angle + π/2, so subtract π/2 to align
+        this.game.addRocket(start.x, start.y, angle - Math.PI / 2);
       } else {
         this.game.addPlatform(cx, cy, len, angle);
       }
@@ -728,12 +729,8 @@ export class InputManager {
   }
 
   hasMotor(body: planck.Body): boolean {
-    for (let j = this.game.world.getJointList(); j; j = j.getNext()) {
-      if (j.getType() !== "revolute-joint") continue;
-      const other = j.getBodyA() === body ? j.getBodyB() : j.getBodyB() === body ? j.getBodyA() : null;
-      if (other && this.getBodyLabel(other) === "motor-anchor") return true;
-    }
-    return false;
+    const ud = body.getUserData() as { motorSpeed?: number } | null;
+    return ud != null && ud.motorSpeed != null;
   }
 
   private handleSelect(wx: number, wy: number, sx: number, sy: number) {
@@ -790,49 +787,26 @@ export class InputManager {
         ud.thrust = -ud.thrust;
       }
     }
-    // Reverse motor joints
-    for (let j = this.game.world.getJointList(); j; j = j.getNext()) {
-      if (j.getType() !== "revolute-joint") continue;
-      const other = j.getBodyA() === body ? j.getBodyB() : j.getBodyB() === body ? j.getBodyA() : null;
-      if (other && this.getBodyLabel(other) === "motor-anchor") {
-        const rj = j as planck.RevoluteJoint;
-        rj.setMotorSpeed(-rj.getMotorSpeed());
-      }
+    // Reverse motor
+    const mud = body.getUserData() as { motorSpeed?: number } | null;
+    if (mud && mud.motorSpeed != null) {
+      mud.motorSpeed = -mud.motorSpeed;
     }
   }
 
   private toggleMotor(body: planck.Body) {
-    // Check if motor already exists — if so, remove it
-    for (let j = this.game.world.getJointList(); j; j = j.getNext()) {
-      if (j.getType() !== "revolute-joint") continue;
-      const other = j.getBodyA() === body ? j.getBodyB() : j.getBodyB() === body ? j.getBodyA() : null;
-      if (other && this.getBodyLabel(other) === "motor-anchor") {
-        this.game.world.destroyJoint(j);
-        this.game.world.destroyBody(other);
-        return;
-      }
+    const ud = body.getUserData() as { motorSpeed?: number } | null;
+    if (ud && ud.motorSpeed != null) {
+      // Remove motor
+      delete ud.motorSpeed;
+    } else {
+      // Add motor — store speed on userData, torque applied each frame
+      if (body.isStatic()) body.setType("dynamic");
+      const data = (body.getUserData() ?? {}) as Record<string, unknown>;
+      data.motorSpeed = 5;
+      body.setUserData(data);
+      body.setAwake(true);
     }
-
-    // Create motor: static anchor + revolute joint with motor
-    const pos = body.getPosition();
-    const anchor = this.game.world.createBody({ type: "static", position: planck.Vec2(pos.x, pos.y) });
-    anchor.createFixture({ shape: planck.Circle(0.01), isSensor: true });
-    anchor.setUserData({ label: "motor-anchor" });
-
-    // Make sure the body is dynamic so the motor can spin it
-    if (body.isStatic()) body.setType("dynamic");
-
-    this.game.world.createJoint(
-      planck.RevoluteJoint(
-        { enableMotor: true, motorSpeed: 5, maxMotorTorque: 500 },
-        anchor,
-        body,
-        planck.Vec2(pos.x, pos.y),
-      ),
-    );
-
-    // Wake body so motor takes effect immediately
-    body.setAwake(true);
   }
 
   private readonly CREATION_TOOLS = new Set<Tool>([
@@ -842,7 +816,6 @@ export class InputManager {
     "car",
     "springball",
     "dynamite",
-    "rocket",
     "balloon",
     "ragdoll",
     "seesaw",
@@ -884,9 +857,6 @@ export class InputManager {
         break;
       case "dynamite":
         this.game.addDynamite(wx, wy);
-        break;
-      case "rocket":
-        this.game.addRocket(wx, wy);
         break;
       case "balloon":
         this.game.addBalloon(wx, wy);
