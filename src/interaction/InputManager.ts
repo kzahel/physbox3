@@ -21,6 +21,7 @@ export const GRAB_RADIUS_PX = 30; // CSS pixels — touch grab hit area
 export class InputManager {
   tool: Tool = "grab";
   private mouseJoint: planck.MouseJoint | null = null;
+  private grabbedStatic: planck.Body | null = null;
   private groundBody: planck.Body;
   private isPanning = false;
   private lastMouse = { x: 0, y: 0 };
@@ -165,6 +166,11 @@ export class InputManager {
     if (this.mouseJoint) {
       const world = this.game.camera.toWorld(e.clientX, e.clientY, this.game.canvas);
       this.mouseJoint.setTarget(planck.Vec2(world.x, world.y));
+    } else if (this.grabbedStatic) {
+      const wdx = dx / this.game.camera.zoom;
+      const wdy = -dy / this.game.camera.zoom;
+      const pos = this.grabbedStatic.getPosition();
+      this.grabbedStatic.setPosition(planck.Vec2(pos.x + wdx, pos.y + wdy));
     }
 
     if (this.tool === "erase" && e.buttons & 1) {
@@ -184,6 +190,7 @@ export class InputManager {
       this.game.world.destroyJoint(this.mouseJoint);
       this.mouseJoint = null;
     }
+    this.grabbedStatic = null;
     this.finishPlatformDraw();
   }
 
@@ -199,19 +206,18 @@ export class InputManager {
     let target: planck.Body | null = null;
     let bestDist = Number.POSITIVE_INFINITY;
 
-    // Use a generous search area, then pick the closest dynamic body
+    // Use a generous search area, then pick the closest body
     this.game.world.queryAABB(
       planck.AABB(planck.Vec2(wx - radius, wy - radius), planck.Vec2(wx + radius, wy + radius)),
       (fixture) => {
-        if (!fixture.getBody().isDynamic()) return true;
+        const body = fixture.getBody();
         // Exact hit: use immediately
         if (fixture.testPoint(point)) {
-          target = fixture.getBody();
+          target = body;
           bestDist = 0;
           return false;
         }
         // Proximity hit: pick closest body center within search area
-        const body = fixture.getBody();
         const d = planck.Vec2.lengthOf(planck.Vec2.sub(body.getPosition(), point));
         if (d < bestDist) {
           bestDist = d;
@@ -222,16 +228,15 @@ export class InputManager {
     );
 
     if (target) {
-      this.mouseJoint = this.game.world.createJoint(
-        planck.MouseJoint(
-          {
-            maxForce: 1000 * (target as planck.Body).getMass(),
-          },
-          this.groundBody,
-          target as planck.Body,
-          point,
-        ),
-      ) as planck.MouseJoint;
+      const t = target as planck.Body;
+      if (t.isDynamic()) {
+        this.mouseJoint = this.game.world.createJoint(
+          planck.MouseJoint({ maxForce: 1000 * t.getMass() }, this.groundBody, t, point),
+        ) as planck.MouseJoint;
+      } else {
+        // Static/kinematic: drag by directly moving position
+        this.grabbedStatic = t;
+      }
     }
   }
 
@@ -282,6 +287,7 @@ export class InputManager {
         this.game.world.destroyJoint(this.mouseJoint);
         this.mouseJoint = null;
       }
+      this.grabbedStatic = null;
 
       // Two-finger pan + pinch zoom
       const prevA = this.lastTouches[0];
@@ -306,9 +312,15 @@ export class InputManager {
       const t = cur[0];
 
       if (this.mouseJoint) {
-        // Dragging a grabbed object
+        // Dragging a grabbed dynamic object
         const world = this.game.camera.toWorld(t.x, t.y, this.game.canvas);
         this.mouseJoint.setTarget(planck.Vec2(world.x, world.y));
+      } else if (this.grabbedStatic) {
+        const prev = this.lastTouches.find((lt) => lt.id === t.id) ?? this.lastTouches[0];
+        const tdx = (t.x - prev.x) / this.game.camera.zoom;
+        const tdy = -(t.y - prev.y) / this.game.camera.zoom;
+        const pos = this.grabbedStatic.getPosition();
+        this.grabbedStatic.setPosition(planck.Vec2(pos.x + tdx, pos.y + tdy));
       } else if (this.tool === "erase") {
         this.toolCursor = { x: t.x, y: t.y };
         this.eraseAtScreen(t.x, t.y);
@@ -375,9 +387,12 @@ export class InputManager {
     if (e.touches.length === 0) this.toolCursor = null;
 
     // Release grab
-    if (e.touches.length === 0 && this.mouseJoint) {
-      this.game.world.destroyJoint(this.mouseJoint);
-      this.mouseJoint = null;
+    if (e.touches.length === 0) {
+      if (this.mouseJoint) {
+        this.game.world.destroyJoint(this.mouseJoint);
+        this.mouseJoint = null;
+      }
+      this.grabbedStatic = null;
     }
 
     this.lastTouches = this.snapTouches(e);
