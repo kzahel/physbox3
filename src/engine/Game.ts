@@ -23,6 +23,16 @@ import { Renderer } from "./Renderer";
 export const KILL_Y = -100;
 const TIMESTEP = 1 / 60;
 
+function applyMotorTorque(world: planck.World) {
+  for (let b = world.getBodyList(); b; b = b.getNext()) {
+    const ud = b.getUserData() as { motorSpeed?: number } | null;
+    if (ud?.motorSpeed == null) continue;
+    // Apply torque to reach target angular velocity
+    const error = ud.motorSpeed - b.getAngularVelocity();
+    b.applyTorque(error * 50, true);
+  }
+}
+
 export class Game {
   world: planck.World;
   camera: Camera;
@@ -258,6 +268,7 @@ export class Game {
       applyRocketThrust(this.world, this.renderer);
       applyBalloonLift(this.world);
       applyFanForce(this.world, this.renderer);
+      applyMotorTorque(this.world);
       this.accumulator += dt * this.timeScale;
       while (this.accumulator >= TIMESTEP) {
         this.world.step(TIMESTEP, this.velocityIterations, this.positionIterations);
