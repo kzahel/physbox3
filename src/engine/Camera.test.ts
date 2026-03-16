@@ -56,7 +56,7 @@ describe("Camera", () => {
     const cam = new Camera();
     const canvas = makeCanvas(800, 600);
     cam.zoomAt(400, 300, 0.01, canvas); // try to zoom way out
-    expect(cam.zoom).toBe(5);
+    expect(cam.zoom).toBe(1);
     cam.zoom = 30;
     cam.zoomAt(400, 300, 100, canvas); // try to zoom way in
     expect(cam.zoom).toBe(200);
