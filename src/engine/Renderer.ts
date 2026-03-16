@@ -1,7 +1,7 @@
 import type * as planck from "planck";
 import { ERASE_RADIUS_PX, GRAB_RADIUS_PX, type InputManager } from "../interaction/InputManager";
 import type { Camera } from "./Camera";
-import { KILL_Y } from "./Game";
+import { KILL_Y, KILL_Y_TOP } from "./Game";
 
 interface Particle {
   x: number;
@@ -44,8 +44,9 @@ export class Renderer {
     this.clear();
     const ctx = this.ctx;
 
-    // Draw ocean at kill floor
+    // Draw ocean at kill floor and sky at kill ceiling
     this.drawOcean(camera);
+    this.drawSky(camera);
 
     for (let body = world.getBodyList(); body; body = body.getNext()) {
       const pos = body.getPosition();
@@ -394,6 +395,42 @@ export class Renderer {
       ctx.lineTo(x, sy);
     }
     ctx.strokeStyle = "rgba(100, 180, 255, 0.5)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  private drawSky(camera: Camera) {
+    const ctx = this.ctx;
+    const cw = this.canvas.clientWidth;
+    const surface = camera.toScreen(0, KILL_Y_TOP, this.canvas);
+
+    // Only draw if sky boundary is visible (screen Y is inverted: sky is at top)
+    if (surface.y < 0) return;
+
+    const bottom = Math.min(this.canvas.clientHeight, surface.y);
+
+    // Sky fill above the boundary
+    ctx.fillStyle = "rgba(40, 60, 120, 0.3)";
+    ctx.fillRect(0, 0, cw, bottom);
+
+    // Gradient fade near the boundary line
+    const gradH = 60;
+    const grad = ctx.createLinearGradient(0, bottom - gradH, 0, bottom);
+    grad.addColorStop(0, "rgba(80, 120, 200, 0)");
+    grad.addColorStop(1, "rgba(80, 120, 200, 0.25)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, bottom - gradH, cw, gradH);
+
+    // Boundary line with wispy cloud effect
+    ctx.beginPath();
+    ctx.moveTo(0, surface.y);
+    for (let x = 0; x <= cw; x += 4) {
+      const wx = (x - cw / 2) / camera.zoom + camera.x;
+      const wisp = Math.sin(wx * 0.5) * 3 + Math.sin(wx * 1.2) * 1.5;
+      const sy = camera.toScreen(0, KILL_Y_TOP + wisp, this.canvas).y;
+      ctx.lineTo(x, sy);
+    }
+    ctx.strokeStyle = "rgba(180, 200, 255, 0.4)";
     ctx.lineWidth = 2;
     ctx.stroke();
   }
