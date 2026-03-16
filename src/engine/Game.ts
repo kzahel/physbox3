@@ -3,6 +3,7 @@ import type { InputManager } from "../interaction/InputManager";
 import { Camera } from "./Camera";
 import { Renderer } from "./Renderer";
 
+export const KILL_Y = -100;
 const TIMESTEP = 1 / 60;
 const VELOCITY_ITERS = 8;
 const POSITION_ITERS = 3;
@@ -189,7 +190,7 @@ export class Game {
     }
 
     // Kill floor: destroy dynamic bodies that fall too far
-    const killY = -100;
+    const killY = KILL_Y;
     const toRemove: planck.Body[] = [];
     let count = 0;
     for (let b = this.world.getBodyList(); b; b = b.getNext()) {

@@ -1,6 +1,7 @@
 import type * as planck from "planck";
 import { ERASE_RADIUS_PX, GRAB_RADIUS_PX, type InputManager } from "../interaction/InputManager";
 import type { Camera } from "./Camera";
+import { KILL_Y } from "./Game";
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
@@ -27,6 +28,9 @@ export class Renderer {
   drawWorld(world: planck.World, camera: Camera) {
     this.clear();
     const ctx = this.ctx;
+
+    // Draw ocean at kill floor
+    this.drawOcean(camera);
 
     for (let body = world.getBodyList(); body; body = body.getNext()) {
       const pos = body.getPosition();
@@ -185,6 +189,50 @@ export class Renderer {
     ctx.fill();
     ctx.setLineDash([]);
     ctx.restore();
+  }
+
+  private drawOcean(camera: Camera) {
+    const ctx = this.ctx;
+    const cw = this.canvas.clientWidth;
+    const ch = this.canvas.clientHeight;
+    const surface = camera.toScreen(0, KILL_Y, this.canvas);
+
+    // Only draw if ocean surface is visible
+    if (surface.y > ch) return;
+
+    const top = Math.max(0, surface.y);
+
+    // Water body
+    ctx.fillStyle = "rgba(20, 60, 120, 0.4)";
+    ctx.fillRect(0, top, cw, ch - top);
+
+    // Surface line with wave effect
+    ctx.beginPath();
+    ctx.moveTo(0, surface.y);
+    for (let x = 0; x <= cw; x += 4) {
+      const wx = (x - cw / 2) / camera.zoom + camera.x;
+      const wave = Math.sin(wx * 0.8) * 2 + Math.sin(wx * 1.5) * 1;
+      const sy = camera.toScreen(0, KILL_Y + wave, this.canvas).y;
+      ctx.lineTo(x, sy);
+    }
+    ctx.lineTo(cw, ch);
+    ctx.lineTo(0, ch);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(30, 80, 160, 0.3)";
+    ctx.fill();
+
+    // Surface highlight
+    ctx.beginPath();
+    ctx.moveTo(0, surface.y);
+    for (let x = 0; x <= cw; x += 4) {
+      const wx = (x - cw / 2) / camera.zoom + camera.x;
+      const wave = Math.sin(wx * 0.8) * 2 + Math.sin(wx * 1.5) * 1;
+      const sy = camera.toScreen(0, KILL_Y + wave, this.canvas).y;
+      ctx.lineTo(x, sy);
+    }
+    ctx.strokeStyle = "rgba(100, 180, 255, 0.5)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
 
   private drawToggleButton(bodyScreen: { x: number; y: number }, isStatic: boolean) {
