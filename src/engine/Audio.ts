@@ -15,6 +15,45 @@ export function unlockAudio() {
   }
 }
 
+/** Short bounce thud — rate-limited to avoid overwhelming audio */
+let lastBounceTime = 0;
+const BOUNCE_COOLDOWN = 0.04; // seconds between any bounce sounds
+const MAX_CONCURRENT_BOUNCES = 3;
+let activeBounces = 0;
+
+export function playBounce(intensity: number) {
+  const ac = getCtx();
+  if (ac.state === "suspended") return;
+  const now = ac.currentTime;
+
+  // Rate limit
+  if (now - lastBounceTime < BOUNCE_COOLDOWN) return;
+  if (activeBounces >= MAX_CONCURRENT_BOUNCES) return;
+  lastBounceTime = now;
+  activeBounces++;
+
+  // intensity 0–1 controls volume and pitch
+  const vol = 0.04 + intensity * 0.12; // quiet: 0.04 – 0.16
+  const pitch = 300 + (1 - intensity) * 500; // higher pitch for lighter hits
+  const dur = 0.04 + intensity * 0.06;
+
+  const osc = ac.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(pitch, now);
+  osc.frequency.exponentialRampToValueAtTime(pitch * 0.4, now + dur);
+
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(vol, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+  osc.connect(gain).connect(ac.destination);
+  osc.start(now);
+  osc.stop(now + dur);
+  osc.onended = () => {
+    activeBounces--;
+  };
+}
+
 /** Synthesized explosion: filtered noise burst + low-frequency boom */
 export function playExplosion(volume = 0.5) {
   const ac = getCtx();

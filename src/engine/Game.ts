@@ -1,6 +1,6 @@
 import * as planck from "planck";
 import type { InputManager } from "../interaction/InputManager";
-import { playExplosion, unlockAudio } from "./Audio";
+import { playBounce, playExplosion, unlockAudio } from "./Audio";
 import { Camera } from "./Camera";
 import { Renderer } from "./Renderer";
 
@@ -49,6 +49,26 @@ export class Game {
     unlockAudio();
 
     this.buildDefaultScene();
+    this.bindBounceSound();
+  }
+
+  private bindBounceSound() {
+    const MIN_SPEED = 2; // ignore gentle resting contacts
+    const MAX_SPEED = 15; // clamp for intensity calc
+
+    this.world.on("post-solve", (contact, impulse) => {
+      const ni = impulse.normalImpulses[0];
+      if (ni < MIN_SPEED) return;
+
+      // Check if either fixture is a circle (ball)
+      const fA = contact.getFixtureA();
+      const fB = contact.getFixtureB();
+      const isCircle = fA.getShape().getType() === "circle" || fB.getShape().getType() === "circle";
+      if (!isCircle) return;
+
+      const intensity = Math.min(1, (ni - MIN_SPEED) / (MAX_SPEED - MIN_SPEED));
+      playBounce(intensity);
+    });
   }
 
   private buildDefaultScene() {
