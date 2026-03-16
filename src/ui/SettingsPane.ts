@@ -10,6 +10,7 @@ export class SettingsPane {
       <div class="section-title">Actions</div>
       <label><button id="s-clear">Clear Dynamic</button></label>
       <label><button id="s-pause">${game.paused ? "Play" : "Pause"}</button></label>
+      <label><button id="s-fullscreen">Fullscreen</button></label>
 
       <div id="stats"></div>
     `;
@@ -28,6 +29,18 @@ export class SettingsPane {
     pauseBtn.addEventListener("click", () => {
       game.paused = !game.paused;
       pauseBtn.textContent = game.paused ? "Play" : "Pause";
+    });
+
+    const fsBtn = container.querySelector<HTMLButtonElement>("#s-fullscreen")!;
+    fsBtn.addEventListener("click", () => {
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else {
+        document.documentElement.requestFullscreen();
+      }
+    });
+    document.addEventListener("fullscreenchange", () => {
+      fsBtn.textContent = document.fullscreenElement ? "Exit Fullscreen" : "Fullscreen";
     });
 
     // Stats update
