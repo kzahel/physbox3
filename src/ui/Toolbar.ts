@@ -24,6 +24,7 @@ const ICONS: Record<Tool, string> = {
   scale: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><rect x="5" y="5" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="2 1"/><path d="M13 5l3-3M16 2v3h-3M5 13l-3 3M2 16v-3h3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   balloon: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><ellipse cx="9" cy="7" rx="5" ry="6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M9 13q-0.5 1 0 2t-1 2" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>`,
   fan: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><rect x="2" y="6" width="5" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M7 8h4M7 10h5M7 12h3" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-dasharray="2 1.5"/></svg>`,
+  cannon: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><rect x="2" y="6" width="8" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="7" width="5" height="4" rx="0.5" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="5" cy="14" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="10" cy="14" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>`,
   ragdoll: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><circle cx="9" cy="3" r="2" fill="none" stroke="currentColor" stroke-width="1.3"/><line x1="9" y1="5" x2="9" y2="11" stroke="currentColor" stroke-width="1.3"/><line x1="5" y1="8" x2="13" y2="8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="9" y1="11" x2="6" y2="16" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="9" y1="11" x2="12" y2="16" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`,
 };
 
@@ -41,6 +42,7 @@ const TOOLS: { id: Tool; label: string }[] = [
   { id: "balloon", label: "Balloon" },
   { id: "ragdoll", label: "Ragdoll" },
   { id: "fan", label: "Fan" },
+  { id: "cannon", label: "Cannon" },
   { id: "conveyor", label: "Belt" },
   { id: "dynamite", label: "TNT" },
   { id: "ropetool", label: "Tie" },

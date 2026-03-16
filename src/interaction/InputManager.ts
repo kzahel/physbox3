@@ -23,7 +23,8 @@ export type Tool =
   | "scale"
   | "balloon"
   | "fan"
-  | "ragdoll";
+  | "ragdoll"
+  | "cannon";
 
 export const ERASE_RADIUS_PX = 24; // CSS pixels
 export const GRAB_RADIUS_PX = 30; // CSS pixels — touch grab hit area
@@ -165,6 +166,7 @@ export class InputManager {
         break;
       case "conveyor":
       case "fan":
+      case "cannon":
         this.platformDraw = { start: { x: world.x, y: world.y }, end: { x: world.x, y: world.y } };
         break;
       case "dynamite":
@@ -315,7 +317,12 @@ export class InputManager {
         const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.canvas);
         this.startScale(world.x, world.y, t.clientY);
         this.touchToolFired = true;
-      } else if (this.tool === "platform" || this.tool === "conveyor" || this.tool === "fan") {
+      } else if (
+        this.tool === "platform" ||
+        this.tool === "conveyor" ||
+        this.tool === "fan" ||
+        this.tool === "cannon"
+      ) {
         const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.canvas);
         this.platformDraw = { start: { x: world.x, y: world.y }, end: { x: world.x, y: world.y } };
         this.touchToolFired = true;
@@ -520,6 +527,8 @@ export class InputManager {
         this.game.addConveyor(cx, cy, len, 3, angle);
       } else if (this.tool === "fan") {
         this.game.addFan(start.x, start.y, angle);
+      } else if (this.tool === "cannon") {
+        this.game.addCannon(start.x, start.y, angle);
       } else {
         this.game.addPlatform(cx, cy, len, angle);
       }

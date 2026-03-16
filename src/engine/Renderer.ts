@@ -160,6 +160,7 @@ export class Renderer {
     if (this.inputManager?.platformDraw) {
       const tool = this.inputManager.tool;
       const isFan = tool === "fan";
+      const isCannon = tool === "cannon";
       const isConveyor = tool === "conveyor";
       const { start, end } = this.inputManager.platformDraw;
       const s = camera.toScreen(start.x, start.y, this.canvas);
@@ -171,9 +172,11 @@ export class Renderer {
       ctx.lineTo(e.x, e.y);
       const color = isFan
         ? "rgba(120, 180, 220, 0.9)"
-        : isConveyor
-          ? "rgba(200, 160, 50, 0.9)"
-          : "rgba(80, 100, 80, 0.9)";
+        : isCannon
+          ? "rgba(180, 80, 80, 0.9)"
+          : isConveyor
+            ? "rgba(200, 160, 50, 0.9)"
+            : "rgba(80, 100, 80, 0.9)";
       ctx.strokeStyle = color;
       ctx.lineWidth = Math.max(4, 0.3 * camera.zoom);
       ctx.lineCap = "round";
@@ -187,8 +190,8 @@ export class Renderer {
         ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
         ctx.fill();
       }
-      // Fan: arrow at end to show direction
-      if (isFan) {
+      // Fan/cannon: arrow at end to show direction
+      if (isFan || isCannon) {
         const dx = e.x - s.x;
         const dy = e.y - s.y;
         const len = Math.hypot(dx, dy);

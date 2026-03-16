@@ -586,6 +586,103 @@ export class Game {
     return torso;
   }
 
+  addCannon(x: number, y: number, angle: number) {
+    // Cannon barrel
+    const body = this.world.createBody({ type: "static", position: planck.Vec2(x, y), angle });
+    body.createFixture({ shape: planck.Box(0.6, 0.3), friction: 0.5 });
+    // Barrel nozzle
+    body.createFixture({
+      shape: planck.Polygon([
+        planck.Vec2(0.4, -0.35),
+        planck.Vec2(0.8, -0.35),
+        planck.Vec2(0.8, 0.35),
+        planck.Vec2(0.4, 0.35),
+      ]),
+    });
+    body.setUserData({ fill: "rgba(80,80,90,0.9)", label: "cannon" });
+
+    const world = this.world;
+    const renderer = this.renderer;
+
+    const fire = () => {
+      if (!body.isActive()) return;
+      const pos = body.getPosition();
+      const a = body.getAngle();
+      const dirX = Math.cos(a);
+      const dirY = Math.sin(a);
+
+      // Spawn cannonball at the barrel tip
+      const spawnX = pos.x + dirX * 1.0;
+      const spawnY = pos.y + dirY * 1.0;
+      const ball = world.createBody({ type: "dynamic", position: planck.Vec2(spawnX, spawnY) });
+      ball.createFixture({ shape: planck.Circle(0.2), density: 5, friction: 0.3, restitution: 0.1 });
+      ball.setUserData({ fill: "rgba(40,40,40,0.9)", label: "cannonball" });
+      ball.setBullet(true);
+
+      // Launch velocity
+      const speed = 20;
+      ball.setLinearVelocity(planck.Vec2(dirX * speed, dirY * speed));
+
+      // Muzzle flash particles
+      renderer.spawnExplosion(spawnX, spawnY);
+
+      // Explode on first contact
+      let exploded = false;
+      world.on("begin-contact", (contact) => {
+        if (exploded) return;
+        const fA = contact.getFixtureA().getBody();
+        const fB = contact.getFixtureB().getBody();
+        if (fA !== ball && fB !== ball) return;
+        // Don't explode on the cannon itself
+        if (fA === body || fB === body) return;
+        exploded = true;
+        setTimeout(() => {
+          if (!ball.isActive()) return;
+          this.explodeAt(ball.getPosition().x, ball.getPosition().y, 5, 20);
+          world.destroyBody(ball);
+        }, 0);
+      });
+
+      // Self-destruct after 5s if no contact
+      setTimeout(() => {
+        if (!exploded && ball.isActive()) world.destroyBody(ball);
+      }, 5000);
+
+      setTimeout(fire, 1000);
+    };
+    setTimeout(fire, 500);
+
+    return body;
+  }
+
+  /** Reusable explosion: particles, sound, radial impulse */
+  explodeAt(wx: number, wy: number, radius: number, force: number) {
+    const center = planck.Vec2(wx, wy);
+    this.renderer.spawnExplosion(wx, wy);
+    playExplosion(0.3);
+
+    const affected: { body: planck.Body; dist: number }[] = [];
+    this.world.queryAABB(
+      planck.AABB(planck.Vec2(wx - radius, wy - radius), planck.Vec2(wx + radius, wy + radius)),
+      (fixture) => {
+        const b = fixture.getBody();
+        if (!b.isDynamic()) return true;
+        const d = planck.Vec2.lengthOf(planck.Vec2.sub(b.getPosition(), center));
+        if (d < radius) affected.push({ body: b, dist: d });
+        return true;
+      },
+    );
+
+    for (const { body: b, dist } of affected) {
+      const dir = planck.Vec2.sub(b.getPosition(), center);
+      const len = planck.Vec2.lengthOf(dir);
+      if (len < 0.01) continue;
+      const falloff = 1 - dist / radius;
+      const impulse = planck.Vec2.mul(dir, (force * falloff * b.getMass()) / len);
+      b.applyLinearImpulse(impulse, b.getPosition(), true);
+    }
+  }
+
   addFan(x: number, y: number, angle: number, force = 15, range = 10) {
     const body = this.world.createBody({ type: "static", position: planck.Vec2(x, y), angle });
     body.createFixture({ shape: planck.Box(0.4, 0.25), friction: 0.5 });
@@ -623,47 +720,12 @@ export class Game {
     });
 
     const world = this.world;
-    const renderer = this.renderer;
-    const blastRadius = 8;
-    const blastForce = 30;
 
     setTimeout(() => {
       if (!body.isActive()) return;
       const pos = body.getPosition();
-      const center = planck.Vec2(pos.x, pos.y);
-
-      // Explosion particles + sound
-      renderer.spawnExplosion(center.x, center.y);
-      playExplosion(0.5);
-
+      this.explodeAt(pos.x, pos.y, 8, 30);
       world.destroyBody(body);
-
-      // Apply radial impulse to nearby dynamic bodies
-      const affected: { body: planck.Body; dist: number }[] = [];
-      world.queryAABB(
-        planck.AABB(
-          planck.Vec2(center.x - blastRadius, center.y - blastRadius),
-          planck.Vec2(center.x + blastRadius, center.y + blastRadius),
-        ),
-        (fixture) => {
-          const b = fixture.getBody();
-          if (!b.isDynamic()) return true;
-          const d = planck.Vec2.lengthOf(planck.Vec2.sub(b.getPosition(), center));
-          if (d < blastRadius) {
-            affected.push({ body: b, dist: d });
-          }
-          return true;
-        },
-      );
-
-      for (const { body: b, dist } of affected) {
-        const dir = planck.Vec2.sub(b.getPosition(), center);
-        const len = planck.Vec2.lengthOf(dir);
-        if (len < 0.01) continue;
-        const falloff = 1 - dist / blastRadius;
-        const impulse = planck.Vec2.mul(dir, (blastForce * falloff * b.getMass()) / len);
-        b.applyLinearImpulse(impulse, b.getPosition(), true);
-      }
     }, fuseTime * 1000);
 
     return body;
