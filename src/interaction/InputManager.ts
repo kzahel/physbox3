@@ -626,7 +626,16 @@ export class InputManager {
 
   isDirectional(body: planck.Body): boolean {
     const label = this.getBodyLabel(body);
-    return label === "car" || label === "conveyor" || label === "rocket";
+    return label === "car" || label === "conveyor" || label === "rocket" || this.hasMotor(body);
+  }
+
+  hasMotor(body: planck.Body): boolean {
+    for (let j = this.game.world.getJointList(); j; j = j.getNext()) {
+      if (j.getType() !== "revolute-joint") continue;
+      const other = j.getBodyA() === body ? j.getBodyB() : j.getBodyB() === body ? j.getBodyA() : null;
+      if (other && this.getBodyLabel(other) === "motor-anchor") return true;
+    }
+    return false;
   }
 
   private handleSelect(wx: number, wy: number, sx: number, sy: number) {
@@ -643,12 +652,19 @@ export class InputManager {
       }
 
       // Direction button (below fixed/free, only for directional bodies)
+      let nextY = sp.y - 55;
       if (this.isDirectional(this.selectedBody)) {
-        const dirY = sp.y - 55;
-        if (Math.abs(sx - sp.x) < 40 && Math.abs(sy - dirY) < 14) {
+        if (Math.abs(sx - sp.x) < 40 && Math.abs(sy - nextY) < 14) {
           this.reverseDirection(this.selectedBody);
           return;
         }
+        nextY -= 25;
+      }
+
+      // Motor button
+      if (Math.abs(sx - sp.x) < 40 && Math.abs(sy - nextY) < 14) {
+        this.toggleMotor(this.selectedBody);
+        return;
       }
     }
     const body = this.findBodyAt(wx, wy);
@@ -676,6 +692,46 @@ export class InputManager {
         ud.thrust = -ud.thrust;
       }
     }
+    // Reverse motor joints
+    for (let j = this.game.world.getJointList(); j; j = j.getNext()) {
+      if (j.getType() !== "revolute-joint") continue;
+      const other = j.getBodyA() === body ? j.getBodyB() : j.getBodyB() === body ? j.getBodyA() : null;
+      if (other && this.getBodyLabel(other) === "motor-anchor") {
+        const rj = j as planck.RevoluteJoint;
+        rj.setMotorSpeed(-rj.getMotorSpeed());
+      }
+    }
+  }
+
+  private toggleMotor(body: planck.Body) {
+    // Check if motor already exists — if so, remove it
+    for (let j = this.game.world.getJointList(); j; j = j.getNext()) {
+      if (j.getType() !== "revolute-joint") continue;
+      const other = j.getBodyA() === body ? j.getBodyB() : j.getBodyB() === body ? j.getBodyA() : null;
+      if (other && this.getBodyLabel(other) === "motor-anchor") {
+        this.game.world.destroyJoint(j);
+        this.game.world.destroyBody(other);
+        return;
+      }
+    }
+
+    // Create motor: static anchor + revolute joint with motor
+    const pos = body.getPosition();
+    const anchor = this.game.world.createBody({ type: "static", position: planck.Vec2(pos.x, pos.y) });
+    anchor.createFixture({ shape: planck.Circle(0.01), isSensor: true });
+    anchor.setUserData({ label: "motor-anchor" });
+
+    // Make sure the body is dynamic so the motor can spin it
+    if (body.isStatic()) body.setType("dynamic");
+
+    this.game.world.createJoint(
+      planck.RevoluteJoint(
+        { enableMotor: true, motorSpeed: 5, maxMotorTorque: 100 },
+        anchor,
+        body,
+        planck.Vec2(pos.x, pos.y),
+      ),
+    );
   }
 
   private readonly CREATION_TOOLS = new Set<Tool>(["box", "ball", "rope", "car", "springball", "dynamite"]);

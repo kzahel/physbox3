@@ -205,9 +205,13 @@ export class Renderer {
       // Toggle button above body
       this.drawToggleButton(sp, body.isStatic());
       // Direction button for cars/conveyors
+      let nextBtnY = 55;
       if (this.inputManager.isDirectional(body)) {
-        this.drawDirectionButton(sp);
+        this.drawDirectionButton(sp, nextBtnY);
+        nextBtnY += 25;
       }
+      // Motor button
+      this.drawMotorButton(sp, nextBtnY, this.inputManager.hasMotor(body));
     }
   }
 
@@ -235,14 +239,14 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawDirectionButton(bodyScreen: { x: number; y: number }) {
+  private drawDirectionButton(bodyScreen: { x: number; y: number }, offsetY = 55) {
     const ctx = this.ctx;
     ctx.save();
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const x = bodyScreen.x;
-    const y = bodyScreen.y - 55;
+    const y = bodyScreen.y - offsetY;
 
     // Pill button
     const w = 38;
@@ -261,6 +265,34 @@ export class Renderer {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("\u21C4 Flip", x, y);
+
+    ctx.restore();
+  }
+
+  private drawMotorButton(bodyScreen: { x: number; y: number }, offsetY: number, active: boolean) {
+    const ctx = this.ctx;
+    ctx.save();
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const x = bodyScreen.x;
+    const y = bodyScreen.y - offsetY;
+
+    const w = 38;
+    const h = 18;
+    ctx.beginPath();
+    ctx.roundRect(x - w, y - h / 2, w * 2, h, h / 2);
+    ctx.fillStyle = active ? "rgba(255, 160, 50, 0.85)" : "rgba(120, 120, 140, 0.85)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 11px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(active ? "\u2699 Motor" : "\u2699 Motor", x, y);
 
     ctx.restore();
   }
