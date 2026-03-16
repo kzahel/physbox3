@@ -5,13 +5,13 @@ export type Tool =
   | "box"
   | "ball"
   | "platform"
-  | "rope"
   | "car"
   | "springball"
   | "launcher"
   | "conveyor"
   | "dynamite"
   | "ropetool"
+  | "spring"
   | "grab"
   | "erase"
   | "attach"
@@ -143,9 +143,6 @@ export class InputManager {
       case "platform":
         this.platformDraw = { start: { x: world.x, y: world.y }, end: { x: world.x, y: world.y } };
         break;
-      case "rope":
-        this.game.addChainRope(world.x, world.y, 8);
-        break;
       case "car":
         this.game.addCar(world.x, world.y);
         break;
@@ -188,6 +185,9 @@ export class InputManager {
         break;
       case "ropetool":
         this.handleRopeTool(world.x, world.y);
+        break;
+      case "spring":
+        this.handleSpringTool(world.x, world.y);
         break;
       case "detach":
         this.handleDetach(world.x, world.y);
@@ -454,9 +454,6 @@ export class InputManager {
         case "ball":
           this.game.addBall(world.x, world.y);
           break;
-        case "rope":
-          this.game.addChainRope(world.x, world.y, 8);
-          break;
         case "car":
           this.game.addCar(world.x, world.y);
           break;
@@ -493,6 +490,9 @@ export class InputManager {
         }
         case "ropetool":
           this.handleRopeTool(world.x, world.y);
+          break;
+        case "spring":
+          this.handleSpringTool(world.x, world.y);
           break;
         case "detach":
           this.handleDetach(world.x, world.y);
@@ -724,6 +724,20 @@ export class InputManager {
     } else {
       const a = this.ropePending;
       if (!(a.body && a.body === body)) {
+        this.game.addRopeBetween(a.x, a.y, wx, wy, a.body, body);
+      }
+      this.ropePending = null;
+    }
+  }
+
+  private handleSpringTool(wx: number, wy: number) {
+    const body = this.findBodyAt(wx, wy);
+
+    if (!this.ropePending) {
+      this.ropePending = { body, x: wx, y: wy };
+    } else {
+      const a = this.ropePending;
+      if (!(a.body && a.body === body)) {
         this.game.addSpring(a.x, a.y, wx, wy, a.body, body);
       }
       this.ropePending = null;
@@ -946,7 +960,6 @@ export class InputManager {
   private readonly CREATION_TOOLS = new Set<Tool>([
     "box",
     "ball",
-    "rope",
     "car",
     "springball",
     "dynamite",
@@ -979,9 +992,6 @@ export class InputManager {
         break;
       case "ball":
         this.game.addBall(wx, wy);
-        break;
-      case "rope":
-        this.game.addChainRope(wx, wy, 8);
         break;
       case "car":
         this.game.addCar(wx, wy);

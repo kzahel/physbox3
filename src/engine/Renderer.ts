@@ -150,7 +150,7 @@ export class Renderer {
         this.drawToolCursor(pos, 10, "rgba(255, 100, 50, 0.6)", "rgba(255, 100, 50, 0.05)");
       } else if (tool === "attract") {
         this.drawToolCursor(pos, 10, "rgba(50, 255, 150, 0.6)", "rgba(50, 255, 150, 0.05)");
-      } else if (tool === "ropetool") {
+      } else if (tool === "ropetool" || tool === "spring") {
         this.drawToolCursor(pos, 10, "rgba(180, 160, 120, 0.6)", "rgba(180, 160, 120, 0.05)");
       } else if (tool === "glue") {
         this.drawToolCursor(pos, GLUE_RADIUS_PX, "rgba(255, 220, 50, 0.7)", "rgba(255, 220, 50, 0.1)");
