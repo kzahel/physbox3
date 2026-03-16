@@ -12,6 +12,7 @@ const ICONS: Record<Tool, string> = {
   attach: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><circle cx="5" cy="9" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="9" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="8" y1="9" x2="10" y2="9" stroke="currentColor" stroke-width="1.5"/></svg>`,
   detach: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><circle cx="5" cy="9" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="9" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="8" y1="7" x2="10" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="10" y1="7" x2="8" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
   attract: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><circle cx="4" cy="9" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="14" cy="9" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 9h2M10 7l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  select: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><path d="M4 3l10 6-5 1-2 5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
 };
 
 const TOOLS: { id: Tool; label: string }[] = [
@@ -24,6 +25,7 @@ const TOOLS: { id: Tool; label: string }[] = [
   { id: "attach", label: "Attach" },
   { id: "detach", label: "Detach" },
   { id: "attract", label: "Attach+" },
+  { id: "select", label: "Select" },
 ];
 
 export class Toolbar {

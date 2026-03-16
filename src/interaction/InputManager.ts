@@ -1,7 +1,7 @@
 import * as planck from "planck";
 import type { Game } from "../engine/Game";
 
-export type Tool = "box" | "ball" | "platform" | "rope" | "grab" | "erase" | "attach" | "detach" | "attract";
+export type Tool = "box" | "ball" | "platform" | "rope" | "grab" | "erase" | "attach" | "detach" | "attract" | "select";
 
 export const ERASE_RADIUS_PX = 24; // CSS pixels
 export const GRAB_RADIUS_PX = 30; // CSS pixels — touch grab hit area
@@ -21,6 +21,9 @@ export class InputManager {
 
   // Platform drawing state (world coords)
   platformDraw: { start: { x: number; y: number }; end: { x: number; y: number } } | null = null;
+
+  // Select tool state
+  selectedBody: planck.Body | null = null;
 
   // Tool cursor position (screen coords, null when not active)
   toolCursor: { x: number; y: number } | null = null;
@@ -116,6 +119,9 @@ export class InputManager {
         break;
       case "attract":
         this.handleAttract(world.x, world.y);
+        break;
+      case "select":
+        this.handleSelect(world.x, world.y, e.clientX, e.clientY);
         break;
     }
   }
@@ -315,6 +321,9 @@ export class InputManager {
         case "attract":
           this.handleAttract(world.x, world.y);
           break;
+        case "select":
+          this.handleSelect(world.x, world.y, t.x, t.y);
+          break;
       }
     }
 
@@ -489,6 +498,25 @@ export class InputManager {
     });
   }
 
+  private handleSelect(wx: number, wy: number, sx: number, sy: number) {
+    // Check if clicking the toggle button for current selection
+    if (this.selectedBody) {
+      const pos = this.selectedBody.getPosition();
+      const sp = this.game.camera.toScreen(pos.x, pos.y, this.game.canvas);
+      const btnX = sp.x;
+      const btnY = sp.y - 30;
+      if (Math.abs(sx - btnX) < 40 && Math.abs(sy - btnY) < 14) {
+        // Toggle static/dynamic
+        const isStatic = this.selectedBody.isStatic();
+        this.selectedBody.setType(isStatic ? "dynamic" : "static");
+        return;
+      }
+    }
+    // Select a new body or deselect
+    const body = this.findBodyAt(wx, wy);
+    this.selectedBody = body;
+  }
+
   resetGroundBody() {
     this.groundBody = this.game.world.createBody({ type: "static" });
   }
@@ -496,6 +524,7 @@ export class InputManager {
   setTool(tool: Tool) {
     this.tool = tool;
     this.attachPending = null;
+    this.selectedBody = null;
     this.cancelAttract();
     this.onToolChange?.(tool);
   }

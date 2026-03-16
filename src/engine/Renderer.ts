@@ -150,6 +150,17 @@ export class Renderer {
       const sp = camera.toScreen(bpos.x, bpos.y, this.canvas);
       this.drawToolCursor(sp, 16, "rgba(255, 200, 50, 0.9)", "rgba(255, 200, 50, 0.15)");
     }
+
+    // Draw select tool UI
+    if (this.inputManager?.selectedBody) {
+      const body = this.inputManager.selectedBody;
+      const bpos = body.getPosition();
+      const sp = camera.toScreen(bpos.x, bpos.y, this.canvas);
+      // Selection highlight ring
+      this.drawToolCursor(sp, 20, "rgba(100, 200, 255, 0.8)", "rgba(100, 200, 255, 0.08)");
+      // Toggle button above body
+      this.drawToggleButton(sp, body.isStatic());
+    }
   }
 
   setInputManager(input: InputManager) {
@@ -173,6 +184,38 @@ export class Renderer {
     ctx.fillStyle = fill;
     ctx.fill();
     ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  private drawToggleButton(bodyScreen: { x: number; y: number }, isStatic: boolean) {
+    const ctx = this.ctx;
+    ctx.save();
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const x = bodyScreen.x;
+    const y = bodyScreen.y - 30;
+    const label = isStatic ? "Fixed" : "Free";
+    const bg = isStatic ? "rgba(200, 80, 80, 0.85)" : "rgba(80, 160, 80, 0.85)";
+
+    // Pill button
+    const w = 38;
+    const h = 18;
+    ctx.beginPath();
+    ctx.roundRect(x - w, y - h / 2, w * 2, h, h / 2);
+    ctx.fillStyle = bg;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Label
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 11px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, x, y);
+
     ctx.restore();
   }
 
