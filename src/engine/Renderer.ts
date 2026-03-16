@@ -740,13 +740,14 @@ export class Renderer {
       ctx.lineTo(sb.x, sb.y);
       ctx.stroke();
 
-      // Anchor dots
+      // Anchor dots (scale with zoom, 0.1m world radius)
+      const r = Math.max(0.1 * camera.zoom, 1);
       ctx.fillStyle = "rgba(150,200,255,0.6)";
       ctx.beginPath();
-      ctx.arc(sa.x, sa.y, 3, 0, Math.PI * 2);
+      ctx.arc(sa.x, sa.y, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(sb.x, sb.y, 3, 0, Math.PI * 2);
+      ctx.arc(sb.x, sb.y, r, 0, Math.PI * 2);
       ctx.fill();
     }
   }
