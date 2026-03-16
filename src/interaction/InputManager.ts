@@ -20,7 +20,8 @@ export type Tool =
   | "select"
   | "seesaw"
   | "rocket"
-  | "scale";
+  | "scale"
+  | "balloon";
 
 export const ERASE_RADIUS_PX = 24; // CSS pixels
 export const GRAB_RADIUS_PX = 30; // CSS pixels — touch grab hit area
@@ -152,6 +153,9 @@ export class InputManager {
         break;
       case "rocket":
         this.game.addRocket(world.x, world.y);
+        break;
+      case "balloon":
+        this.game.addBalloon(world.x, world.y);
         break;
       case "conveyor":
         this.platformDraw = { start: { x: world.x, y: world.y }, end: { x: world.x, y: world.y } };
@@ -420,6 +424,9 @@ export class InputManager {
           break;
         case "rocket":
           this.game.addRocket(world.x, world.y);
+          break;
+        case "balloon":
+          this.game.addBalloon(world.x, world.y);
           break;
         case "dynamite":
           this.game.addDynamite(world.x, world.y);
@@ -765,12 +772,15 @@ export class InputManager {
 
     this.game.world.createJoint(
       planck.RevoluteJoint(
-        { enableMotor: true, motorSpeed: 5, maxMotorTorque: 100 },
+        { enableMotor: true, motorSpeed: 5, maxMotorTorque: 500 },
         anchor,
         body,
         planck.Vec2(pos.x, pos.y),
       ),
     );
+
+    // Wake body so motor takes effect immediately
+    body.setAwake(true);
   }
 
   private readonly CREATION_TOOLS = new Set<Tool>([
@@ -781,6 +791,7 @@ export class InputManager {
     "springball",
     "dynamite",
     "rocket",
+    "balloon",
     "seesaw",
     "launcher",
   ]);
@@ -823,6 +834,9 @@ export class InputManager {
         break;
       case "rocket":
         this.game.addRocket(wx, wy);
+        break;
+      case "balloon":
+        this.game.addBalloon(wx, wy);
         break;
       case "seesaw":
         this.game.addSeesaw(wx, wy);
