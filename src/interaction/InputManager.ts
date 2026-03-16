@@ -17,7 +17,8 @@ export type Tool =
   | "attach"
   | "detach"
   | "attract"
-  | "select";
+  | "select"
+  | "seesaw";
 
 export const ERASE_RADIUS_PX = 24; // CSS pixels
 export const GRAB_RADIUS_PX = 30; // CSS pixels — touch grab hit area
@@ -140,6 +141,9 @@ export class InputManager {
         break;
       case "launcher":
         this.game.addLauncher(world.x, world.y);
+        break;
+      case "seesaw":
+        this.game.addSeesaw(world.x, world.y);
         break;
       case "conveyor":
         this.game.addConveyor(world.x, world.y);
@@ -383,6 +387,9 @@ export class InputManager {
           break;
         case "launcher":
           this.game.addLauncher(world.x, world.y);
+          break;
+        case "seesaw":
+          this.game.addSeesaw(world.x, world.y);
           break;
         case "conveyor":
           this.game.addConveyor(world.x, world.y);

@@ -305,6 +305,30 @@ export class Game {
     return chassis;
   }
 
+  addSeesaw(x: number, y: number) {
+    // Triangular fulcrum (static)
+    const fulcrum = this.world.createBody({ type: "static", position: planck.Vec2(x, y) });
+    fulcrum.createFixture({
+      shape: planck.Polygon([
+        planck.Vec2(-0.6, 0),
+        planck.Vec2(0.6, 0),
+        planck.Vec2(0, 0.8),
+      ]),
+      friction: 0.5,
+    });
+    fulcrum.setUserData({ fill: "rgba(140,120,100,0.9)" });
+
+    // Plank (dynamic)
+    const plank = this.world.createBody({ type: "dynamic", position: planck.Vec2(x, y + 1) });
+    plank.createFixture({ shape: planck.Box(3, 0.15), density: 1, friction: 0.7 });
+    plank.setUserData({ fill: "rgba(180,140,80,0.9)" });
+
+    // Hinge at the top of the fulcrum
+    this.world.createJoint(planck.RevoluteJoint({}, fulcrum, plank, planck.Vec2(x, y + 0.8)));
+
+    return plank;
+  }
+
   addConveyor(x: number, y: number, w = 6, speed = 3) {
     const body = this.world.createBody({ type: "kinematic", position: planck.Vec2(x, y) });
     const fixture = body.createFixture({ shape: planck.Box(w / 2, 0.2), friction: 1 });
