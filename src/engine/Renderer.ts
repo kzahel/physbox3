@@ -1,5 +1,5 @@
-import * as planck from 'planck';
-import type { Camera } from './Camera';
+import type * as planck from "planck";
+import type { Camera } from "./Camera";
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
@@ -7,7 +7,7 @@ export class Renderer {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d')!;
+    this.ctx = canvas.getContext("2d")!;
   }
 
   resize() {
@@ -44,12 +44,12 @@ export class Renderer {
 
         // Style
         const fillColor = userData?.fill ?? this.bodyColor(body);
-        const strokeColor = userData?.stroke ?? 'rgba(255,255,255,0.3)';
-        ctx.fillStyle = isSensor ? 'rgba(100,200,255,0.15)' : fillColor;
+        const strokeColor = userData?.stroke ?? "rgba(255,255,255,0.3)";
+        ctx.fillStyle = isSensor ? "rgba(100,200,255,0.15)" : fillColor;
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 1 / camera.zoom;
 
-        if (shape.getType() === 'circle') {
+        if (shape.getType() === "circle") {
           const circle = shape as planck.CircleShape;
           const r = circle.getRadius();
           const center = circle.getCenter();
@@ -62,7 +62,7 @@ export class Renderer {
           ctx.moveTo(center.x, center.y);
           ctx.lineTo(center.x + r, center.y);
           ctx.stroke();
-        } else if (shape.getType() === 'polygon') {
+        } else if (shape.getType() === "polygon") {
           const poly = shape as planck.PolygonShape;
           const verts = poly.m_vertices;
           ctx.beginPath();
@@ -73,13 +73,13 @@ export class Renderer {
           ctx.closePath();
           ctx.fill();
           ctx.stroke();
-        } else if (shape.getType() === 'edge') {
+        } else if (shape.getType() === "edge") {
           const edge = shape as planck.EdgeShape;
           ctx.beginPath();
           ctx.moveTo(edge.m_vertex1.x, edge.m_vertex1.y);
           ctx.lineTo(edge.m_vertex2.x, edge.m_vertex2.y);
           ctx.stroke();
-        } else if (shape.getType() === 'chain') {
+        } else if (shape.getType() === "chain") {
           const chain = shape as planck.ChainShape;
           const verts = chain.m_vertices;
           ctx.beginPath();
@@ -100,7 +100,7 @@ export class Renderer {
 
   private drawJoints(world: planck.World, camera: Camera) {
     const ctx = this.ctx;
-    ctx.strokeStyle = 'rgba(150,200,255,0.4)';
+    ctx.strokeStyle = "rgba(150,200,255,0.4)";
     ctx.lineWidth = 1;
 
     for (let joint = world.getJointList(); joint; joint = joint.getNext()) {
@@ -115,7 +115,7 @@ export class Renderer {
       ctx.stroke();
 
       // Anchor dots
-      ctx.fillStyle = 'rgba(150,200,255,0.6)';
+      ctx.fillStyle = "rgba(150,200,255,0.6)";
       ctx.beginPath();
       ctx.arc(sa.x, sa.y, 3, 0, Math.PI * 2);
       ctx.fill();
@@ -126,10 +126,10 @@ export class Renderer {
   }
 
   private bodyColor(body: planck.Body): string {
-    if (body.isStatic()) return 'rgba(80,80,100,0.8)';
-    if (body.isKinematic()) return 'rgba(100,180,100,0.6)';
+    if (body.isStatic()) return "rgba(80,80,100,0.8)";
+    if (body.isKinematic()) return "rgba(100,180,100,0.6)";
     const ud = body.getUserData() as BodyStyle | null;
-    return ud?.fill ?? 'rgba(120,160,255,0.6)';
+    return ud?.fill ?? "rgba(120,160,255,0.6)";
   }
 }
 

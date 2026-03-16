@@ -1,12 +1,12 @@
-import type { InputManager, Tool } from '../interaction/InputManager';
+import type { InputManager, Tool } from "../interaction/InputManager";
 
 const TOOLS: { id: Tool; label: string }[] = [
-  { id: 'grab', label: 'Grab' },
-  { id: 'box', label: 'Box' },
-  { id: 'ball', label: 'Ball' },
-  { id: 'platform', label: 'Platform' },
-  { id: 'rope', label: 'Rope' },
-  { id: 'erase', label: 'Erase' },
+  { id: "grab", label: "Grab" },
+  { id: "box", label: "Box" },
+  { id: "ball", label: "Ball" },
+  { id: "platform", label: "Platform" },
+  { id: "rope", label: "Rope" },
+  { id: "erase", label: "Erase" },
 ];
 
 export class Toolbar {
@@ -14,9 +14,9 @@ export class Toolbar {
 
   constructor(container: HTMLElement, input: InputManager) {
     for (const t of TOOLS) {
-      const btn = document.createElement('button');
+      const btn = document.createElement("button");
       btn.textContent = t.label;
-      btn.addEventListener('click', () => input.setTool(t.id));
+      btn.addEventListener("click", () => input.setTool(t.id));
       container.appendChild(btn);
       this.buttons.set(t.id, btn);
     }
@@ -25,8 +25,8 @@ export class Toolbar {
     this.highlight(input.tool);
 
     // Keyboard shortcuts: 1-6
-    window.addEventListener('keydown', (e) => {
-      const idx = parseInt(e.key) - 1;
+    window.addEventListener("keydown", (e) => {
+      const idx = parseInt(e.key, 10) - 1;
       if (idx >= 0 && idx < TOOLS.length) {
         input.setTool(TOOLS[idx].id);
       }
@@ -35,7 +35,7 @@ export class Toolbar {
 
   private highlight(tool: Tool) {
     for (const [id, btn] of this.buttons) {
-      btn.classList.toggle('active', id === tool);
+      btn.classList.toggle("active", id === tool);
     }
   }
 }

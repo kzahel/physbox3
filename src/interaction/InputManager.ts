@@ -1,10 +1,10 @@
-import * as planck from 'planck';
-import type { Game } from '../engine/Game';
+import * as planck from "planck";
+import type { Game } from "../engine/Game";
 
-export type Tool = 'box' | 'ball' | 'platform' | 'rope' | 'grab' | 'erase';
+export type Tool = "box" | "ball" | "platform" | "rope" | "grab" | "erase";
 
 export class InputManager {
-  tool: Tool = 'grab';
+  tool: Tool = "grab";
   private mouseJoint: planck.MouseJoint | null = null;
   private groundBody: planck.Body;
   private isPanning = false;
@@ -18,35 +18,35 @@ export class InputManager {
 
   constructor(game: Game) {
     this.game = game;
-    this.groundBody = game.world.createBody({ type: 'static' });
+    this.groundBody = game.world.createBody({ type: "static" });
     this.bind();
   }
 
   private bind() {
     const canvas = this.game.canvas;
 
-    canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
-    canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
-    canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
-    canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvas.addEventListener("mousedown", (e) => this.onMouseDown(e));
+    canvas.addEventListener("mousemove", (e) => this.onMouseMove(e));
+    canvas.addEventListener("mouseup", (e) => this.onMouseUp(e));
+    canvas.addEventListener("wheel", (e) => this.onWheel(e), { passive: false });
+    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    window.addEventListener('keydown', (e) => {
+    window.addEventListener("keydown", (e) => {
       this.keys.add(e.key);
-      if (e.key === ' ') {
+      if (e.key === " ") {
         e.preventDefault();
         this.game.paused = !this.game.paused;
       }
     });
-    window.addEventListener('keyup', (e) => this.keys.delete(e.key));
+    window.addEventListener("keyup", (e) => this.keys.delete(e.key));
 
     // Camera pan with WASD
     const panSpeed = 8;
     const tick = () => {
-      if (this.keys.has('w') || this.keys.has('W')) this.game.camera.y += panSpeed / this.game.camera.zoom;
-      if (this.keys.has('s') || this.keys.has('S')) this.game.camera.y -= panSpeed / this.game.camera.zoom;
-      if (this.keys.has('a') || this.keys.has('A')) this.game.camera.x -= panSpeed / this.game.camera.zoom;
-      if (this.keys.has('d') || this.keys.has('D')) this.game.camera.x += panSpeed / this.game.camera.zoom;
+      if (this.keys.has("w") || this.keys.has("W")) this.game.camera.y += panSpeed / this.game.camera.zoom;
+      if (this.keys.has("s") || this.keys.has("S")) this.game.camera.y -= panSpeed / this.game.camera.zoom;
+      if (this.keys.has("a") || this.keys.has("A")) this.game.camera.x -= panSpeed / this.game.camera.zoom;
+      if (this.keys.has("d") || this.keys.has("D")) this.game.camera.x += panSpeed / this.game.camera.zoom;
       requestAnimationFrame(tick);
     };
     tick();
@@ -64,22 +64,22 @@ export class InputManager {
     const world = this.game.camera.toWorld(e.clientX, e.clientY, this.game.canvas);
 
     switch (this.tool) {
-      case 'grab':
+      case "grab":
         this.startGrab(world.x, world.y);
         break;
-      case 'box':
+      case "box":
         this.game.addBox(world.x, world.y);
         break;
-      case 'ball':
+      case "ball":
         this.game.addBall(world.x, world.y);
         break;
-      case 'platform':
+      case "platform":
         this.game.addPlatform(world.x, world.y, 6);
         break;
-      case 'rope':
+      case "rope":
         this.game.addChainRope(world.x, world.y, 8);
         break;
-      case 'erase':
+      case "erase":
         this.game.destroyBodyAt(world.x, world.y);
         break;
     }
@@ -100,7 +100,7 @@ export class InputManager {
       this.mouseJoint.setTarget(planck.Vec2(world.x, world.y));
     }
 
-    if (this.tool === 'erase' && (e.buttons & 1)) {
+    if (this.tool === "erase" && e.buttons & 1) {
       const world = this.game.camera.toWorld(e.clientX, e.clientY, this.game.canvas);
       this.game.destroyBodyAt(world.x, world.y);
     }
@@ -137,9 +137,14 @@ export class InputManager {
 
     if (target) {
       this.mouseJoint = this.game.world.createJoint(
-        planck.MouseJoint({
-          maxForce: 1000 * (target as planck.Body).getMass(),
-        }, this.groundBody, target as planck.Body, point),
+        planck.MouseJoint(
+          {
+            maxForce: 1000 * (target as planck.Body).getMass(),
+          },
+          this.groundBody,
+          target as planck.Body,
+          point,
+        ),
       ) as planck.MouseJoint;
     }
   }

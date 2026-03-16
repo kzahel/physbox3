@@ -1,4 +1,4 @@
-import type { Game } from '../engine/Game';
+import type { Game } from "../engine/Game";
 
 export class SettingsPane {
   constructor(container: HTMLElement, game: Game) {
@@ -9,27 +9,29 @@ export class SettingsPane {
 
       <div class="section-title">Actions</div>
       <label><button id="s-clear">Clear Dynamic</button></label>
-      <label><button id="s-pause">${game.paused ? 'Play' : 'Pause'}</button></label>
+      <label><button id="s-pause">${game.paused ? "Play" : "Pause"}</button></label>
 
       <div id="stats"></div>
     `;
 
-    const gravSlider = container.querySelector<HTMLInputElement>('#s-gravity')!;
-    gravSlider.addEventListener('input', () => game.setGravity(parseFloat(gravSlider.value)));
+    const gravSlider = container.querySelector<HTMLInputElement>("#s-gravity")!;
+    gravSlider.addEventListener("input", () => game.setGravity(parseFloat(gravSlider.value)));
 
-    const speedSlider = container.querySelector<HTMLInputElement>('#s-speed')!;
-    speedSlider.addEventListener('input', () => { game.timeScale = parseFloat(speedSlider.value); });
+    const speedSlider = container.querySelector<HTMLInputElement>("#s-speed")!;
+    speedSlider.addEventListener("input", () => {
+      game.timeScale = parseFloat(speedSlider.value);
+    });
 
-    container.querySelector('#s-clear')!.addEventListener('click', () => game.clearDynamic());
+    container.querySelector("#s-clear")!.addEventListener("click", () => game.clearDynamic());
 
-    const pauseBtn = container.querySelector<HTMLButtonElement>('#s-pause')!;
-    pauseBtn.addEventListener('click', () => {
+    const pauseBtn = container.querySelector<HTMLButtonElement>("#s-pause")!;
+    pauseBtn.addEventListener("click", () => {
       game.paused = !game.paused;
-      pauseBtn.textContent = game.paused ? 'Play' : 'Pause';
+      pauseBtn.textContent = game.paused ? "Play" : "Pause";
     });
 
     // Stats update
-    const statsEl = container.querySelector('#stats')!;
+    const statsEl = container.querySelector("#stats")!;
     setInterval(() => {
       statsEl.textContent = `FPS: ${game.fps} | Bodies: ${game.bodyCount}`;
     }, 500);
