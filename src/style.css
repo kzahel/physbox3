@@ -65,31 +65,6 @@ body {
   color: #fff;
 }
 
-/* Play/Pause button */
-#play-pause {
-  position: fixed;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  width: 44px;
-  height: 44px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 50%;
-  background: rgba(20, 20, 40, 0.85);
-  backdrop-filter: blur(8px);
-  color: #ccc;
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-#play-pause:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-}
-
 /* Bottom tools panel */
 #bottom-tools {
   position: fixed;
@@ -99,12 +74,6 @@ body {
   display: flex;
   gap: 8px;
   z-index: 10;
-  /* shift right to not overlap play/pause */
-  margin-left: 32px;
-}
-
-#bottom-tools:empty {
-  display: none;
 }
 
 #bottom-tools button {

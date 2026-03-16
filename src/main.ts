@@ -11,22 +11,28 @@ game.inputManager = input;
 game.renderer.setInputManager(input);
 
 new Toolbar(document.getElementById("toolbar")!, input);
-new SettingsPane(document.getElementById("settings")!, game);
+
+// Bottom tools bar (play/pause + extras)
+const bottomTools = document.getElementById("bottom-tools")!;
 
 // Play/Pause button
-const playPauseBtn = document.getElementById("play-pause")!;
+const playPauseBtn = document.createElement("button");
+playPauseBtn.setAttribute("aria-label", "Play/Pause");
+playPauseBtn.style.fontSize = "20px";
+playPauseBtn.style.width = "44px";
+playPauseBtn.style.borderRadius = "50%";
+playPauseBtn.style.padding = "8px";
 const updatePlayPause = () => {
   playPauseBtn.textContent = game.paused ? "\u25B6" : "\u23F8";
 };
+updatePlayPause();
 playPauseBtn.addEventListener("click", () => {
   game.paused = !game.paused;
-  updatePlayPause();
 });
-// Sync when paused via spacebar or settings pane
 game.onPauseChange = updatePlayPause;
+bottomTools.appendChild(playPauseBtn);
 
-// Bottom tools
-const bottomTools = document.getElementById("bottom-tools")!;
+// Tilt gravity (only on devices with orientation sensor)
 if (TiltGravity.isSupported()) {
   const tilt = new TiltGravity(game);
   const tiltBtn = document.createElement("button");
@@ -38,6 +44,9 @@ if (TiltGravity.isSupported()) {
   });
   bottomTools.appendChild(tiltBtn);
 }
+
+// Settings pane (after onPauseChange is set so it can chain)
+new SettingsPane(document.getElementById("settings")!, game);
 
 // Mobile hamburger sidebar toggle
 const hamburger = document.getElementById("hamburger")!;
