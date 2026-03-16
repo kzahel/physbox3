@@ -36,6 +36,10 @@ export class InputManager {
   // Select tool state
   selectedBody: planck.Body | null = null;
 
+  // Multi-placement mode
+  multiPlace = false;
+  private multiPlaceInterval: ReturnType<typeof setInterval> | null = null;
+
   // Tool cursor position (screen coords, null when not active)
   toolCursor: { x: number; y: number } | null = null;
 
@@ -138,6 +142,7 @@ export class InputManager {
         this.handleSelect(world.x, world.y, e.clientX, e.clientY);
         break;
     }
+    this.startMultiPlace();
   }
 
   private onMouseMove(e: MouseEvent) {
@@ -170,6 +175,7 @@ export class InputManager {
 
   private onMouseUp(_e: MouseEvent) {
     this.isPanning = false;
+    this.stopMultiPlace();
     if (this.mouseJoint) {
       this.game.world.destroyJoint(this.mouseJoint);
       this.mouseJoint = null;
@@ -252,6 +258,12 @@ export class InputManager {
         this.toolCursor = { x: t.clientX, y: t.clientY };
         this.eraseAtScreen(t.clientX, t.clientY);
         this.touchToolFired = true;
+      } else if (this.multiPlace && this.CREATION_TOOLS.has(this.tool)) {
+        const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.canvas);
+        this.placeCreationTool(world.x, world.y);
+        this.lastMouse = { x: t.clientX, y: t.clientY };
+        this.startMultiPlace();
+        this.touchToolFired = true;
       }
     }
   }
@@ -300,6 +312,8 @@ export class InputManager {
       } else if (this.platformDraw) {
         const world = this.game.camera.toWorld(t.x, t.y, this.game.canvas);
         this.platformDraw.end = { x: world.x, y: world.y };
+      } else if (this.multiPlaceInterval) {
+        this.lastMouse = { x: t.x, y: t.y };
       }
     }
 
@@ -344,8 +358,11 @@ export class InputManager {
       }
     }
 
-    // Finish platform draw on touch end
-    if (e.touches.length === 0) this.finishPlatformDraw();
+    // Finish platform draw / stop multi-place on touch end
+    if (e.touches.length === 0) {
+      this.finishPlatformDraw();
+      this.stopMultiPlace();
+    }
 
     // Clear erase cursor on touch end
     if (e.touches.length === 0) this.toolCursor = null;
@@ -532,6 +549,41 @@ export class InputManager {
     // Select a new body or deselect
     const body = this.findBodyAt(wx, wy);
     this.selectedBody = body;
+  }
+
+  private readonly CREATION_TOOLS = new Set<Tool>(["box", "ball", "rope", "car"]);
+
+  private startMultiPlace() {
+    if (!this.multiPlace || !this.CREATION_TOOLS.has(this.tool)) return;
+    this.stopMultiPlace();
+    this.multiPlaceInterval = setInterval(() => {
+      const world = this.game.camera.toWorld(this.lastMouse.x, this.lastMouse.y, this.game.canvas);
+      this.placeCreationTool(world.x, world.y);
+    }, 100);
+  }
+
+  private stopMultiPlace() {
+    if (this.multiPlaceInterval) {
+      clearInterval(this.multiPlaceInterval);
+      this.multiPlaceInterval = null;
+    }
+  }
+
+  private placeCreationTool(wx: number, wy: number) {
+    switch (this.tool) {
+      case "box":
+        this.game.addBox(wx, wy);
+        break;
+      case "ball":
+        this.game.addBall(wx, wy);
+        break;
+      case "rope":
+        this.game.addChainRope(wx, wy, 8);
+        break;
+      case "car":
+        this.game.addCar(wx, wy);
+        break;
+    }
   }
 
   resetGroundBody() {

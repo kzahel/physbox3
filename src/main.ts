@@ -32,6 +32,16 @@ playPauseBtn.addEventListener("click", () => {
 game.onPauseChange = updatePlayPause;
 bottomTools.appendChild(playPauseBtn);
 
+// Multi-place toggle
+const multiBtn = document.createElement("button");
+multiBtn.textContent = "Multi";
+multiBtn.addEventListener("click", () => {
+  input.multiPlace = !input.multiPlace;
+  multiBtn.classList.toggle("active", input.multiPlace);
+  multiBtn.textContent = input.multiPlace ? "Multi: ON" : "Multi";
+});
+bottomTools.appendChild(multiBtn);
+
 // Tilt gravity (only on devices with orientation sensor)
 if (TiltGravity.isSupported()) {
   const tilt = new TiltGravity(game);
