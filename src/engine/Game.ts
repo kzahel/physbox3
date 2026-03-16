@@ -264,7 +264,7 @@ export class Game {
     // Physics step
     if (!this.paused) {
       this.inputManager?.update();
-      applyRocketThrust(this.world, this.renderer);
+      applyRocketThrust(this.world, this.renderer, dt * this.timeScale);
       applyBalloonLift(this.world);
       applyFanForce(this.world, this.renderer);
       applyMotorTorque(this.world);
