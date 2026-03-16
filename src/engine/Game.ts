@@ -132,8 +132,8 @@ export class Game {
     const suspAxis = planck.Vec2(0, 1);
     const wheelOpts = {
       enableMotor: true,
-      motorSpeed: 0,
-      maxMotorTorque: 30,
+      motorSpeed: -10,
+      maxMotorTorque: 50,
       frequencyHz: 4,
       dampingRatio: 0.7,
     };
