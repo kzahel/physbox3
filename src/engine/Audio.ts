@@ -32,10 +32,10 @@ export function playBounce(intensity: number) {
   lastBounceTime = now;
   activeBounces++;
 
-  // intensity 0–1 controls volume and pitch
-  const vol = 0.04 + intensity * 0.12; // quiet: 0.04 – 0.16
-  const pitch = 300 + (1 - intensity) * 500; // higher pitch for lighter hits
-  const dur = 0.04 + intensity * 0.06;
+  // intensity 0–1 controls volume and pitch — quadratic curve so soft hits are quiet
+  const vol = 0.02 + intensity * intensity * 0.35; // 0.02 – 0.37
+  const pitch = 250 + (1 - intensity) * 600; // higher pitch for lighter hits
+  const dur = 0.03 + intensity * 0.1;
 
   const osc = ac.createOscillator();
   osc.type = "sine";
