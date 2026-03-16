@@ -1,5 +1,6 @@
 import * as planck from "planck";
 import type { InputManager } from "../interaction/InputManager";
+import { playExplosion, unlockAudio } from "./Audio";
 import { Camera } from "./Camera";
 import { Renderer } from "./Renderer";
 
@@ -45,6 +46,7 @@ export class Game {
 
     this.renderer.resize();
     window.addEventListener("resize", () => this.renderer.resize());
+    unlockAudio();
 
     this.buildDefaultScene();
   }
@@ -463,8 +465,9 @@ export class Game {
       const pos = body.getPosition();
       const center = planck.Vec2(pos.x, pos.y);
 
-      // Explosion particles
+      // Explosion particles + sound
       renderer.spawnExplosion(center.x, center.y);
+      playExplosion(0.5);
 
       world.destroyBody(body);
 
