@@ -10,6 +10,10 @@ export class InputManager {
   private isPanning = false;
   private lastMouse = { x: 0, y: 0 };
 
+  // Touch state
+  private lastTouches: { id: number; x: number; y: number }[] = [];
+  private touchToolFired = false;
+
   // Keyboard state
   private keys = new Set<string>();
   private game: Game;
@@ -30,6 +34,12 @@ export class InputManager {
     canvas.addEventListener("mouseup", (e) => this.onMouseUp(e));
     canvas.addEventListener("wheel", (e) => this.onWheel(e), { passive: false });
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    // Touch events for mobile
+    canvas.addEventListener("touchstart", (e) => this.onTouchStart(e), { passive: false });
+    canvas.addEventListener("touchmove", (e) => this.onTouchMove(e), { passive: false });
+    canvas.addEventListener("touchend", (e) => this.onTouchEnd(e));
+    canvas.addEventListener("touchcancel", (e) => this.onTouchEnd(e));
 
     window.addEventListener("keydown", (e) => {
       this.keys.add(e.key);
@@ -147,6 +157,117 @@ export class InputManager {
         ),
       ) as planck.MouseJoint;
     }
+  }
+
+  private snapTouches(e: TouchEvent): { id: number; x: number; y: number }[] {
+    return Array.from(e.touches).map((t) => ({ id: t.identifier, x: t.clientX, y: t.clientY }));
+  }
+
+  private touchDist(a: { x: number; y: number }, b: { x: number; y: number }): number {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
+  private onTouchStart(e: TouchEvent) {
+    e.preventDefault();
+    this.lastTouches = this.snapTouches(e);
+    this.touchToolFired = false;
+
+    // Single finger + grab tool → start grab
+    if (e.touches.length === 1 && this.tool === "grab") {
+      const t = e.touches[0];
+      const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.canvas);
+      this.startGrab(world.x, world.y);
+    }
+  }
+
+  private onTouchMove(e: TouchEvent) {
+    e.preventDefault();
+    const cur = this.snapTouches(e);
+
+    if (cur.length >= 2 && this.lastTouches.length >= 2) {
+      // Release any grab when second finger comes in
+      if (this.mouseJoint) {
+        this.game.world.destroyJoint(this.mouseJoint);
+        this.mouseJoint = null;
+      }
+
+      // Two-finger pan + pinch zoom
+      const prevA = this.lastTouches[0];
+      const prevB = this.lastTouches[1];
+      const curA = cur[0];
+      const curB = cur[1];
+
+      // Pan: average movement of both fingers
+      const dx = (curA.x + curB.x - prevA.x - prevB.x) / 2;
+      const dy = (curA.y + curB.y - prevA.y - prevB.y) / 2;
+      this.game.camera.pan(dx, dy);
+
+      // Pinch zoom
+      const prevDist = this.touchDist(prevA, prevB);
+      const curDist = this.touchDist(curA, curB);
+      if (prevDist > 0) {
+        const midX = (curA.x + curB.x) / 2;
+        const midY = (curA.y + curB.y) / 2;
+        this.game.camera.zoomAt(midX, midY, curDist / prevDist, this.game.canvas);
+      }
+    } else if (cur.length === 1 && this.lastTouches.length >= 1) {
+      const prev = this.lastTouches[0];
+      const t = cur[0];
+
+      if (this.mouseJoint) {
+        // Dragging a grabbed object
+        const world = this.game.camera.toWorld(t.x, t.y, this.game.canvas);
+        this.mouseJoint.setTarget(planck.Vec2(world.x, world.y));
+      } else if (this.tool === "erase") {
+        const world = this.game.camera.toWorld(t.x, t.y, this.game.canvas);
+        this.game.destroyBodyAt(world.x, world.y);
+        this.touchToolFired = true;
+      } else if (this.tool !== "grab") {
+        // Single-finger pan when using placement tools (place on tap, pan on drag)
+        const dx = t.x - prev.x;
+        const dy = t.y - prev.y;
+        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+          this.game.camera.pan(dx, dy);
+          this.touchToolFired = true; // suppress tap-to-place after drag
+        }
+      }
+    }
+
+    this.lastTouches = cur;
+  }
+
+  private onTouchEnd(e: TouchEvent) {
+    // Fire tool action on single-finger tap (touchstart → touchend with no significant move)
+    if (e.touches.length === 0 && this.lastTouches.length === 1 && !this.touchToolFired) {
+      const t = this.lastTouches[0];
+      const world = this.game.camera.toWorld(t.x, t.y, this.game.canvas);
+
+      switch (this.tool) {
+        case "box":
+          this.game.addBox(world.x, world.y);
+          break;
+        case "ball":
+          this.game.addBall(world.x, world.y);
+          break;
+        case "platform":
+          this.game.addPlatform(world.x, world.y, 6);
+          break;
+        case "rope":
+          this.game.addChainRope(world.x, world.y, 8);
+          break;
+        case "erase":
+          this.game.destroyBodyAt(world.x, world.y);
+          break;
+      }
+    }
+
+    // Release grab
+    if (e.touches.length === 0 && this.mouseJoint) {
+      this.game.world.destroyJoint(this.mouseJoint);
+      this.mouseJoint = null;
+    }
+
+    this.lastTouches = this.snapTouches(e);
   }
 
   setTool(tool: Tool) {

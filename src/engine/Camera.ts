@@ -3,19 +3,23 @@ export class Camera {
   y = 0;
   zoom = 30; // pixels per meter (Planck uses meters)
 
-  /** Convert world coords to screen coords */
+  /** Convert world coords to screen (CSS pixel) coords */
   toScreen(wx: number, wy: number, canvas: HTMLCanvasElement): { x: number; y: number } {
+    const cw = canvas.clientWidth;
+    const ch = canvas.clientHeight;
     return {
-      x: (wx - this.x) * this.zoom + canvas.width / 2,
-      y: -(wy - this.y) * this.zoom + canvas.height / 2, // flip Y: Planck Y-up → screen Y-down
+      x: (wx - this.x) * this.zoom + cw / 2,
+      y: -(wy - this.y) * this.zoom + ch / 2, // flip Y: Planck Y-up → screen Y-down
     };
   }
 
-  /** Convert screen coords to world coords */
+  /** Convert screen (CSS pixel) coords to world coords */
   toWorld(sx: number, sy: number, canvas: HTMLCanvasElement): { x: number; y: number } {
+    const cw = canvas.clientWidth;
+    const ch = canvas.clientHeight;
     return {
-      x: (sx - canvas.width / 2) / this.zoom + this.x,
-      y: -(sy - canvas.height / 2) / this.zoom + this.y,
+      x: (sx - cw / 2) / this.zoom + this.x,
+      y: -(sy - ch / 2) / this.zoom + this.y,
     };
   }
 

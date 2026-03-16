@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Camera } from "./Camera";
 
 function makeCanvas(w: number, h: number) {
-  return { width: w, height: h } as HTMLCanvasElement;
+  return { width: w, height: h, clientWidth: w, clientHeight: h } as HTMLCanvasElement;
 }
 
 describe("Camera", () => {
