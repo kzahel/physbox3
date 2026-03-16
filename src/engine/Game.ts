@@ -21,6 +21,7 @@ import { clearDynamic, destroyBodyAt, explodeAt, scaleBody } from "./Physics";
 import { Renderer } from "./Renderer";
 
 export const KILL_Y = -100;
+export const KILL_Y_TOP = 200;
 const TIMESTEP = 1 / 60;
 
 function applyMotorTorque(world: planck.World) {
@@ -282,7 +283,7 @@ export class Game {
     let count = 0;
     for (let b = this.world.getBodyList(); b; b = b.getNext()) {
       if (b.isDynamic()) {
-        if (b.getPosition().y < killY) {
+        if (b.getPosition().y < killY || b.getPosition().y > KILL_Y_TOP) {
           toRemove.push(b);
         } else {
           count++;
