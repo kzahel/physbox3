@@ -28,9 +28,7 @@ function applyMotorTorque(world: planck.World) {
   for (let b = world.getBodyList(); b; b = b.getNext()) {
     const ud = b.getUserData() as { motorSpeed?: number } | null;
     if (ud?.motorSpeed == null) continue;
-    // Apply torque to reach target angular velocity
-    const error = ud.motorSpeed - b.getAngularVelocity();
-    b.applyTorque(error * 50, true);
+    b.setAngularVelocity(ud.motorSpeed);
   }
 }
 
