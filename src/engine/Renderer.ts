@@ -1,5 +1,5 @@
 import type * as planck from "planck";
-import { ERASE_RADIUS_PX, type InputManager } from "../interaction/InputManager";
+import { ERASE_RADIUS_PX, GRAB_RADIUS_PX, type InputManager } from "../interaction/InputManager";
 import type { Camera } from "./Camera";
 
 export class Renderer {
@@ -98,9 +98,15 @@ export class Renderer {
     // Draw joints
     this.drawJoints(world, camera);
 
-    // Draw erase cursor
-    if (this.inputManager?.tool === "erase" && this.inputManager.eraseCursor) {
-      this.drawEraseCursor(this.inputManager.eraseCursor);
+    // Draw tool cursor overlay
+    if (this.inputManager?.toolCursor) {
+      const tool = this.inputManager.tool;
+      const pos = this.inputManager.toolCursor;
+      if (tool === "erase") {
+        this.drawToolCursor(pos, ERASE_RADIUS_PX, "rgba(255, 80, 80, 0.7)", "rgba(255, 80, 80, 0.1)");
+      } else if (tool === "grab") {
+        this.drawToolCursor(pos, GRAB_RADIUS_PX, "rgba(100, 200, 255, 0.5)", "rgba(100, 200, 255, 0.05)");
+      }
     }
   }
 
@@ -110,16 +116,19 @@ export class Renderer {
 
   private inputManager: InputManager | null = null;
 
-  private drawEraseCursor(pos: { x: number; y: number }) {
+  private drawToolCursor(pos: { x: number; y: number }, radius: number, stroke: string, fill: string) {
     const ctx = this.ctx;
     ctx.save();
+    // Reset to CSS-pixel identity so screen coords map correctly
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, ERASE_RADIUS_PX, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255, 80, 80, 0.7)";
+    ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = stroke;
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 4]);
     ctx.stroke();
-    ctx.fillStyle = "rgba(255, 80, 80, 0.1)";
+    ctx.fillStyle = fill;
     ctx.fill();
     ctx.setLineDash([]);
     ctx.restore();

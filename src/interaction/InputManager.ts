@@ -4,6 +4,7 @@ import type { Game } from "../engine/Game";
 export type Tool = "box" | "ball" | "platform" | "rope" | "grab" | "erase";
 
 export const ERASE_RADIUS_PX = 24; // CSS pixels
+export const GRAB_RADIUS_PX = 30; // CSS pixels — touch grab hit area
 
 export class InputManager {
   tool: Tool = "grab";
@@ -12,8 +13,8 @@ export class InputManager {
   private isPanning = false;
   private lastMouse = { x: 0, y: 0 };
 
-  // Erase cursor position (screen coords, null when not active)
-  eraseCursor: { x: number; y: number } | null = null;
+  // Tool cursor position (screen coords, null when not active)
+  toolCursor: { x: number; y: number } | null = null;
 
   // Touch state
   private lastTouches: { id: number; x: number; y: number }[] = [];
@@ -105,10 +106,8 @@ export class InputManager {
     const dy = e.clientY - this.lastMouse.y;
     this.lastMouse = { x: e.clientX, y: e.clientY };
 
-    // Track erase cursor
-    if (this.tool === "erase") {
-      this.eraseCursor = { x: e.clientX, y: e.clientY };
-    }
+    // Track tool cursor for visual feedback
+    this.toolCursor = { x: e.clientX, y: e.clientY };
 
     if (this.isPanning) {
       this.game.camera.pan(dx, dy);
@@ -139,11 +138,13 @@ export class InputManager {
     this.game.camera.zoomAt(e.clientX, e.clientY, factor, this.game.canvas);
   }
 
-  private startGrab(wx: number, wy: number, radius = 0.01) {
+  private startGrab(wx: number, wy: number, radiusPx = 5) {
+    const radius = radiusPx / this.game.camera.zoom;
     const point = planck.Vec2(wx, wy);
     let target: planck.Body | null = null;
-    let bestDist = radius;
+    let bestDist = Number.POSITIVE_INFINITY;
 
+    // Use a generous search area, then pick the closest dynamic body
     this.game.world.queryAABB(
       planck.AABB(planck.Vec2(wx - radius, wy - radius), planck.Vec2(wx + radius, wy + radius)),
       (fixture) => {
@@ -151,9 +152,10 @@ export class InputManager {
         // Exact hit: use immediately
         if (fixture.testPoint(point)) {
           target = fixture.getBody();
+          bestDist = 0;
           return false;
         }
-        // Proximity hit: pick closest within radius
+        // Proximity hit: pick closest body center within search area
         const body = fixture.getBody();
         const d = planck.Vec2.lengthOf(planck.Vec2.sub(body.getPosition(), point));
         if (d < bestDist) {
@@ -194,11 +196,11 @@ export class InputManager {
     if (e.touches.length === 1) {
       const t = e.touches[0];
       if (this.tool === "grab") {
+        this.toolCursor = { x: t.clientX, y: t.clientY };
         const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.canvas);
-        const touchRadius = 20 / this.game.camera.zoom;
-        this.startGrab(world.x, world.y, touchRadius);
+        this.startGrab(world.x, world.y, GRAB_RADIUS_PX);
       } else if (this.tool === "erase") {
-        this.eraseCursor = { x: t.clientX, y: t.clientY };
+        this.toolCursor = { x: t.clientX, y: t.clientY };
         this.eraseAtScreen(t.clientX, t.clientY);
         this.touchToolFired = true;
       }
@@ -243,7 +245,7 @@ export class InputManager {
         const world = this.game.camera.toWorld(t.x, t.y, this.game.canvas);
         this.mouseJoint.setTarget(planck.Vec2(world.x, world.y));
       } else if (this.tool === "erase") {
-        this.eraseCursor = { x: t.x, y: t.y };
+        this.toolCursor = { x: t.x, y: t.y };
         this.eraseAtScreen(t.x, t.y);
         this.touchToolFired = true;
       }
@@ -278,7 +280,7 @@ export class InputManager {
     }
 
     // Clear erase cursor on touch end
-    if (e.touches.length === 0) this.eraseCursor = null;
+    if (e.touches.length === 0) this.toolCursor = null;
 
     // Release grab
     if (e.touches.length === 0 && this.mouseJoint) {
@@ -312,7 +314,6 @@ export class InputManager {
 
   setTool(tool: Tool) {
     this.tool = tool;
-    if (tool !== "erase") this.eraseCursor = null;
     this.onToolChange?.(tool);
   }
 }
