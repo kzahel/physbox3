@@ -32,7 +32,7 @@ export function createCannon(
     const spawnY = pos.y + dirY * 1.0;
     const ball = world.createBody({ type: "dynamic", position: planck.Vec2(spawnX, spawnY) });
     ball.createFixture({ shape: planck.Circle(0.2), density: 5, friction: 0.3, restitution: 0.1 });
-    ball.setUserData({ fill: "rgba(40,40,40,0.9)", label: "cannonball" });
+    ball.setUserData({ fill: "rgba(100,100,110,0.9)", label: "cannonball" });
     ball.setBullet(true);
 
     const speed = 20;

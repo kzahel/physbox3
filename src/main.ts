@@ -55,6 +55,30 @@ if (TiltGravity.isSupported()) {
   bottomTools.appendChild(tiltBtn);
 }
 
+// Light/Dark mode toggle
+const DARK_BG = "#1a1a2e";
+const LIGHT_BG = "#d8d8e0";
+let darkMode = localStorage.getItem("physbox-dark-mode") !== "false";
+
+function applyTheme() {
+  document.body.style.background = darkMode ? DARK_BG : LIGHT_BG;
+  themeBtn.textContent = darkMode ? "\u263E" : "\u2600";
+}
+
+const themeBtn = document.createElement("button");
+themeBtn.setAttribute("aria-label", "Toggle light/dark mode");
+themeBtn.style.fontSize = "18px";
+themeBtn.style.width = "44px";
+themeBtn.style.borderRadius = "50%";
+themeBtn.style.padding = "8px";
+themeBtn.addEventListener("click", () => {
+  darkMode = !darkMode;
+  localStorage.setItem("physbox-dark-mode", String(darkMode));
+  applyTheme();
+});
+bottomTools.appendChild(themeBtn);
+applyTheme();
+
 // Settings pane (after onPauseChange is set so it can chain)
 new SettingsPane(document.getElementById("settings")!, game);
 
