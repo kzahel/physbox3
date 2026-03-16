@@ -23,9 +23,10 @@ body {
 #toolbar {
   position: fixed;
   top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 12px;
+  right: 270px;
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 8px 12px;
   background: rgba(20, 20, 40, 0.85);
@@ -284,10 +285,7 @@ body {
 
   /* Shrink toolbar buttons a bit so they all fit */
   #toolbar {
-    left: 12px;
-    transform: none;
-    flex-wrap: wrap;
-    max-width: calc(100vw - 64px);
+    right: 56px;
   }
 
   #toolbar button {
