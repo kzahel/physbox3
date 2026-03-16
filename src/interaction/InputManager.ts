@@ -22,7 +22,8 @@ export type Tool =
   | "rocket"
   | "scale"
   | "balloon"
-  | "fan";
+  | "fan"
+  | "ragdoll";
 
 export const ERASE_RADIUS_PX = 24; // CSS pixels
 export const GRAB_RADIUS_PX = 30; // CSS pixels — touch grab hit area
@@ -98,6 +99,7 @@ export class InputManager {
         e.preventDefault();
         this.game.paused = !this.game.paused;
       }
+      if (e.key.startsWith("Arrow")) e.preventDefault();
     });
     window.addEventListener("keyup", (e) => this.keys.delete(e.key));
 
@@ -157,6 +159,9 @@ export class InputManager {
         break;
       case "balloon":
         this.game.addBalloon(world.x, world.y);
+        break;
+      case "ragdoll":
+        this.game.addRagdoll(world.x, world.y);
         break;
       case "conveyor":
       case "fan":
@@ -430,6 +435,9 @@ export class InputManager {
         case "balloon":
           this.game.addBalloon(world.x, world.y);
           break;
+        case "ragdoll":
+          this.game.addRagdoll(world.x, world.y);
+          break;
         case "dynamite":
           this.game.addDynamite(world.x, world.y);
           break;
@@ -636,8 +644,9 @@ export class InputManager {
     this.attracting = null;
   }
 
-  /** Apply attraction forces — call once per frame */
+  /** Apply per-frame forces (attraction, ragdoll control) */
   update() {
+    this.updateRagdolls();
     if (!this.attracting) return;
     const { bodyA, bodyB } = this.attracting;
     const dir = planck.Vec2.sub(bodyA.getPosition(), bodyB.getPosition());
@@ -647,6 +656,36 @@ export class InputManager {
     bodyB.applyForceToCenter(force, true);
     if (bodyA.isDynamic()) {
       bodyA.applyForceToCenter(planck.Vec2.mul(force, -1), true);
+    }
+  }
+
+  private updateRagdolls() {
+    const moveForce = 8;
+    const jumpImpulse = 6;
+    const maxSpeed = 6;
+
+    const left = this.keys.has("ArrowLeft");
+    const right = this.keys.has("ArrowRight");
+    const jump = this.keys.has("ArrowUp");
+
+    for (const rd of this.game.ragdolls) {
+      const torso = rd.torso;
+      if (!torso.isActive()) continue;
+      const vel = torso.getLinearVelocity();
+      const grounded = rd.footContacts > 0;
+
+      // Horizontal movement
+      if (left && vel.x > -maxSpeed) {
+        torso.applyForceToCenter(planck.Vec2(-moveForce * torso.getMass(), 0), true);
+      }
+      if (right && vel.x < maxSpeed) {
+        torso.applyForceToCenter(planck.Vec2(moveForce * torso.getMass(), 0), true);
+      }
+
+      // Jump
+      if (jump && grounded && vel.y < 1) {
+        torso.applyLinearImpulse(planck.Vec2(0, jumpImpulse * torso.getMass()), torso.getPosition(), true);
+      }
     }
   }
 
@@ -796,6 +835,7 @@ export class InputManager {
     "dynamite",
     "rocket",
     "balloon",
+    "ragdoll",
     "seesaw",
     "launcher",
   ]);
@@ -841,6 +881,9 @@ export class InputManager {
         break;
       case "balloon":
         this.game.addBalloon(wx, wy);
+        break;
+      case "ragdoll":
+        this.game.addRagdoll(wx, wy);
         break;
       case "seesaw":
         this.game.addSeesaw(wx, wy);
