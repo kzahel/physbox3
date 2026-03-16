@@ -119,6 +119,9 @@ export class Renderer {
     // Draw joints
     this.drawJoints(world, camera);
 
+    // Conveyor belt animation
+    this.drawConveyorAnimation(world, camera);
+
     // Dynamite wick + sparks
     this.drawDynamiteEffects(world, camera);
 
@@ -148,8 +151,9 @@ export class Renderer {
       }
     }
 
-    // Draw platform preview
+    // Draw platform/conveyor preview
     if (this.inputManager?.platformDraw) {
+      const isConveyor = this.inputManager.tool === "conveyor";
       const { start, end } = this.inputManager.platformDraw;
       const s = camera.toScreen(start.x, start.y, this.canvas);
       const e = camera.toScreen(end.x, end.y, this.canvas);
@@ -158,14 +162,14 @@ export class Renderer {
       ctx.beginPath();
       ctx.moveTo(s.x, s.y);
       ctx.lineTo(e.x, e.y);
-      ctx.strokeStyle = "rgba(80, 100, 80, 0.9)";
-      ctx.lineWidth = Math.max(4, 0.3 * camera.zoom);
+      ctx.strokeStyle = isConveyor ? "rgba(200, 160, 50, 0.9)" : "rgba(80, 100, 80, 0.9)";
+      ctx.lineWidth = Math.max(4, (isConveyor ? 0.4 : 0.3) * camera.zoom);
       ctx.lineCap = "round";
       ctx.setLineDash([8, 6]);
       ctx.stroke();
       ctx.setLineDash([]);
       // Endpoint dots
-      ctx.fillStyle = "rgba(120, 160, 120, 0.8)";
+      ctx.fillStyle = isConveyor ? "rgba(200, 160, 50, 0.8)" : "rgba(120, 160, 120, 0.8)";
       for (const p of [s, e]) {
         ctx.beginPath();
         ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
@@ -303,6 +307,56 @@ export class Renderer {
     ctx.strokeStyle = "rgba(100, 180, 255, 0.5)";
     ctx.lineWidth = 2;
     ctx.stroke();
+  }
+
+  private drawConveyorAnimation(world: planck.World, camera: Camera) {
+    const ctx = this.ctx;
+    const time = performance.now() / 1000;
+
+    for (let body = world.getBodyList(); body; body = body.getNext()) {
+      const ud = body.getUserData() as { label?: string; speed?: number } | null;
+      if (ud?.label !== "conveyor") continue;
+
+      const speed = ud.speed ?? 3;
+      const pos = body.getPosition();
+      const angle = body.getAngle();
+
+      // Get conveyor half-width from first fixture
+      const fixture = body.getFixtureList();
+      if (!fixture) continue;
+      const shape = fixture.getShape() as planck.PolygonShape;
+      const hw = Math.abs(shape.m_vertices[0].x); // half-width
+
+      ctx.save();
+      const screen = camera.toScreen(pos.x, pos.y, this.canvas);
+      ctx.translate(screen.x, screen.y);
+      ctx.rotate(-angle);
+
+      // Animated chevrons along the belt surface
+      const spacing = 0.8; // world units between chevrons
+      const offset = (time * speed) % spacing;
+      const count = Math.ceil((hw * 2) / spacing) + 1;
+      const chevronSize = 0.15 * camera.zoom;
+
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.lineWidth = Math.max(1, 0.06 * camera.zoom);
+      ctx.lineCap = "round";
+
+      for (let i = 0; i < count; i++) {
+        const lx = (-hw + offset + i * spacing) * camera.zoom;
+        if (Math.abs(lx) > hw * camera.zoom) continue;
+        const ly = 0;
+        // Draw chevron pointing in speed direction
+        const dir = speed > 0 ? 1 : -1;
+        ctx.beginPath();
+        ctx.moveTo(lx - chevronSize * dir, ly - chevronSize);
+        ctx.lineTo(lx, ly);
+        ctx.lineTo(lx - chevronSize * dir, ly + chevronSize);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
   }
 
   spawnExplosion(wx: number, wy: number) {

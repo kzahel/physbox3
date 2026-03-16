@@ -150,7 +150,7 @@ export class InputManager {
         this.game.addRocket(world.x, world.y);
         break;
       case "conveyor":
-        this.game.addConveyor(world.x, world.y);
+        this.platformDraw = { start: { x: world.x, y: world.y }, end: { x: world.x, y: world.y } };
         break;
       case "dynamite":
         this.game.addDynamite(world.x, world.y);
@@ -286,7 +286,7 @@ export class InputManager {
         this.toolCursor = { x: t.clientX, y: t.clientY };
         const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.canvas);
         this.startGrab(world.x, world.y, GRAB_RADIUS_PX);
-      } else if (this.tool === "platform") {
+      } else if (this.tool === "platform" || this.tool === "conveyor") {
         const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.canvas);
         this.platformDraw = { start: { x: world.x, y: world.y }, end: { x: world.x, y: world.y } };
         this.touchToolFired = true;
@@ -398,9 +398,6 @@ export class InputManager {
         case "rocket":
           this.game.addRocket(world.x, world.y);
           break;
-        case "conveyor":
-          this.game.addConveyor(world.x, world.y);
-          break;
         case "dynamite":
           this.game.addDynamite(world.x, world.y);
           break;
@@ -478,7 +475,11 @@ export class InputManager {
       const cx = (start.x + end.x) / 2;
       const cy = (start.y + end.y) / 2;
       const angle = Math.atan2(dy, dx);
-      this.game.addPlatform(cx, cy, len, angle);
+      if (this.tool === "conveyor") {
+        this.game.addConveyor(cx, cy, len, 3, angle);
+      } else {
+        this.game.addPlatform(cx, cy, len, angle);
+      }
     }
     this.platformDraw = null;
   }

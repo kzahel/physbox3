@@ -363,8 +363,8 @@ export class Game {
     return body;
   }
 
-  addConveyor(x: number, y: number, w = 6, speed = 3) {
-    const body = this.world.createBody({ type: "kinematic", position: planck.Vec2(x, y) });
+  addConveyor(x: number, y: number, w = 6, speed = 3, angle = 0) {
+    const body = this.world.createBody({ type: "kinematic", position: planck.Vec2(x, y), angle });
     const fixture = body.createFixture({ shape: planck.Box(w / 2, 0.2), friction: 1 });
     fixture.setUserData({ fill: "rgba(200,160,50,0.8)", stroke: "rgba(200,160,50,0.5)" });
     body.setUserData({ fill: "rgba(200,160,50,0.8)", label: "conveyor", speed });
