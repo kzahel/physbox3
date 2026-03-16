@@ -344,30 +344,40 @@ export class Game {
     const motorSpeed = -(6 + r() * 14); // -6 to -20
     const torque = 25 + r() * 75; // 25 to 100
 
-    const wheelRadius = (0.35 + r() * 0.3) * sz;
+    const rearWheelRadius = (0.3 + r() * 0.45) * sz;
+    const frontWheelRadius = (0.3 + r() * 0.45) * sz;
     const suspAxis = planck.Vec2(0, 1);
-    const wheelOpts = {
+
+    const rearWheelOpts = {
       enableMotor: true,
       motorSpeed,
       maxMotorTorque: torque,
-      frequencyHz: 3 + r() * 3,
-      dampingRatio: 0.5 + r() * 0.4,
+      frequencyHz: 1.5 + r() * 6,
+      dampingRatio: 0.2 + r() * 0.8,
+    };
+    const frontWheelOpts = {
+      enableMotor: true,
+      motorSpeed,
+      maxMotorTorque: torque,
+      frequencyHz: 1.5 + r() * 6,
+      dampingRatio: 0.2 + r() * 0.8,
     };
 
     const wheelX = halfW * 0.6;
-    const wheelY = -(halfH + wheelRadius * 0.4);
 
     // Rear wheel
-    const rearWheel = this.world.createBody({ type: "dynamic", position: planck.Vec2(x - wheelX, y + wheelY) });
-    rearWheel.createFixture({ shape: planck.Circle(wheelRadius), density: 1, friction: 0.7 + r() * 0.3 });
+    const rearY = -(halfH + rearWheelRadius * 0.4);
+    const rearWheel = this.world.createBody({ type: "dynamic", position: planck.Vec2(x - wheelX, y + rearY) });
+    rearWheel.createFixture({ shape: planck.Circle(rearWheelRadius), density: 1, friction: 0.7 + r() * 0.3 });
     rearWheel.setUserData({ fill: wheelColor });
-    this.world.createJoint(planck.WheelJoint(wheelOpts, chassis, rearWheel, rearWheel.getPosition(), suspAxis));
+    this.world.createJoint(planck.WheelJoint(rearWheelOpts, chassis, rearWheel, rearWheel.getPosition(), suspAxis));
 
     // Front wheel
-    const frontWheel = this.world.createBody({ type: "dynamic", position: planck.Vec2(x + wheelX, y + wheelY) });
-    frontWheel.createFixture({ shape: planck.Circle(wheelRadius), density: 1, friction: 0.7 + r() * 0.3 });
+    const frontY = -(halfH + frontWheelRadius * 0.4);
+    const frontWheel = this.world.createBody({ type: "dynamic", position: planck.Vec2(x + wheelX, y + frontY) });
+    frontWheel.createFixture({ shape: planck.Circle(frontWheelRadius), density: 1, friction: 0.7 + r() * 0.3 });
     frontWheel.setUserData({ fill: wheelColor });
-    this.world.createJoint(planck.WheelJoint(wheelOpts, chassis, frontWheel, frontWheel.getPosition(), suspAxis));
+    this.world.createJoint(planck.WheelJoint(frontWheelOpts, chassis, frontWheel, frontWheel.getPosition(), suspAxis));
 
     return chassis;
   }
