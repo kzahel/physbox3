@@ -124,6 +124,84 @@ body {
   margin-top: 0;
 }
 
+#settings button {
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ccc;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#settings button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+/* Scene save/load */
+.scene-save-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.scene-save-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e0e0e0;
+  font-size: 12px;
+  outline: none;
+}
+
+.scene-save-row input:focus {
+  border-color: rgba(100, 140, 255, 0.5);
+}
+
+.scenes-list {
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.scenes-empty {
+  font-size: 11px;
+  color: #666;
+  padding: 4px 0;
+}
+
+.scene-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.scene-name {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.scene-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.scene-actions button {
+  padding: 2px 6px;
+  font-size: 13px;
+  line-height: 1;
+}
+
 #stats {
   font-size: 11px;
   color: #888;
