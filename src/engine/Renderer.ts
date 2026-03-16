@@ -327,6 +327,30 @@ export class Renderer {
     }
   }
 
+  spawnFlame(wx: number, wy: number, bodyAngle: number) {
+    // Exhaust direction is opposite to rocket's "up"
+    const exDirX = Math.sin(bodyAngle);
+    const exDirY = -Math.cos(bodyAngle);
+    for (let i = 0; i < 2; i++) {
+      const spread = (Math.random() - 0.5) * 1.5;
+      const speed = 3 + Math.random() * 4;
+      const life = 0.15 + Math.random() * 0.25;
+      const isSmoke = Math.random() < 0.2;
+      this.particles.push({
+        x: wx + (Math.random() - 0.5) * 0.2,
+        y: wy + (Math.random() - 0.5) * 0.2,
+        vx: exDirX * speed + spread,
+        vy: exDirY * speed + spread,
+        life,
+        maxLife: life,
+        size: isSmoke ? 0.2 + Math.random() * 0.3 : 0.08 + Math.random() * 0.12,
+        r: isSmoke ? 100 : 255,
+        g: isSmoke ? 100 : 150 + Math.floor(Math.random() * 105),
+        b: isSmoke ? 100 : 0,
+      });
+    }
+  }
+
   spawnSpark(wx: number, wy: number) {
     for (let i = 0; i < 3; i++) {
       const angle = Math.random() * Math.PI * 2;

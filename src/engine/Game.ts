@@ -329,6 +329,40 @@ export class Game {
     return plank;
   }
 
+  addRocket(x: number, y: number) {
+    const body = this.world.createBody({ type: "dynamic", position: planck.Vec2(x, y) });
+    // Rocket body (tall narrow rectangle)
+    body.createFixture({ shape: planck.Box(0.3, 0.8), density: 1.5, friction: 0.3 });
+    // Nose cone
+    body.createFixture({
+      shape: planck.Polygon([
+        planck.Vec2(-0.3, 0.8),
+        planck.Vec2(0.3, 0.8),
+        planck.Vec2(0, 1.4),
+      ]),
+      density: 0.5,
+    });
+    // Fins
+    body.createFixture({
+      shape: planck.Polygon([
+        planck.Vec2(-0.3, -0.8),
+        planck.Vec2(-0.7, -1.0),
+        planck.Vec2(-0.3, -0.3),
+      ]),
+      density: 0.3,
+    });
+    body.createFixture({
+      shape: planck.Polygon([
+        planck.Vec2(0.3, -0.8),
+        planck.Vec2(0.7, -1.0),
+        planck.Vec2(0.3, -0.3),
+      ]),
+      density: 0.3,
+    });
+    body.setUserData({ fill: "rgba(200,200,220,0.9)", label: "rocket", thrust: 40 });
+    return body;
+  }
+
   addConveyor(x: number, y: number, w = 6, speed = 3) {
     const body = this.world.createBody({ type: "kinematic", position: planck.Vec2(x, y) });
     const fixture = body.createFixture({ shape: planck.Box(w / 2, 0.2), friction: 1 });
@@ -427,6 +461,25 @@ export class Game {
     this.buildDefaultScene();
   }
 
+  private applyRocketThrust() {
+    for (let b = this.world.getBodyList(); b; b = b.getNext()) {
+      if (!b.isDynamic()) continue;
+      const ud = b.getUserData() as { label?: string; thrust?: number } | null;
+      if (ud?.label !== "rocket" || !ud.thrust) continue;
+      const angle = b.getAngle();
+      // Thrust along the body's local "up" direction
+      const fx = -Math.sin(angle) * ud.thrust * b.getMass();
+      const fy = Math.cos(angle) * ud.thrust * b.getMass();
+      b.applyForceToCenter(planck.Vec2(fx, fy), true);
+
+      // Spawn flame particles from the exhaust (bottom of rocket)
+      const pos = b.getPosition();
+      const exhaustX = pos.x + Math.sin(angle) * 1.0;
+      const exhaustY = pos.y - Math.cos(angle) * 1.0;
+      this.renderer.spawnFlame(exhaustX, exhaustY, angle);
+    }
+  }
+
   clearDynamic() {
     const toRemove: planck.Body[] = [];
     for (let b = this.world.getBodyList(); b; b = b.getNext()) {
@@ -480,6 +533,7 @@ export class Game {
     // Physics step
     if (!this.paused) {
       this.inputManager?.update();
+      this.applyRocketThrust();
       this.accumulator += dt * this.timeScale;
       while (this.accumulator >= TIMESTEP) {
         this.world.step(TIMESTEP, this.velocityIterations, this.positionIterations);

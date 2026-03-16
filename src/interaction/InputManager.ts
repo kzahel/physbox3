@@ -18,7 +18,8 @@ export type Tool =
   | "detach"
   | "attract"
   | "select"
-  | "seesaw";
+  | "seesaw"
+  | "rocket";
 
 export const ERASE_RADIUS_PX = 24; // CSS pixels
 export const GRAB_RADIUS_PX = 30; // CSS pixels — touch grab hit area
@@ -144,6 +145,9 @@ export class InputManager {
         break;
       case "seesaw":
         this.game.addSeesaw(world.x, world.y);
+        break;
+      case "rocket":
+        this.game.addRocket(world.x, world.y);
         break;
       case "conveyor":
         this.game.addConveyor(world.x, world.y);
@@ -391,6 +395,9 @@ export class InputManager {
         case "seesaw":
           this.game.addSeesaw(world.x, world.y);
           break;
+        case "rocket":
+          this.game.addRocket(world.x, world.y);
+          break;
         case "conveyor":
           this.game.addConveyor(world.x, world.y);
           break;
@@ -618,7 +625,7 @@ export class InputManager {
 
   isDirectional(body: planck.Body): boolean {
     const label = this.getBodyLabel(body);
-    return label === "car" || label === "conveyor";
+    return label === "car" || label === "conveyor" || label === "rocket";
   }
 
   private handleSelect(wx: number, wy: number, sx: number, sy: number) {
@@ -661,6 +668,11 @@ export class InputManager {
       const ud = body.getUserData() as { speed?: number } | null;
       if (ud && ud.speed != null) {
         ud.speed = -ud.speed;
+      }
+    } else if (label === "rocket") {
+      const ud = body.getUserData() as { thrust?: number } | null;
+      if (ud && ud.thrust != null) {
+        ud.thrust = -ud.thrust;
       }
     }
   }
