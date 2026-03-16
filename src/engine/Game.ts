@@ -119,6 +119,7 @@ export class Game {
     const links = Math.max(2, Math.round(dist / linkLen));
     const stepX = dx / links;
     const stepY = dy / links;
+    const angle = Math.atan2(dy, dx) - Math.PI / 2; // rotate so long axis aligns with rope direction
 
     // Start anchor: use existing body or create static anchor
     let prev: planck.Body;
@@ -133,7 +134,7 @@ export class Game {
     for (let i = 1; i < links; i++) {
       const lx = x1 + stepX * i;
       const ly = y1 + stepY * i;
-      const link = this.world.createBody({ type: "dynamic", position: planck.Vec2(lx, ly) });
+      const link = this.world.createBody({ type: "dynamic", position: planck.Vec2(lx, ly), angle });
       link.createFixture({ shape: planck.Box(0.08, linkLen / 2), density: 2, friction: 0.4 });
       link.setUserData({ fill: "rgba(180,160,120,0.7)" });
 
