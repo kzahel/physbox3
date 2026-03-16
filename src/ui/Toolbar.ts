@@ -27,6 +27,7 @@ const ICONS: Record<Tool, string> = {
   cannon: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><rect x="2" y="6" width="8" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="7" width="5" height="4" rx="0.5" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="5" cy="14" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="10" cy="14" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>`,
   ragdoll: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><circle cx="9" cy="3" r="2" fill="none" stroke="currentColor" stroke-width="1.3"/><line x1="9" y1="5" x2="9" y2="11" stroke="currentColor" stroke-width="1.3"/><line x1="5" y1="8" x2="13" y2="8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="9" y1="11" x2="6" y2="16" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="9" y1="11" x2="12" y2="16" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`,
   glue: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><path d="M9 2v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="6" y="6" width="6" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M7 10v3q2 2 4 0v-3" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 14q0 1 1 2t1-2" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>`,
+  unglue: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><path d="M9 2v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="6" y="6" width="6" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M7 10v3q2 2 4 0v-3" fill="none" stroke="currentColor" stroke-width="1.3"/><line x1="4" y1="4" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
 };
 
 const TOOLS: { id: Tool; label: string }[] = [
@@ -49,6 +50,7 @@ const TOOLS: { id: Tool; label: string }[] = [
   { id: "ropetool", label: "Tie" },
   { id: "erase", label: "Erase" },
   { id: "glue", label: "Glue" },
+  { id: "unglue", label: "Unglue" },
   { id: "attract", label: "Attach" },
   { id: "detach", label: "Detach" },
   { id: "select", label: "Select" },

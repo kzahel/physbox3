@@ -25,7 +25,8 @@ export type Tool =
   | "fan"
   | "ragdoll"
   | "cannon"
-  | "glue";
+  | "glue"
+  | "unglue";
 
 export const ERASE_RADIUS_PX = 24; // CSS pixels
 export const GRAB_RADIUS_PX = 30; // CSS pixels — touch grab hit area
@@ -179,6 +180,9 @@ export class InputManager {
       case "glue":
         this.glueAtScreen(e.clientX, e.clientY);
         break;
+      case "unglue":
+        this.unglueAtScreen(e.clientX, e.clientY);
+        break;
       case "attach":
         this.handleAttach(world.x, world.y);
         break;
@@ -229,6 +233,9 @@ export class InputManager {
     }
     if (this.tool === "glue" && e.buttons & 1) {
       this.glueAtScreen(e.clientX, e.clientY);
+    }
+    if (this.tool === "unglue" && e.buttons & 1) {
+      this.unglueAtScreen(e.clientX, e.clientY);
     }
 
     if (this.platformDraw) {
@@ -342,6 +349,10 @@ export class InputManager {
         this.toolCursor = { x: t.clientX, y: t.clientY };
         this.glueAtScreen(t.clientX, t.clientY);
         this.touchToolFired = true;
+      } else if (this.tool === "unglue") {
+        this.toolCursor = { x: t.clientX, y: t.clientY };
+        this.unglueAtScreen(t.clientX, t.clientY);
+        this.touchToolFired = true;
       }
     }
   }
@@ -407,6 +418,10 @@ export class InputManager {
         this.toolCursor = { x: t.x, y: t.y };
         this.glueAtScreen(t.x, t.y);
         this.touchToolFired = true;
+      } else if (this.tool === "unglue") {
+        this.toolCursor = { x: t.x, y: t.y };
+        this.unglueAtScreen(t.x, t.y);
+        this.touchToolFired = true;
       } else if (this.platformDraw) {
         const world = this.game.camera.toWorld(t.x, t.y, this.game.canvas);
         this.platformDraw.end = { x: world.x, y: world.y };
@@ -468,6 +483,9 @@ export class InputManager {
           break;
         case "glue":
           this.glueAtScreen(t.x, t.y);
+          break;
+        case "unglue":
+          this.unglueAtScreen(t.x, t.y);
           break;
         case "attach": {
           this.handleAttach(world.x, world.y);
@@ -595,6 +613,36 @@ export class InputManager {
       }
     }
     return maxR;
+  }
+
+  /** Unglue: remove all weld joints from bodies within brush radius */
+  private unglueAtScreen(sx: number, sy: number) {
+    const r = GLUE_RADIUS_PX / this.game.camera.zoom;
+    const world = this.game.camera.toWorld(sx, sy, this.game.canvas);
+    const center = planck.Vec2(world.x, world.y);
+    const bodies: planck.Body[] = [];
+
+    this.game.world.queryAABB(
+      planck.AABB(planck.Vec2(world.x - r, world.y - r), planck.Vec2(world.x + r, world.y + r)),
+      (fixture) => {
+        const body = fixture.getBody();
+        if (body === this.groundBody) return true;
+        if (planck.Vec2.lengthOf(planck.Vec2.sub(body.getPosition(), center)) < r) {
+          if (!bodies.includes(body)) bodies.push(body);
+        }
+        return true;
+      },
+    );
+
+    const toDestroy: planck.Joint[] = [];
+    for (const body of bodies) {
+      for (let je = body.getJointList(); je; je = je.next) {
+        const joint = je.joint;
+        if (!joint || joint.getType() !== "weld-joint") continue;
+        if (!toDestroy.includes(joint)) toDestroy.push(joint);
+      }
+    }
+    for (const j of toDestroy) this.game.world.destroyJoint(j);
   }
 
   private finishPlatformDraw() {

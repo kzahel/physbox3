@@ -154,6 +154,8 @@ export class Renderer {
         this.drawToolCursor(pos, 10, "rgba(180, 160, 120, 0.6)", "rgba(180, 160, 120, 0.05)");
       } else if (tool === "glue") {
         this.drawToolCursor(pos, GLUE_RADIUS_PX, "rgba(255, 220, 50, 0.7)", "rgba(255, 220, 50, 0.1)");
+      } else if (tool === "unglue") {
+        this.drawToolCursor(pos, GLUE_RADIUS_PX, "rgba(255, 120, 50, 0.7)", "rgba(255, 120, 50, 0.1)");
       } else if (tool === "scale" && !this.inputManager?.scaleDrag) {
         this.drawToolCursor(pos, 14, "rgba(180, 120, 255, 0.6)", "rgba(180, 120, 255, 0.05)");
       }
