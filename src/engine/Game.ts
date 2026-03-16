@@ -46,6 +46,7 @@ export class Game {
   inputManager: InputManager | null = null;
   ragdolls: RagdollData[] = [];
   followSelected = false;
+  followBody: planck.Body | null = null;
   onPauseChange?: () => void;
 
   private _paused = false;
@@ -292,14 +293,13 @@ export class Game {
     for (const b of toRemove) this.world.destroyBody(b);
     this.bodyCount = count;
 
-    // Camera follow
-    if (this.followSelected) {
-      const target = this.inputManager?.selectedBody;
-      if (target && target.isActive()) {
-        const pos = target.getPosition();
-        this.camera.x = pos.x;
-        this.camera.y = pos.y;
-      }
+    // Camera follow — update followBody when selection changes
+    const sel = this.inputManager?.selectedBody ?? null;
+    if (sel && sel !== this.followBody) this.followBody = sel;
+    if (this.followSelected && this.followBody?.isActive()) {
+      const pos = this.followBody.getPosition();
+      this.camera.x = pos.x;
+      this.camera.y = pos.y;
     }
 
     // Render
