@@ -236,7 +236,6 @@ export class InputManager {
         this.game.camera.zoomAt(midX, midY, curDist / prevDist, this.game.canvas);
       }
     } else if (cur.length === 1 && this.lastTouches.length >= 1) {
-      const prev = this.lastTouches[0];
       const t = cur[0];
 
       if (this.mouseJoint) {
@@ -247,14 +246,6 @@ export class InputManager {
         this.eraseCursor = { x: t.x, y: t.y };
         this.eraseAtScreen(t.x, t.y);
         this.touchToolFired = true;
-      } else {
-        // Single-finger pan (for placement tools, or grab tool when not holding a body)
-        const dx = t.x - prev.x;
-        const dy = t.y - prev.y;
-        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
-          this.game.camera.pan(dx, dy);
-          this.touchToolFired = true;
-        }
       }
     }
 
