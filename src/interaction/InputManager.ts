@@ -297,10 +297,7 @@ export class InputManager {
     const toRemove: planck.Body[] = [];
 
     this.game.world.queryAABB(
-      planck.AABB(
-        planck.Vec2(world.x - r, world.y - r),
-        planck.Vec2(world.x + r, world.y + r),
-      ),
+      planck.AABB(planck.Vec2(world.x - r, world.y - r), planck.Vec2(world.x + r, world.y + r)),
       (fixture) => {
         const body = fixture.getBody();
         if (!body.isDynamic()) return true;

@@ -1,6 +1,6 @@
 import type * as planck from "planck";
+import { ERASE_RADIUS_PX, type InputManager } from "../interaction/InputManager";
 import type { Camera } from "./Camera";
-import { type InputManager, ERASE_RADIUS_PX } from "../interaction/InputManager";
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
