@@ -13,8 +13,10 @@ export class Renderer {
 
   resize() {
     const dpr = window.devicePixelRatio || 1;
-    this.canvas.width = window.innerWidth * dpr;
-    this.canvas.height = window.innerHeight * dpr;
+    // Use clientWidth/Height to match actual CSS layout size (100vw/100vh)
+    // window.innerWidth/Height can differ on mobile due to browser chrome
+    this.canvas.width = this.canvas.clientWidth * dpr;
+    this.canvas.height = this.canvas.clientHeight * dpr;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
