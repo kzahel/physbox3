@@ -122,6 +122,9 @@ export class Renderer {
     // Conveyor belt animation
     this.drawConveyorAnimation(world, camera);
 
+    // Balloon strings
+    this.drawBalloonStrings(world, camera);
+
     // Dynamite wick + sparks
     this.drawDynamiteEffects(world, camera);
 
@@ -409,6 +412,52 @@ export class Renderer {
         ctx.stroke();
       }
 
+      ctx.restore();
+    }
+  }
+
+  private drawBalloonStrings(world: planck.World, camera: Camera) {
+    const ctx = this.ctx;
+    for (let body = world.getBodyList(); body; body = body.getNext()) {
+      const ud = body.getUserData() as { label?: string; fill?: string } | null;
+      if (ud?.label !== "balloon") continue;
+
+      const pos = body.getPosition();
+      const angle = body.getAngle();
+
+      // Get radius from first fixture
+      const fixture = body.getFixtureList();
+      if (!fixture) continue;
+      const shape = fixture.getShape() as planck.CircleShape;
+      const radius = shape.getRadius();
+
+      // String hangs from bottom of balloon, with a slight wave
+      const bottomX = pos.x - Math.sin(angle) * radius;
+      const bottomY = pos.y - Math.cos(angle) * radius;
+      const stringLen = radius * 3;
+      const sp = camera.toScreen(bottomX, bottomY, this.canvas);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(sp.x, sp.y);
+      // Wavy string using quadratic curves
+      const segments = 3;
+      const segLen = (stringLen * camera.zoom) / segments;
+      for (let i = 0; i < segments; i++) {
+        const wobble = (i % 2 === 0 ? 1 : -1) * 4;
+        ctx.quadraticCurveTo(sp.x + wobble, sp.y + segLen * (i + 0.5), sp.x, sp.y + segLen * (i + 1));
+      }
+      ctx.strokeStyle = ud.fill ?? "rgba(200,200,200,0.6)";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Highlight / shine on the balloon
+      const center = camera.toScreen(pos.x, pos.y, this.canvas);
+      const shineR = radius * camera.zoom * 0.3;
+      ctx.beginPath();
+      ctx.arc(center.x - shineR, center.y - shineR, shineR, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.25)";
+      ctx.fill();
       ctx.restore();
     }
   }

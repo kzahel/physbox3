@@ -454,6 +454,32 @@ export class Game {
     return body;
   }
 
+  addBalloon(x: number, y: number) {
+    const r = Math.random;
+    const radius = 0.5 + r() * 0.3;
+    const hue = Math.floor(r() * 360);
+    const color = `hsla(${hue},70%,55%,0.75)`;
+
+    // Balloon body (circle, very light)
+    const body = this.world.createBody({
+      type: "dynamic",
+      position: planck.Vec2(x, y),
+      linearDamping: 0.5,
+      angularDamping: 1,
+    });
+    body.createFixture({ shape: planck.Circle(radius), density: 0.05, friction: 0.1, restitution: 0.4 });
+
+    // Small weight at the bottom (string knot)
+    body.createFixture({
+      shape: planck.Circle(planck.Vec2(0, -radius - 0.15), 0.06),
+      density: 0.5,
+    });
+
+    const lift = 12 + r() * 8; // buoyancy force multiplier
+    body.setUserData({ fill: color, label: "balloon", lift });
+    return body;
+  }
+
   addConveyor(x: number, y: number, w = 6, speed = 3, angle = 0) {
     const body = this.world.createBody({ type: "kinematic", position: planck.Vec2(x, y), angle });
     const fixture = body.createFixture({ shape: planck.Box(w / 2, 0.2), friction: 1 });
@@ -659,6 +685,16 @@ export class Game {
     }
   }
 
+  private applyBalloonLift() {
+    for (let b = this.world.getBodyList(); b; b = b.getNext()) {
+      if (!b.isDynamic()) continue;
+      const ud = b.getUserData() as { label?: string; lift?: number } | null;
+      if (ud?.label !== "balloon" || !ud.lift) continue;
+      // Upward force opposing gravity
+      b.applyForceToCenter(planck.Vec2(0, ud.lift * b.getMass()), true);
+    }
+  }
+
   clearDynamic() {
     const toRemove: planck.Body[] = [];
     for (let b = this.world.getBodyList(); b; b = b.getNext()) {
@@ -713,6 +749,7 @@ export class Game {
     if (!this.paused) {
       this.inputManager?.update();
       this.applyRocketThrust();
+      this.applyBalloonLift();
       this.accumulator += dt * this.timeScale;
       while (this.accumulator >= TIMESTEP) {
         this.world.step(TIMESTEP, this.velocityIterations, this.positionIterations);

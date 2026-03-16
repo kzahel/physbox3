@@ -22,6 +22,7 @@ const ICONS: Record<Tool, string> = {
   attract: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><circle cx="4" cy="9" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="14" cy="9" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 9h2M10 7l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   select: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><path d="M4 3l10 6-5 1-2 5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
   scale: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><rect x="5" y="5" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="2 1"/><path d="M13 5l3-3M16 2v3h-3M5 13l-3 3M2 16v-3h3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  balloon: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><ellipse cx="9" cy="7" rx="5" ry="6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M9 13q-0.5 1 0 2t-1 2" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>`,
 };
 
 const TOOLS: { id: Tool; label: string }[] = [
@@ -35,6 +36,7 @@ const TOOLS: { id: Tool; label: string }[] = [
   { id: "launcher", label: "Launch" },
   { id: "seesaw", label: "Seesaw" },
   { id: "rocket", label: "Rocket" },
+  { id: "balloon", label: "Balloon" },
   { id: "conveyor", label: "Belt" },
   { id: "dynamite", label: "TNT" },
   { id: "ropetool", label: "Tie" },
