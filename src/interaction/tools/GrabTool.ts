@@ -46,6 +46,9 @@ export class GrabTool implements ToolHandler {
   }
 
   private startGrab(wx: number, wy: number, radiusPx = 5) {
+    // Clean up any existing grab before starting a new one
+    this.onUp();
+
     const radius = radiusPx / this.ctx.game.camera.zoom;
     const point = planck.Vec2(wx, wy);
     let target: planck.Body | null = null;

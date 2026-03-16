@@ -347,6 +347,7 @@ export class InputManager {
       if (this.tool === "grab") {
         const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.canvas);
         h.onDown?.(world.x, world.y, t.clientX, t.clientY);
+        this.touchToolFired = true;
       } else if (this.tool === "scale") {
         const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.canvas);
         h.onDown?.(world.x, world.y, t.clientX, t.clientY);
