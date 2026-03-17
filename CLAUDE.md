@@ -2,25 +2,34 @@
 
 2D physics sandbox. Migrating from Planck.js (Box2D v2.4) to box2d3-wasm (Box2D v3, WASM+SIMD).
 
-## Status: MIGRATION IN PROGRESS
+## Status: MIGRATION IN PROGRESS — Phase 1 Complete
 
-See `docs/migration-plan.md` for the full plan. Currently in early Phase 0/1.
+See `docs/migration-plan.md` for the full plan and `docs/box2d3-wasm-reference.md` for the complete API reference.
 
-**What works:** Type declarations, Box2D WASM init singleton, PhysWorld wrapper.
-**What doesn't:** Everything else — the codebase still has planck imports everywhere.
+**Phase 1 done:** Game.ts, Physics.ts, Interpolation.ts, IRenderer.ts, main.ts — all migrated, 0 TS errors.
+**Next:** Phase 2 (Renderers), then Phase 3A (simple prefabs) for first visual test.
+**Remaining errors:** 176 TS errors in unmigrated files (prefabs, tools, renderers still import planck).
 
 ## Build & Dev
 
 - `npm run dev` — start dev server
 - `npm run build` — production build
 - `npm run lint` — biome check (formatting + linting)
-- `npx tsc --noEmit` — type check (currently fails — 46 files still import planck)
+- `npx tsc --noEmit` — type check (176 errors remain in unmigrated files)
+
+## Key Documentation
+
+- `docs/migration-plan.md` — phased migration plan with status, gotchas, and order of work
+- `docs/box2d3-wasm-reference.md` — **complete API reference** for box2d3-wasm. Covers all types, classes, methods, enums, events, and ID types. Use this as the authoritative source for API signatures — the auto-generated `.d.ts` is incomplete (e.g., missing `world.Create*Joint()` OOP methods).
 
 ## Architecture
 
 - `src/engine/Box2D.ts` — WASM module singleton (async init)
 - `src/engine/PhysWorld.ts` — World wrapper (body/joint tracking, userData, events)
-- `src/engine/Game.ts` — game loop, prefab delegates (needs migration)
+- `src/engine/Game.ts` — game loop, prefab delegates (`Game.pw` is a `PhysWorld`)
+- `src/engine/Physics.ts` — body queries, explosions, scaling, joint helpers (all take `PhysWorld`)
+- `src/engine/Interpolation.ts` — frame interpolation (uses box2d3 Body type)
+- `src/engine/IRenderer.ts` — renderer interface (`drawWorld` takes `PhysWorld`)
 - `src/engine/Renderer.ts` — canvas rendering (needs migration)
 - `src/engine/Camera.ts` — world/screen coordinate transforms, zoom, pan
 - `src/interaction/InputManager.ts` — input handling, tool logic
@@ -38,6 +47,45 @@ See `docs/migration-plan.md` for the full plan. Currently in early Phase 0/1.
 - Body/joint iteration via `PhysWorld.forEachBody()` / `forEachJoint()` (tracked Set)
 - Events polled after `world.Step()` via `PhysWorld.processEvents()`
 - No MouseJoint in v3 — use MotorJoint for grab tool
+
+### Critical: ID arrays vs OOP wrappers
+
+- `body.GetShapes()` returns **`b2ShapeId[]`** (plain ID structs), NOT `Shape[]` OOP wrappers. Use flat API: `b2Shape_GetType(id)`, `b2Shape_GetCircle(id)`, `b2Shape_TestPoint(id, point)`, etc.
+- `body.GetJoints()` returns **`b2JointId[]`** (plain ID structs), NOT `Joint[]` OOP wrappers. Use flat API: `b2Joint_GetType(id)`, `b2Joint_GetBodyA(id)`, etc.
+- `body.GetPointer()` / `world.GetPointer()` return internal indices usable with flat API functions that expect ID types.
+
+### Established Migration Patterns
+
+```typescript
+// Body creation
+const B2 = b2();
+const bodyDef = B2.b2DefaultBodyDef();
+bodyDef.type = B2.b2BodyType.b2_dynamicBody;
+bodyDef.position = new B2.b2Vec2(x, y);
+const body = pw.createBody(bodyDef);
+
+// Shape creation
+const shapeDef = B2.b2DefaultShapeDef();
+shapeDef.density = 1;
+shapeDef.enableHitEvents = true;
+shapeDef.material.restitution = 0.5;
+body.CreateCircleShape(shapeDef, circle);
+body.CreatePolygonShape(shapeDef, B2.b2MakeBox(halfW, halfH));
+
+// UserData
+pw.setUserData(body, { fill: "#f00", label: "ball" });
+
+// Body type check
+isDynamic(body)  // body.GetType().value === B2.b2BodyType.b2_dynamicBody.value
+
+// Body angle
+B2.b2Rot_GetAngle(body.GetRotation())
+
+// Shape geometry (via flat API on b2ShapeId)
+const shapeIds: b2ShapeId[] = body.GetShapes();
+B2.b2Shape_GetCircle(shapeId)   // → b2Circle { center, radius }
+B2.b2Shape_GetPolygon(shapeId)  // → b2Polygon { count, GetVertex(i) }
+```
 
 ### Mobile / Touch is First Class
 
