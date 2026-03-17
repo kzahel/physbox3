@@ -12,7 +12,7 @@ import {
 import type { Camera } from "./Camera";
 import { KILL_Y, KILL_Y_TOP } from "./Game";
 import type { IRenderer } from "./IRenderer";
-import { type Particle, ParticleSystem } from "./ParticleSystem";
+import { ParticleSystem } from "./ParticleSystem";
 import { BTN_DIRECTION_OFFSET_Y, BTN_HALF_HEIGHT, BTN_HALF_WIDTH, BTN_SPACING, BTN_TOGGLE_OFFSET_Y } from "./Renderer";
 
 // ── Color parsing ──
@@ -133,11 +133,6 @@ export class ThreeJSRenderer implements IRenderer {
   private oceanMesh: THREE.Mesh;
   private skyMesh: THREE.Mesh;
 
-  // Particle points
-  private pointsGeometry: THREE.BufferGeometry;
-  private pointsMaterial: THREE.PointsMaterial;
-  private pointsMesh: THREE.Points;
-
   // The container element holding canvases
   private container: HTMLElement;
   // The original 2D canvas (hidden while 3D is active)
@@ -217,20 +212,7 @@ export class ThreeJSRenderer implements IRenderer {
     this.skyMesh.position.set(0, KILL_Y_TOP + 100, -1);
     this.scene.add(this.skyMesh);
 
-    // Particle points system
-    this.pointsGeometry = new THREE.BufferGeometry();
-    this.pointsMaterial = new THREE.PointsMaterial({
-      size: 0.15,
-      vertexColors: true,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-    this.pointsMesh = new THREE.Points(this.pointsGeometry, this.pointsMaterial);
-    this.pointsMesh.position.z = 1;
-    this.scene.add(this.pointsMesh);
-
-    // Overlay canvas for 2D UI (tool cursors, buttons, text)
+    // Overlay canvas for 2D UI (tool cursors, buttons, text, particles)
     this.overlayCanvas = document.createElement("canvas");
     this.overlayCanvas.style.cssText =
       "position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;";
@@ -254,9 +236,6 @@ export class ThreeJSRenderer implements IRenderer {
       this.scene.remove(group);
     }
     this.jointLines.clear();
-
-    this.pointsGeometry.dispose();
-    this.pointsMaterial.dispose();
 
     this.glRenderer.dispose();
     this.overlayCanvas.remove();
@@ -305,9 +284,8 @@ export class ThreeJSRenderer implements IRenderer {
     // Reconcile joints
     this.syncJoints(world);
 
-    // Update particles
+    // Update particles (drawn on overlay)
     this.particles.tick();
-    this.syncParticles();
 
     // Render 3D scene
     this.glRenderer.render(this.scene, this.camera3d);
@@ -545,29 +523,19 @@ export class ThreeJSRenderer implements IRenderer {
     return points;
   }
 
-  // ── Particles ──
+  // ── Particles (drawn on 2D overlay for correct per-particle sizing) ──
 
-  private syncParticles() {
-    const particles = this.particles.getParticles();
-    const count = particles.length;
-
-    const positions = new Float32Array(count * 3);
-    const colors = new Float32Array(count * 3);
-
-    for (let i = 0; i < count; i++) {
-      const p = particles[i] as Particle;
-      positions[i * 3] = p.x;
-      positions[i * 3 + 1] = p.y;
-      positions[i * 3 + 2] = 1;
-
+  private drawParticles(camera: Camera) {
+    const ctx = this.overlayCtx;
+    for (const p of this.particles.getParticles()) {
+      const sp = camera.toScreen(p.x, p.y, this.glCanvas);
       const alpha = p.life / p.maxLife;
-      colors[i * 3] = (p.r / 255) * alpha;
-      colors[i * 3 + 1] = (p.g / 255) * alpha;
-      colors[i * 3 + 2] = (p.b / 255) * alpha;
+      const r = p.size * camera.zoom;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, Math.max(1, r), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha.toFixed(2)})`;
+      ctx.fill();
     }
-
-    this.pointsGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    this.pointsGeometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
   }
 
   // ── 2D Overlay (tool cursors, buttons, previews) ──
@@ -582,6 +550,9 @@ export class ThreeJSRenderer implements IRenderer {
 
     // Balloon strings
     this.drawBalloonStrings(world, camera);
+
+    // Particles
+    this.drawParticles(camera);
 
     // Tool cursor
     if (this.inputManager?.toolCursor) {
