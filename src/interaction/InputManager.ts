@@ -283,7 +283,7 @@ export class InputManager {
       return;
     }
 
-    const world = this.game.camera.toWorld(e.clientX, e.clientY, this.game.canvas);
+    const world = this.game.camera.toWorld(e.clientX, e.clientY, this.game.container);
     this.handler.onDown?.(world.x, world.y, e.clientX, e.clientY);
     this.startMultiPlace();
   }
@@ -299,7 +299,7 @@ export class InputManager {
       return;
     }
 
-    const world = this.game.camera.toWorld(e.clientX, e.clientY, this.game.canvas);
+    const world = this.game.camera.toWorld(e.clientX, e.clientY, this.game.container);
     this.handler.onMove?.(world.x, world.y, dx, dy, e.clientX, e.clientY);
 
     // Brush tools: continuous application while dragging
@@ -317,7 +317,7 @@ export class InputManager {
   private onWheel(e: WheelEvent) {
     e.preventDefault();
     const factor = e.deltaY > 0 ? 0.9 : 1.1;
-    this.game.camera.zoomAt(e.clientX, e.clientY, factor, this.game.canvas);
+    this.game.camera.zoomAt(e.clientX, e.clientY, factor, this.game.container);
   }
 
   // ── Touch events ──
@@ -346,19 +346,19 @@ export class InputManager {
 
       // Tools that need immediate touch-start action
       if (this.tool === "grab") {
-        const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.canvas);
+        const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.container);
         h.onDown?.(world.x, world.y, t.clientX, t.clientY);
         this.touchToolFired = true;
       } else if (this.tool === "scale") {
-        const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.canvas);
+        const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.container);
         h.onDown?.(world.x, world.y, t.clientX, t.clientY);
         this.touchToolFired = true;
       } else if (this.isPlatformDrawTool()) {
-        const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.canvas);
+        const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.container);
         h.onDown?.(world.x, world.y, t.clientX, t.clientY);
         this.touchToolFired = true;
       } else if (this.isBrushTool()) {
-        const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.canvas);
+        const world = this.game.camera.toWorld(t.clientX, t.clientY, this.game.container);
         h.onDown?.(world.x, world.y, t.clientX, t.clientY);
         this.touchToolFired = true;
       }
@@ -392,12 +392,12 @@ export class InputManager {
       if (prevDist > 0) {
         const midX = (curA.x + curB.x) / 2;
         const midY = (curA.y + curB.y) / 2;
-        this.game.camera.zoomAt(midX, midY, curDist / prevDist, this.game.canvas);
+        this.game.camera.zoomAt(midX, midY, curDist / prevDist, this.game.container);
       }
     } else if (cur.length === 1 && this.lastTouches.length >= 1) {
       const t = cur[0];
       this.toolCursor = { x: t.x, y: t.y };
-      const world = this.game.camera.toWorld(t.x, t.y, this.game.canvas);
+      const world = this.game.camera.toWorld(t.x, t.y, this.game.container);
       const prev = this.lastTouches.find((lt) => lt.id === t.id) ?? this.lastTouches[0];
       const dx = t.x - prev.x;
       const dy = t.y - prev.y;
@@ -428,7 +428,7 @@ export class InputManager {
     // Single-finger tap — fire tool
     if (e.touches.length === 0 && this.lastTouches.length === 1 && !this.touchToolFired) {
       const t = this.lastTouches[0];
-      const world = this.game.camera.toWorld(t.x, t.y, this.game.canvas);
+      const world = this.game.camera.toWorld(t.x, t.y, this.game.container);
       this.handler.onDown?.(world.x, world.y, t.x, t.y);
     }
 
@@ -448,7 +448,7 @@ export class InputManager {
     if (!this.multiPlace || !this.handler.isCreationTool) return;
     this.stopMultiPlace();
     this.multiPlaceInterval = setInterval(() => {
-      const world = this.game.camera.toWorld(this.lastMouse.x, this.lastMouse.y, this.game.canvas);
+      const world = this.game.camera.toWorld(this.lastMouse.x, this.lastMouse.y, this.game.container);
       this.handler.onDown?.(world.x, world.y, this.lastMouse.x, this.lastMouse.y);
     }, 100);
   }
