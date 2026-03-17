@@ -210,6 +210,7 @@ export class ThreeJSRenderer implements IRenderer {
       vertexColors: true,
       transparent: true,
       depthWrite: false,
+      depthTest: false,
       blending: THREE.AdditiveBlending,
     });
     this.pointsMesh = new THREE.Points(this.pointsGeometry, this.pointsMaterial);
@@ -567,6 +568,7 @@ export class ThreeJSRenderer implements IRenderer {
 
     this.pointsGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
     this.pointsGeometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+    this.pointsGeometry.setDrawRange(0, count);
   }
 
   // ── 2D Overlay (tool cursors, buttons, previews) ──
