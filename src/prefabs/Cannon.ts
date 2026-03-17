@@ -8,8 +8,8 @@ import type { PhysWorld } from "../engine/PhysWorld";
 const CANNON_FIRE_INTERVAL = 1;
 const CANNONBALL_SPEED = 20;
 const CANNONBALL_LIFETIME = 5;
-const CANNONBALL_EXPLOSION_RADIUS = 5;
-const CANNONBALL_EXPLOSION_FORCE = 2;
+const CANNONBALL_EXPLOSION_RADIUS = 12;
+const CANNONBALL_EXPLOSION_FORCE = 5;
 
 export function createCannon(pw: PhysWorld, x: number, y: number, angle: number): Body {
   const B2 = b2();

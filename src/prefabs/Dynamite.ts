@@ -4,8 +4,8 @@ import { b2 } from "../engine/Box2D";
 import { forEachBodyByLabel, markDestroyed } from "../engine/Physics";
 import type { PhysWorld } from "../engine/PhysWorld";
 
-const DYNAMITE_EXPLOSION_RADIUS = 8;
-const DYNAMITE_EXPLOSION_FORCE = 3;
+const DYNAMITE_EXPLOSION_RADIUS = 15;
+const DYNAMITE_EXPLOSION_FORCE = 6;
 
 export function createDynamite(pw: PhysWorld, x: number, y: number, fuseTime = 3): Body {
   const B2 = b2();
