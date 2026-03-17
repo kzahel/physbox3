@@ -17,24 +17,23 @@ import { BTN_DIRECTION_OFFSET_Y, BTN_HALF_HEIGHT, BTN_HALF_WIDTH, BTN_SPACING, B
 
 // ── Color parsing ──
 
-function parseRGBA(color: string): { r: number; g: number; b: number; a: number } {
-  const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-  if (!m) return { r: 120, g: 160, b: 255, a: 0.6 };
-  return {
-    r: parseInt(m[1], 10) / 255,
-    g: parseInt(m[2], 10) / 255,
-    b: parseInt(m[3], 10) / 255,
-    a: m[4] != null ? parseFloat(m[4]) : 1,
-  };
+const _colorCtx = document.createElement("canvas").getContext("2d")!;
+
+function parseColor(color: string): { r: number; g: number; b: number; a: number } {
+  _colorCtx.clearRect(0, 0, 1, 1);
+  _colorCtx.fillStyle = color;
+  _colorCtx.fillRect(0, 0, 1, 1);
+  const d = _colorCtx.getImageData(0, 0, 1, 1).data;
+  return { r: d[0] / 255, g: d[1] / 255, b: d[2] / 255, a: d[3] / 255 };
 }
 
 function rgbaToThreeColor(color: string): THREE.Color {
-  const c = parseRGBA(color);
+  const c = parseColor(color);
   return new THREE.Color(c.r, c.g, c.b);
 }
 
 function rgbaToOpacity(color: string): number {
-  return parseRGBA(color).a;
+  return parseColor(color).a;
 }
 
 // ── Cursor styles (same as Canvas renderer) ──
