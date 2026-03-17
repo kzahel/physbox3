@@ -3,8 +3,7 @@ import type { Game } from "../engine/Game";
 export class TiltGravity {
   private game: Game;
   private active = false;
-  private orientationHandler: ((e: DeviceOrientationEvent) => void) | null =
-    null;
+  private orientationHandler: ((e: DeviceOrientationEvent) => void) | null = null;
   private motionHandler: ((e: DeviceMotionEvent) => void) | null = null;
   private magnitude: number;
 
@@ -17,9 +16,9 @@ export class TiltGravity {
   private accelY = 0;
 
   // Smoothing factor to reduce jitter (0 = no smoothing, 1 = frozen)
-  private static readonly ACCEL_SMOOTH = 0.3;
-  // Scale factor for inertial effect (1.0 = physically accurate)
-  private static readonly ACCEL_SCALE = 1.0;
+  private static readonly ACCEL_SMOOTH = 0.15;
+  // Scale factor for inertial effect (1.0 = physically accurate, higher = more dramatic)
+  private static readonly ACCEL_SCALE = 3.0;
 
   constructor(game: Game) {
     this.game = game;
@@ -95,28 +94,38 @@ export class TiltGravity {
   }
 
   private onMotion(e: DeviceMotionEvent) {
-    // Use gravity-subtracted acceleration (pure user motion).
-    // Falls back to accelerationIncludingGravity if unavailable,
-    // but that case is handled by tilt gravity already covering the gravity part.
+    // Prefer gravity-subtracted acceleration (pure user motion).
+    // Fall back to accelerationIncludingGravity minus our tilt-derived gravity
+    // (many devices don't provide the separated acceleration).
+    let ax: number;
+    let ay: number;
     const a = e.acceleration;
-    if (!a || a.x == null || a.y == null) return;
+    if (a && a.x != null && a.y != null) {
+      ax = a.x;
+      ay = a.y;
+    } else {
+      const ag = e.accelerationIncludingGravity;
+      if (!ag || ag.x == null || ag.y == null) return;
+      // accelerationIncludingGravity is in device frame and includes ~9.8 m/s²
+      // from Earth gravity. Subtract what we already model via tilt gravity
+      // (tiltGx/tiltGy are in world coords which match device coords here).
+      ax = ag.x - this.tiltGx;
+      ay = ag.y - -this.tiltGy; // ag.y positive = up in device frame, tiltGy is world (Y-up negated)
+    }
 
     // Device coords: x = right, y = up (in portrait).
     // In the inertial frame, accelerating the phone right means objects
     // experience a pseudo-force to the left: negate both axes.
-    // Phone Y-up maps to our world Y-up; phone X-right maps to world X-right.
     const k = TiltGravity.ACCEL_SMOOTH;
-    this.accelX = this.accelX * k + -a.x * TiltGravity.ACCEL_SCALE * (1 - k);
-    this.accelY = this.accelY * k + -a.y * TiltGravity.ACCEL_SCALE * (1 - k);
+    const s = TiltGravity.ACCEL_SCALE;
+    this.accelX = this.accelX * k + -ax * s * (1 - k);
+    this.accelY = this.accelY * k + -ay * s * (1 - k);
 
     this.applyGravity();
   }
 
   private applyGravity() {
     // Combine tilt gravity with inertial pseudo-force
-    this.game.setGravityXY(
-      this.tiltGx + this.accelX,
-      this.tiltGy + this.accelY,
-    );
+    this.game.setGravityXY(this.tiltGx + this.accelX, this.tiltGy + this.accelY);
   }
 }
