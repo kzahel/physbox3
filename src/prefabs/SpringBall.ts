@@ -1,6 +1,6 @@
 import type { Body } from "box2d3";
 import { b2 } from "../engine/Box2D";
-import { createDistanceJoint } from "../engine/Physics";
+import { createDistanceJoint, distance } from "../engine/Physics";
 import type { PhysWorld } from "../engine/PhysWorld";
 
 export function createSpringBall(pw: PhysWorld, x: number, y: number): Body {
@@ -73,7 +73,7 @@ export function createSpringBall(pw: PhysWorld, x: number, y: number): Body {
     const b = pods[(i + 1) % sides];
     const aPos = a.GetPosition();
     const bPos = b.GetPosition();
-    const edgeLen = Math.hypot(aPos.x - bPos.x, aPos.y - bPos.y);
+    const edgeLen = distance(aPos, bPos);
     createDistanceJoint(
       pw,
       a,

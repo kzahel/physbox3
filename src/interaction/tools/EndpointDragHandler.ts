@@ -1,6 +1,7 @@
 import type { Body, b2ShapeId } from "box2d3";
 import { getBodyUserData } from "../../engine/BodyUserData";
 import { b2 } from "../../engine/Box2D";
+import { distance } from "../../engine/Physics";
 import type { ToolContext } from "../ToolHandler";
 
 const ENDPOINT_SNAP_PX = 24;
@@ -109,8 +110,9 @@ export class EndpointDragHandler {
     const endB = body.GetWorldPoint(new B2.b2Vec2(halfWidth, 0));
 
     const snapRadius = ENDPOINT_SNAP_PX / this.ctx.game.camera.zoom;
-    const distA = Math.hypot(wx - endA.x, wy - endA.y);
-    const distB = Math.hypot(wx - endB.x, wy - endB.y);
+    const pt = { x: wx, y: wy };
+    const distA = distance(pt, endA);
+    const distB = distance(pt, endB);
 
     const minDist = Math.min(distA, distB);
     if (minDist > snapRadius) return null;

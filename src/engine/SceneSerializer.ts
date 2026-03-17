@@ -143,8 +143,8 @@ export function serializeScene(game: Game): SceneData {
     const links = chainBodies.length + 1;
 
     ropes.push({
-      bodyAId: ropeBodies.has(bodyA) ? null : -1, // placeholder
-      bodyBId: ropeBodies.has(bodyB) ? null : -1,
+      bodyAId: null, // resolved below after body IDs are assigned
+      bodyBId: null,
       x1: anchorA.x,
       y1: anchorA.y,
       x2: anchorB.x,

@@ -335,7 +335,13 @@ export class Game {
 
   setBounciness(value: number) {
     this.bounciness = value;
-    // TODO: update material restitution on existing shapes or use restitution callback
+    const B2 = b2();
+    this.pw.forEachBody((body) => {
+      if (!isDynamic(body)) return;
+      for (const shapeId of body.GetShapes()) {
+        B2.b2Shape_SetRestitution(shapeId, value);
+      }
+    });
   }
 
   setGravity(g: number) {
