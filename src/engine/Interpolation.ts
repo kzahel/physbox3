@@ -1,5 +1,6 @@
-import type * as planck from "planck";
-import { forEachBody } from "./Physics";
+import type { Body, b2Vec2 } from "box2d3";
+import { b2 } from "./Box2D";
+import type { PhysWorld } from "./PhysWorld";
 
 /** Snapshot of a body's transform at a previous physics step. */
 export interface BodySnapshot {
@@ -13,16 +14,17 @@ export interface Interpolation {
   /** Blend factor: 0 = previous physics state, 1 = current physics state. */
   alpha: number;
   /** Previous-step transforms keyed by body. Missing entries = no interpolation (use current). */
-  prev: WeakMap<planck.Body, BodySnapshot>;
+  prev: WeakMap<Body, BodySnapshot>;
 }
 
 /** Default interpolation (alpha=1, no blending — equivalent to pre-interpolation behavior). */
 export const NO_INTERP: Interpolation = { alpha: 1, prev: new WeakMap() };
 
 /** Return the interpolated position and angle for a body. */
-export function lerpBody(body: planck.Body, interp: Interpolation): { x: number; y: number; angle: number } {
-  const cur = body.getPosition();
-  const curAngle = body.getAngle();
+export function lerpBody(body: Body, interp: Interpolation): { x: number; y: number; angle: number } {
+  const B2 = b2();
+  const cur = body.GetPosition();
+  const curAngle = B2.b2Rot_GetAngle(body.GetRotation());
   const prev = interp.prev.get(body);
   if (!prev || interp.alpha >= 1) {
     return { x: cur.x, y: cur.y, angle: curAngle };
@@ -36,20 +38,16 @@ export function lerpBody(body: planck.Body, interp: Interpolation): { x: number;
 }
 
 /**
- * Interpolated equivalent of body.getWorldPoint(localPoint).
+ * Interpolated equivalent of body.GetWorldPoint(localPoint).
  * Converts a current world-space point to local, then back to world using interpolated transform.
  */
-export function lerpWorldPoint(
-  body: planck.Body,
-  worldPoint: planck.Vec2Value,
-  interp: Interpolation,
-): { x: number; y: number } {
+export function lerpWorldPoint(body: Body, worldPoint: b2Vec2, interp: Interpolation): { x: number; y: number } {
   const prev = interp.prev.get(body);
   if (!prev || interp.alpha >= 1) {
     return { x: worldPoint.x, y: worldPoint.y };
   }
   // Convert world point to local space using current body transform
-  const localP = body.getLocalPoint(worldPoint);
+  const localP = body.GetLocalPoint(worldPoint);
   // Re-project using interpolated transform
   const s = lerpBody(body, interp);
   const cos = Math.cos(s.angle);
@@ -61,9 +59,10 @@ export function lerpWorldPoint(
 }
 
 /** Snapshot all body transforms into the WeakMap. Call before physics stepping. */
-export function snapshotBodies(world: planck.World, prev: WeakMap<planck.Body, BodySnapshot>): void {
-  forEachBody(world, (body) => {
-    const pos = body.getPosition();
-    prev.set(body, { x: pos.x, y: pos.y, angle: body.getAngle() });
+export function snapshotBodies(pw: PhysWorld, prev: WeakMap<Body, BodySnapshot>): void {
+  const B2 = b2();
+  pw.forEachBody((body) => {
+    const pos = body.GetPosition();
+    prev.set(body, { x: pos.x, y: pos.y, angle: B2.b2Rot_GetAngle(body.GetRotation()) });
   });
 }

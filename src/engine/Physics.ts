@@ -1,7 +1,9 @@
-import * as planck from "planck";
+import type { Body, b2ShapeId, Joint } from "box2d3";
 import { playExplosion } from "./Audio";
 import { type BodyUserData, getBodyUserData } from "./BodyUserData";
+import { b2 } from "./Box2D";
 import type { IRenderer } from "./IRenderer";
+import type { PhysWorld } from "./PhysWorld";
 
 /** Clamp a value between min and max (inclusive). */
 export function clamp(v: number, min: number, max: number): number {
@@ -13,260 +15,304 @@ export function distance(a: { x: number; y: number }, b: { x: number; y: number 
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-/** Iterate all bodies in the world (hides Planck's linked-list API). */
-export function forEachBody(world: planck.World, cb: (body: planck.Body) => void): void {
-  for (let b = world.getBodyList(); b; b = b.getNext()) cb(b);
+/** Check if a body is dynamic. */
+export function isDynamic(body: Body): boolean {
+  const B2 = b2();
+  return body.GetType().value === B2.b2BodyType.b2_dynamicBody.value;
+}
+
+/** Get the angle of a body in radians. */
+export function bodyAngle(body: Body): number {
+  return b2().b2Rot_GetAngle(body.GetRotation());
+}
+
+/** Iterate all bodies in the world. */
+export function forEachBody(pw: PhysWorld, cb: (body: Body) => void): void {
+  pw.forEachBody(cb);
 }
 
 /** Iterate all bodies matching a type guard, passing the narrowed userData to the callback. */
 export function forEachBodyByLabel<T extends BodyUserData>(
-  world: planck.World,
+  pw: PhysWorld,
   guard: (ud: BodyUserData | null) => ud is T,
-  cb: (body: planck.Body, ud: T) => void,
+  cb: (body: Body, ud: T) => void,
   dynamicOnly = false,
 ): void {
-  forEachBody(world, (b) => {
-    if (dynamicOnly && !b.isDynamic()) return;
-    const ud = getBodyUserData(b);
+  pw.forEachBody((b) => {
+    if (dynamicOnly && !isDynamic(b)) return;
+    const ud = getBodyUserData(pw, b);
     if (guard(ud)) cb(b, ud);
   });
 }
 
-/**
- * Create a function that registers a world listener at most once per world instance.
- * Returns a guard function: call it with a world before using the listener.
- */
-export function createWorldListener(register: (world: planck.World) => void): (world: planck.World) => void {
-  const registered = new WeakSet<planck.World>();
-  return (world) => {
-    if (registered.has(world)) return;
-    registered.add(world);
-    register(world);
-  };
-}
-
 /** Mark a body as destroyed in its userData so timer-based prefabs (cannons, dynamite) stop. */
-export function markDestroyed(body: planck.Body): void {
-  const ud = (body.getUserData() ?? {}) as Record<string, unknown>;
-  ud.destroyed = true;
-  body.setUserData(ud);
+export function markDestroyed(pw: PhysWorld, body: Body): void {
+  const ud = pw.getUserData(body);
+  if (ud) {
+    ud.destroyed = true;
+    pw.setUserData(body, ud);
+  } else {
+    pw.setUserData(body, { destroyed: true });
+  }
 }
 
-/** Reusable explosion: particles, sound, radial impulse */
+/** Reusable explosion: particles, sound, built-in radial impulse */
 export function explodeAt(
-  world: planck.World,
+  pw: PhysWorld,
   renderer: IRenderer,
   wx: number,
   wy: number,
   radius: number,
   force: number,
 ): void {
-  const center = planck.Vec2(wx, wy);
+  const B2 = b2();
   renderer.particles.spawnExplosion(wx, wy);
   playExplosion(0.3);
 
-  const affected = queryBodiesInRadius(world, wx, wy, radius);
-
-  for (const b of affected) {
-    if (!b.isDynamic()) continue;
-    const dir = planck.Vec2.sub(b.getPosition(), center);
-    const len = planck.Vec2.lengthOf(dir);
-    if (len < 0.01) continue;
-    const falloff = 1 - len / radius;
-    const impulse = planck.Vec2.mul(dir, (force * falloff * b.getMass()) / len);
-    b.applyLinearImpulse(impulse, b.getPosition(), true);
-  }
+  const def = B2.b2DefaultExplosionDef();
+  def.position = new B2.b2Vec2(wx, wy);
+  def.radius = radius;
+  def.falloff = radius;
+  def.impulsePerLength = force;
+  pw.explode(def);
 }
 
-/** Recreate a body with all fixtures scaled */
-export function scaleBody(_world: planck.World, body: planck.Body, scale: number): planck.Body {
-  // Replace fixtures in-place (preserves joints, no body recreation needed)
-  // Shapes are immutable in Box2D, so we destroy and recreate each fixture.
-  const fixtureData: {
+/** Recreate a body's shapes at a new scale. */
+export function scaleBody(_pw: PhysWorld, body: Body, scale: number): Body {
+  const B2 = b2();
+
+  // Collect shape data before destroying
+  const shapeData: {
+    type: number; // b2ShapeType value
     density: number;
     friction: number;
     restitution: number;
     isSensor: boolean;
-    userData: unknown;
-    shapeType: string;
+    // Circle data
     radius?: number;
-    center?: { x: number; y: number };
+    centerX?: number;
+    centerY?: number;
+    // Polygon data
     verts?: { x: number; y: number }[];
   }[] = [];
 
-  for (let f = body.getFixtureList(); f; f = f.getNext()) {
-    const shape = f.getShape();
-    const fd = {
-      density: f.getDensity(),
-      friction: f.getFriction(),
-      restitution: f.getRestitution(),
-      isSensor: f.isSensor(),
-      userData: f.getUserData(),
-      shapeType: shape.getType(),
-    } as (typeof fixtureData)[number];
+  const shapes = body.GetShapes();
+  if (shapes) {
+    for (let i = 0; i < shapes.length; i++) {
+      const shape = shapes[i];
+      const shapeId = shape.GetPointer() as b2ShapeId;
+      const shapeType = B2.b2Shape_GetType(shapeId);
+      const entry: (typeof shapeData)[number] = {
+        type: shapeType.value,
+        density: B2.b2Shape_GetDensity(shapeId),
+        friction: B2.b2Shape_GetFriction(shapeId),
+        restitution: B2.b2Shape_GetRestitution(shapeId),
+        isSensor: B2.b2Shape_IsSensor(shapeId),
+      };
 
-    if (shape.getType() === "circle") {
-      const circle = shape as planck.CircleShape;
-      const c = circle.getCenter();
-      fd.radius = circle.getRadius() * scale;
-      fd.center = { x: c.x * scale, y: c.y * scale };
-    } else if (shape.getType() === "polygon") {
-      const poly = shape as planck.PolygonShape;
-      fd.verts = poly.m_vertices.map((v) => ({ x: v.x * scale, y: v.y * scale }));
-    } else {
-      continue;
+      if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
+        const circle = B2.b2Shape_GetCircle(shapeId);
+        entry.radius = circle.radius * scale;
+        entry.centerX = circle.center.x * scale;
+        entry.centerY = circle.center.y * scale;
+      } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
+        const poly = B2.b2Shape_GetPolygon(shapeId);
+        entry.verts = [];
+        for (let j = 0; j < poly.count; j++) {
+          const v = poly.GetVertex(j);
+          entry.verts.push({ x: v.x * scale, y: v.y * scale });
+        }
+      } else {
+        continue;
+      }
+      shapeData.push(entry);
     }
-    fixtureData.push(fd);
   }
 
-  // Remove old fixtures
-  const toRemove: planck.Fixture[] = [];
-  for (let f = body.getFixtureList(); f; f = f.getNext()) toRemove.push(f);
-  for (const f of toRemove) body.destroyFixture(f);
-
-  // Create scaled fixtures
-  for (const fd of fixtureData) {
-    let shape: planck.Shape;
-    if (fd.shapeType === "circle") {
-      shape = planck.Circle(planck.Vec2(fd.center!.x, fd.center!.y), fd.radius!);
-    } else {
-      shape = planck.Polygon(fd.verts!.map((v) => planck.Vec2(v.x, v.y)));
+  // Destroy old shapes
+  if (shapes) {
+    for (let i = 0; i < shapes.length; i++) {
+      shapes[i].Destroy(false);
     }
-    const fix = body.createFixture({
-      shape,
-      density: fd.density,
-      friction: fd.friction,
-      restitution: fd.restitution,
-      isSensor: fd.isSensor,
-    });
-    if (fd.userData) fix.setUserData(fd.userData);
   }
 
-  body.resetMassData();
+  // Create scaled shapes
+  for (const sd of shapeData) {
+    const shapeDef = B2.b2DefaultShapeDef();
+    shapeDef.density = sd.density;
+    shapeDef.material.friction = sd.friction;
+    shapeDef.material.restitution = sd.restitution;
+    shapeDef.isSensor = sd.isSensor;
+
+    if (sd.type === B2.b2ShapeType.b2_circleShape.value) {
+      const circle = new B2.b2Circle();
+      circle.center = new B2.b2Vec2(sd.centerX!, sd.centerY!);
+      circle.radius = sd.radius!;
+      body.CreateCircleShape(shapeDef, circle);
+    } else if (sd.type === B2.b2ShapeType.b2_polygonShape.value && sd.verts) {
+      const hull = B2.b2ComputeHull(sd.verts.map((v) => new B2.b2Vec2(v.x, v.y)));
+      const poly = B2.b2MakePolygon(hull, 0);
+      body.CreatePolygonShape(shapeDef, poly);
+    }
+  }
+
+  body.ApplyMassFromShapes();
   return body;
 }
 
 /** Collect unique dynamic/static bodies whose center is within `radius` world-units of (wx, wy). */
-export function queryBodiesInRadius(
-  world: planck.World,
-  wx: number,
-  wy: number,
-  radius: number,
-  exclude?: planck.Body,
-): planck.Body[] {
-  const center = planck.Vec2(wx, wy);
-  const seen = new Set<planck.Body>();
-  const bodies: planck.Body[] = [];
+export function queryBodiesInRadius(pw: PhysWorld, wx: number, wy: number, radius: number, exclude?: Body): Body[] {
+  const center = { x: wx, y: wy };
+  const bodies: Body[] = [];
 
-  world.queryAABB(
-    planck.AABB(planck.Vec2(wx - radius, wy - radius), planck.Vec2(wx + radius, wy + radius)),
-    (fixture) => {
-      const body = fixture.getBody();
-      if (body === exclude || seen.has(body)) return true;
-      if (distance(body.getPosition(), center) < radius) {
-        seen.add(body);
-        bodies.push(body);
-      }
-      return true;
-    },
-  );
+  pw.forEachBody((body) => {
+    if (body === exclude) return;
+    if (distance(body.GetPosition(), center) < radius) {
+      bodies.push(body);
+    }
+  });
 
   return bodies;
 }
 
 /** Find the closest body to a world point, preferring exact testPoint hits. */
-export function findClosestBody(world: planck.World, wx: number, wy: number, radius: number): planck.Body | null {
-  const point = planck.Vec2(wx, wy);
-  let target: planck.Body | null = null;
+export function findClosestBody(pw: PhysWorld, wx: number, wy: number, radius: number): Body | null {
+  const B2 = b2();
+  const point = new B2.b2Vec2(wx, wy);
+  let target: Body | null = null;
   let bestDist = Number.POSITIVE_INFINITY;
 
-  world.queryAABB(
-    planck.AABB(planck.Vec2(wx - radius, wy - radius), planck.Vec2(wx + radius, wy + radius)),
-    (fixture) => {
-      const body = fixture.getBody();
-      if (fixture.testPoint(point)) {
-        target = body;
-        bestDist = 0;
-        return false;
+  pw.forEachBody((body) => {
+    const pos = body.GetPosition();
+    const d = distance(pos, { x: wx, y: wy });
+    if (d > radius && bestDist <= radius) return;
+
+    // Check if point is inside any shape
+    const shapes = body.GetShapes();
+    if (shapes) {
+      for (let i = 0; i < shapes.length; i++) {
+        if (shapes[i].TestPoint(point)) {
+          if (d < bestDist || bestDist > 0) {
+            target = body;
+            bestDist = 0;
+          }
+          return;
+        }
       }
-      const d = distance(body.getPosition(), point);
-      if (d < bestDist) {
-        bestDist = d;
-        target = body;
-      }
-      return true;
-    },
-  );
+    }
+
+    if (d < bestDist && d < radius) {
+      bestDist = d;
+      target = body;
+    }
+  });
 
   return target;
 }
 
-export function destroyBodyAt(world: planck.World, wx: number, wy: number, radius = 0.5): boolean {
-  const body = findClosestBody(world, wx, wy, radius);
+export function destroyBodyAt(pw: PhysWorld, wx: number, wy: number, radius = 0.5): boolean {
+  const body = findClosestBody(pw, wx, wy, radius);
   if (body) {
-    markDestroyed(body);
-    world.destroyBody(body);
+    markDestroyed(pw, body);
+    pw.destroyBody(body);
     return true;
   }
   return false;
 }
 
-/** Create a weld joint between two bodies at the given anchor point. */
-export function createWeldJoint(
-  world: planck.World,
-  a: planck.Body,
-  b: planck.Body,
-  anchor: planck.Vec2,
-  opts: planck.WeldJointOpt = {},
-): planck.Joint {
-  return world.createJoint(planck.WeldJoint(opts, a, b, anchor))!;
+/** Create a weld joint between two bodies at the given anchor point (world space).
+ *  Returns the b2JointId for the created joint. */
+export function createWeldJoint(pw: PhysWorld, a: Body, b: Body, anchor: { x: number; y: number }) {
+  const B2 = b2();
+  const def = B2.b2DefaultWeldJointDef();
+  def.base.bodyIdA = a.GetPointer();
+  def.base.bodyIdB = b.GetPointer();
+
+  // Convert world-space anchor to local frames
+  const anchorVec = new B2.b2Vec2(anchor.x, anchor.y);
+  const localA = a.GetLocalPoint(anchorVec);
+  const localB = b.GetLocalPoint(anchorVec);
+
+  const frameA = new B2.b2Transform();
+  frameA.p = localA;
+  frameA.q = B2.b2Rot_identity;
+  def.base.localFrameA = frameA;
+
+  const frameB = new B2.b2Transform();
+  frameB.p = localB;
+  frameB.q = B2.b2Rot_identity;
+  def.base.localFrameB = frameB;
+
+  return B2.b2CreateWeldJoint(pw.world.GetPointer(), def);
 }
 
 /** Check if two bodies are connected by a weld joint. */
-export function areWelded(a: planck.Body, b: planck.Body): boolean {
-  for (let je = a.getJointList(); je; je = je.next) {
-    const joint = je.joint;
-    if (!joint || joint.getType() !== "weld-joint") continue;
-    const other = joint.getBodyA() === a ? joint.getBodyB() : joint.getBodyA();
-    if (other === b) return true;
+export function areWelded(_pw: PhysWorld, a: Body, b: Body): boolean {
+  const B2 = b2();
+  const bId = b.GetPointer();
+  const joints = a.GetJoints();
+  if (!joints) return false;
+  for (let i = 0; i < joints.length; i++) {
+    const joint = joints[i];
+    if (joint.GetType().value !== B2.b2JointType.b2_weldJoint.value) continue;
+    const jId = joint.GetPointer();
+    const bodyAId = B2.b2Joint_GetBodyA(jId);
+    const bodyBId = B2.b2Joint_GetBodyB(jId);
+    if (B2.B2_ID_EQUALS(bodyAId, bId) || B2.B2_ID_EQUALS(bodyBId, bId)) {
+      return true;
+    }
   }
   return false;
 }
 
-/** Collect all weld joints attached to a body. */
-export function getWeldJoints(body: planck.Body): planck.Joint[] {
-  const joints: planck.Joint[] = [];
-  for (let je = body.getJointList(); je; je = je.next) {
-    const joint = je.joint;
-    if (joint && joint.getType() === "weld-joint") joints.push(joint);
-  }
-  return joints;
-}
-
-/** Compute the bounding radius of a body from its fixtures. */
-export function bodyRadius(body: planck.Body): number {
-  let maxR = 0;
-  for (let f = body.getFixtureList(); f; f = f.getNext()) {
-    const shape = f.getShape();
-    if (shape.getType() === "circle") {
-      maxR = Math.max(maxR, (shape as planck.CircleShape).getRadius());
-    } else if (shape.getType() === "polygon") {
-      const aabb = new planck.AABB();
-      shape.computeAABB(aabb, planck.Transform.identity(), 0);
-      const ext = planck.Vec2.sub(aabb.upperBound, aabb.lowerBound);
-      maxR = Math.max(maxR, planck.Vec2.lengthOf(ext) / 2);
+/** Collect all weld joints attached to a body (as flat API joint IDs). */
+export function getWeldJoints(_pw: PhysWorld, body: Body): Joint[] {
+  const B2 = b2();
+  const result: Joint[] = [];
+  const joints = body.GetJoints();
+  if (!joints) return result;
+  for (let i = 0; i < joints.length; i++) {
+    const joint = joints[i];
+    if (joint.GetType().value === B2.b2JointType.b2_weldJoint.value) {
+      result.push(joint);
     }
   }
+  return result;
+}
+
+/** Compute the bounding radius of a body from its shapes. */
+export function bodyRadius(body: Body): number {
+  const B2 = b2();
+  let maxR = 0;
+
+  const shapes = body.GetShapes();
+  if (shapes) {
+    for (let i = 0; i < shapes.length; i++) {
+      const shape = shapes[i];
+      const shapeId = shape.GetPointer() as b2ShapeId;
+      const shapeType = B2.b2Shape_GetType(shapeId);
+
+      if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
+        const circle = B2.b2Shape_GetCircle(shapeId);
+        maxR = Math.max(maxR, circle.radius);
+      } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
+        const aabb = B2.b2Shape_GetAABB(shapeId);
+        const ext = B2.b2Sub(aabb.upperBound, aabb.lowerBound);
+        maxR = Math.max(maxR, B2.b2Length(ext) / 2);
+      }
+    }
+  }
+
   return maxR;
 }
 
-export function clearDynamic(world: planck.World): void {
-  const toRemove: planck.Body[] = [];
-  forEachBody(world, (b) => {
-    if (b.isDynamic()) toRemove.push(b);
+export function clearDynamic(pw: PhysWorld): void {
+  const toRemove: Body[] = [];
+  pw.forEachBody((b) => {
+    if (isDynamic(b)) toRemove.push(b);
   });
   for (const b of toRemove) {
-    markDestroyed(b);
-    world.destroyBody(b);
+    markDestroyed(pw, b);
+    pw.destroyBody(b);
   }
 }

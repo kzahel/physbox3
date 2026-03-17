@@ -1,4 +1,4 @@
-import * as planck from "planck";
+import type { Body } from "box2d3";
 import type { InputManager } from "../interaction/InputManager";
 import { createBall } from "../prefabs/Ball";
 import { applyBalloonLift, createBalloon } from "../prefabs/Balloon";
@@ -18,11 +18,13 @@ import { createSpringBall } from "../prefabs/SpringBall";
 import { createTrain } from "../prefabs/Train";
 import { playBounce, playWoodHit, unlockAudio } from "./Audio";
 import { getBodyUserData } from "./BodyUserData";
+import { b2 } from "./Box2D";
 import { Camera } from "./Camera";
 import type { Interpolation } from "./Interpolation";
 import { snapshotBodies } from "./Interpolation";
 import type { IRenderer } from "./IRenderer";
-import { clamp, clearDynamic, destroyBodyAt, explodeAt, forEachBody, markDestroyed, scaleBody } from "./Physics";
+import { clamp, clearDynamic, destroyBodyAt, explodeAt, isDynamic, markDestroyed, scaleBody } from "./Physics";
+import { PhysWorld } from "./PhysWorld";
 import { Renderer } from "./Renderer";
 import { WaterSystem } from "./WaterSystem";
 
@@ -31,16 +33,18 @@ export const KILL_Y_TOP = 200;
 const DEFAULT_PHYSICS_HZ = 60;
 const COLLISION_MIN_IMPULSE = 2;
 const COLLISION_MAX_IMPULSE = 15;
+/** box2d3 sub-steps per physics tick (replaces velocity/position iterations) */
+const SUB_STEPS = 4;
 
-function applyMotorTorque(world: planck.World) {
-  forEachBody(world, (b) => {
-    const ud = getBodyUserData(b);
-    if (ud?.motorSpeed != null) b.setAngularVelocity(ud.motorSpeed);
+function applyMotorTorque(pw: PhysWorld) {
+  pw.forEachBody((b) => {
+    const ud = getBodyUserData(pw, b);
+    if (ud?.motorSpeed != null) b.SetAngularVelocity(ud.motorSpeed);
   });
 }
 
 export class Game {
-  world: planck.World;
+  pw: PhysWorld;
   camera: Camera;
   renderer: IRenderer;
   canvas: HTMLCanvasElement;
@@ -50,15 +54,13 @@ export class Game {
   gravity = -10;
   bounciness = 0.5;
   timeScale = 1;
-  velocityIterations = 8;
-  positionIterations = 3;
   physicsHz = DEFAULT_PHYSICS_HZ;
   inputManager: InputManager | null = null;
   water = new WaterSystem();
-  sandBodies: planck.Body[] = [];
+  sandBodies: Body[] = [];
   ragdolls: RagdollData[] = [];
   followSelected = false;
-  followBody: planck.Body | null = null;
+  followBody: Body | null = null;
   onPauseChange?: () => void;
 
   private _paused = false;
@@ -78,7 +80,7 @@ export class Game {
   private accumulator = 0;
   private frameCount = 0;
   private fpsTimer = 0;
-  private prevStates = new WeakMap<planck.Body, { x: number; y: number; angle: number }>();
+  private prevStates = new WeakMap<Body, { x: number; y: number; angle: number }>();
   private interpAlpha = 1;
 
   private resizeHandler = () => this.renderer.resize();
@@ -86,7 +88,7 @@ export class Game {
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.container = canvas.parentElement!;
-    this.world = new planck.World({ gravity: planck.Vec2(0, this.gravity) });
+    this.pw = new PhysWorld(0, this.gravity);
     this.camera = new Camera();
     this.renderer = new Renderer(canvas);
 
@@ -96,7 +98,7 @@ export class Game {
 
     this.buildDefaultScene();
     this.bindCollisionSounds();
-    this.bindBounciness();
+    this.applyBounciness();
   }
 
   /** Swap the active renderer at runtime. */
@@ -109,10 +111,11 @@ export class Game {
     this.renderer.resize();
   }
 
-  private bindBounciness() {
-    this.world.on("pre-solve", (contact) => {
-      contact.setRestitution(this.bounciness);
-    });
+  private applyBounciness() {
+    // In box2d3, restitution is set per-shape material or via world restitution threshold.
+    // We use the restitution threshold as a global bounciness control.
+    // Individual shape restitution values multiply with this.
+    this.pw.setRestitutionThreshold(0);
   }
 
   /** Compute a 0–1 volume multiplier based on zoom level and whether the
@@ -137,46 +140,61 @@ export class Game {
   }
 
   private bindCollisionSounds() {
-    this.world.on("post-solve", (contact, impulse) => {
-      const ni = impulse.normalImpulses[0];
-      if (ni < COLLISION_MIN_IMPULSE) return;
+    const B2 = b2();
+    // Set hit event threshold to our minimum impulse
+    B2.b2World_SetHitEventThreshold(this.pw.world.GetPointer(), COLLISION_MIN_IMPULSE);
 
-      const fA = contact.getFixtureA();
-      const fB = contact.getFixtureB();
-      const udA = getBodyUserData(fA.getBody());
-      const udB = getBodyUserData(fB.getBody());
-      if (udA?.label === "polygon" || udB?.label === "polygon") return;
+    this.pw.onHit((_point, _normal, shapeIdA, shapeIdB, approachSpeed) => {
+      if (approachSpeed < COLLISION_MIN_IMPULSE) return;
 
-      // Use midpoint of the two bodies as the collision location
-      const pA = fA.getBody().getPosition();
-      const pB = fB.getBody().getPosition();
+      const bodyIdA = B2.b2Shape_GetBody(shapeIdA);
+      const bodyIdB = B2.b2Shape_GetBody(shapeIdB);
+      const pA = B2.b2Body_GetPosition(bodyIdA);
+      const pB = B2.b2Body_GetPosition(bodyIdB);
+
       const vol = this.collisionVolume((pA.x + pB.x) / 2, (pA.y + pB.y) / 2);
       if (vol < 0.01) return;
 
-      const tA = fA.getShape().getType();
-      const tB = fB.getShape().getType();
-      const intensity = Math.min(1, (ni - COLLISION_MIN_IMPULSE) / (COLLISION_MAX_IMPULSE - COLLISION_MIN_IMPULSE));
+      const tA = B2.b2Shape_GetType(shapeIdA);
+      const tB = B2.b2Shape_GetType(shapeIdB);
+      const intensity = Math.min(
+        1,
+        (approachSpeed - COLLISION_MIN_IMPULSE) / (COLLISION_MAX_IMPULSE - COLLISION_MIN_IMPULSE),
+      );
 
-      if (tA === "circle" || tB === "circle") {
+      if (tA.value === B2.b2ShapeType.b2_circleShape.value || tB.value === B2.b2ShapeType.b2_circleShape.value) {
         playBounce(intensity, vol);
-      } else if (tA === "polygon" || tB === "polygon") {
+      } else if (
+        tA.value === B2.b2ShapeType.b2_polygonShape.value ||
+        tB.value === B2.b2ShapeType.b2_polygonShape.value
+      ) {
         playWoodHit(intensity, vol);
       }
     });
   }
 
+  /** Create a static body with a box shape. */
+  private createStaticBox(x: number, y: number, halfW: number, halfH: number, fill: string, label: string): Body {
+    const B2 = b2();
+    const bodyDef = B2.b2DefaultBodyDef();
+    bodyDef.type = B2.b2BodyType.b2_staticBody;
+    bodyDef.position = new B2.b2Vec2(x, y);
+    const body = this.pw.createBody(bodyDef);
+
+    const shapeDef = B2.b2DefaultShapeDef();
+    shapeDef.enableHitEvents = true;
+    shapeDef.material.restitution = this.bounciness;
+    const box = B2.b2MakeBox(halfW, halfH);
+    body.CreatePolygonShape(shapeDef, box);
+
+    this.pw.setUserData(body, { fill, label });
+    return body;
+  }
+
   private buildDefaultScene() {
-    const ground = this.world.createBody({ type: "static", position: planck.Vec2(0, -1) });
-    ground.createFixture({ shape: planck.Box(40, 1) });
-    ground.setUserData({ fill: "rgba(60,70,90,0.9)", label: "ground" });
-
-    const leftWall = this.world.createBody({ type: "static", position: planck.Vec2(-40, 10) });
-    leftWall.createFixture({ shape: planck.Box(1, 12) });
-    leftWall.setUserData({ fill: "rgba(60,70,90,0.9)", label: "wall" });
-
-    const rightWall = this.world.createBody({ type: "static", position: planck.Vec2(40, 10) });
-    rightWall.createFixture({ shape: planck.Box(1, 12) });
-    rightWall.setUserData({ fill: "rgba(60,70,90,0.9)", label: "wall" });
+    this.createStaticBox(0, -1, 40, 1, "rgba(60,70,90,0.9)", "ground");
+    this.createStaticBox(-40, 10, 1, 12, "rgba(60,70,90,0.9)", "wall");
+    this.createStaticBox(40, 10, 1, 12, "rgba(60,70,90,0.9)", "wall");
 
     this.addBox(0, 5);
     this.addBall(-3, 8, 0.5);
@@ -184,143 +202,154 @@ export class Game {
   }
 
   // --- Prefab delegates (preserve external API) ---
+  // NOTE: Prefabs still take planck.World — will fail to compile until Phase 3 migration.
+  // After Phase 3, all prefab signatures change from planck.World to PhysWorld.
 
   addBox(x: number, y: number, w = 1, h = 1) {
-    return createBox(this.world, x, y, w, h);
+    return createBox(this.pw, x, y, w, h);
   }
 
   addBall(x: number, y: number, radius = 0.5) {
-    return createBall(this.world, x, y, radius);
+    return createBall(this.pw, x, y, radius);
   }
 
   addPlatform(x: number, y: number, w: number, angle = 0) {
-    return createPlatform(this.world, x, y, w, angle);
+    return createPlatform(this.pw, x, y, w, angle);
   }
 
   addChainRope(x: number, y: number, links: number, linkLen = 0.4) {
-    return createChainRope(this.world, x, y, links, linkLen);
+    return createChainRope(this.pw, x, y, links, linkLen);
   }
 
-  addRopeBetween(x1: number, y1: number, x2: number, y2: number, bodyA: planck.Body | null, bodyB: planck.Body | null) {
-    return createRopeBetween(this.world, x1, y1, x2, y2, bodyA, bodyB);
+  addRopeBetween(x1: number, y1: number, x2: number, y2: number, bodyA: Body | null, bodyB: Body | null) {
+    return createRopeBetween(this.pw, x1, y1, x2, y2, bodyA, bodyB);
   }
 
-  addSpring(x1: number, y1: number, x2: number, y2: number, bodyA: planck.Body | null, bodyB: planck.Body | null) {
-    // Use ground body for null endpoints
-    const ground = this.world.getBodyList()!;
-    const a = bodyA ?? ground;
-    const b = bodyB ?? ground;
-    if (a === b) return;
-    const anchorA = planck.Vec2(x1, y1);
-    const anchorB = planck.Vec2(x2, y2);
-    const dist = planck.Vec2.lengthOf(planck.Vec2.sub(anchorA, anchorB));
-    const localA = a.getLocalPoint(anchorA);
-    const localB = b.getLocalPoint(anchorB);
-    const joint = planck.DistanceJoint(
-      {
-        frequencyHz: 3,
-        dampingRatio: 0.3,
-        length: dist,
-        collideConnected: true,
-      },
-      a,
-      b,
-      anchorA,
-      anchorB,
-    );
-    // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
-    (joint as any).m_localAnchorA = localA;
-    // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
-    (joint as any).m_localAnchorB = localB;
-    this.world.createJoint(joint);
+  addSpring(x1: number, y1: number, x2: number, y2: number, bodyA: Body | null, bodyB: Body | null) {
+    const B2 = b2();
+
+    // Use first tracked body as ground anchor for null endpoints
+    const firstBody = this.pw.bodies.values().next().value;
+    if (!firstBody) return;
+    const a = bodyA ?? firstBody;
+    const b_ = bodyB ?? firstBody;
+    if (a === b_) return;
+
+    const anchorA = new B2.b2Vec2(x1, y1);
+    const anchorB = new B2.b2Vec2(x2, y2);
+    const dist = B2.b2Distance(anchorA, anchorB);
+    const localA = a.GetLocalPoint(anchorA);
+    const localB = b_.GetLocalPoint(anchorB);
+
+    const def = B2.b2DefaultDistanceJointDef();
+    def.base.bodyIdA = a.GetPointer();
+    def.base.bodyIdB = b_.GetPointer();
+    def.length = dist;
+    def.enableSpring = true;
+    def.hertz = 3;
+    def.dampingRatio = 0.3;
+    def.base.collideConnected = true;
+
+    const frameA = new B2.b2Transform();
+    frameA.p = localA;
+    frameA.q = B2.b2Rot_identity;
+    def.base.localFrameA = frameA;
+
+    const frameB = new B2.b2Transform();
+    frameB.p = localB;
+    frameB.q = B2.b2Rot_identity;
+    def.base.localFrameB = frameB;
+
+    B2.b2CreateDistanceJoint(this.pw.world.GetPointer(), def);
   }
 
   addSpringBall(x: number, y: number) {
-    return createSpringBall(this.world, x, y);
+    return createSpringBall(this.pw, x, y);
   }
 
   addLauncher(x: number, y: number) {
-    return createLauncher(this.world, x, y);
+    return createLauncher(this.pw, x, y);
   }
 
   addCar(x: number, y: number) {
-    return createCar(this.world, x, y);
+    return createCar(this.pw, x, y);
   }
 
   addSeesaw(x: number, y: number) {
-    return createSeesaw(this.world, x, y);
+    return createSeesaw(this.pw, x, y);
   }
 
   addRocket(x: number, y: number, angle = 0) {
-    return createRocket(this.world, x, y, angle);
+    return createRocket(this.pw, x, y, angle);
   }
 
   addBalloon(x: number, y: number) {
-    return createBalloon(this.world, x, y);
+    return createBalloon(this.pw, x, y);
   }
 
   addRagdoll(x: number, y: number) {
-    return createRagdoll(this.world, x, y, this.ragdolls);
+    return createRagdoll(this.pw, x, y, this.ragdolls);
   }
 
   addCannon(x: number, y: number, angle: number) {
-    return createCannon(this.world, x, y, angle);
+    return createCannon(this.pw, x, y, angle);
   }
 
   addFan(x: number, y: number, angle: number, force = 15, range = 10) {
-    return createFan(this.world, x, y, angle, force, range);
+    return createFan(this.pw, x, y, angle, force, range);
   }
 
   addConveyor(x: number, y: number, w = 6, speed = 3, angle = 0) {
-    return createConveyor(this.world, x, y, w, speed, angle);
+    return createConveyor(this.pw, x, y, w, speed, angle);
   }
 
   addTrain(x: number, y: number) {
-    return createTrain(this.world, x, y);
+    return createTrain(this.pw, x, y);
   }
 
   addDynamite(x: number, y: number, fuseTime = 3) {
-    return createDynamite(this.world, x, y, fuseTime);
+    return createDynamite(this.pw, x, y, fuseTime);
   }
 
   // --- Physics utilities ---
 
   explodeAt(wx: number, wy: number, radius: number, force: number) {
-    explodeAt(this.world, this.renderer, wx, wy, radius, force);
+    explodeAt(this.pw, this.renderer, wx, wy, radius, force);
   }
 
-  scaleBody(body: planck.Body, scale: number): planck.Body {
-    return scaleBody(this.world, body, scale);
+  scaleBody(body: Body, scale: number): Body {
+    return scaleBody(this.pw, body, scale);
   }
 
   clearDynamic() {
-    clearDynamic(this.world);
+    clearDynamic(this.pw);
   }
 
   destroyBodyAt(wx: number, wy: number, radius = 0.5): boolean {
-    return destroyBodyAt(this.world, wx, wy, radius);
+    return destroyBodyAt(this.pw, wx, wy, radius);
   }
 
   // --- Settings ---
 
   setBounciness(value: number) {
     this.bounciness = value;
+    // TODO: update material restitution on existing shapes or use restitution callback
   }
 
   setGravity(g: number) {
     this.gravity = g;
-    this.world.setGravity(planck.Vec2(0, g));
+    this.pw.setGravity(0, g);
   }
 
   setGravityXY(gx: number, gy: number) {
     this.gravity = gy;
-    this.world.setGravity(planck.Vec2(gx, gy));
+    this.pw.setGravity(gx, gy);
   }
 
   reset() {
-    // Create a fresh world to clear all event listeners (cannon contacts, etc.)
-    this.world = new planck.World({ gravity: planck.Vec2(0, this.gravity) });
-    this.bindBounciness();
+    this.pw.destroy();
+    this.pw = new PhysWorld(0, this.gravity);
+    this.applyBounciness();
     this.bindCollisionSounds();
     this.ragdolls.length = 0;
     this.sandBodies.length = 0;
@@ -356,7 +385,7 @@ export class Game {
     this.removeOutOfBoundsBodies();
     this.updateCameraFollow();
     const interp: Interpolation = { alpha: this.interpAlpha, prev: this.prevStates };
-    this.renderer.drawWorld(this.world, this.camera, this.water, interp);
+    this.renderer.drawWorld(this.pw, this.camera, this.water, interp);
   }
 
   private updateFPS(dt: number) {
@@ -372,33 +401,34 @@ export class Game {
   private stepPhysics(dt: number) {
     const timestep = 1 / this.physicsHz;
     const scaledDt = dt * this.timeScale;
-    tickDynamite(this.world, scaledDt, (wx, wy, r, f) => this.explodeAt(wx, wy, r, f));
-    tickCannons(this.world, this.renderer, (wx, wy, r, f) => this.explodeAt(wx, wy, r, f), scaledDt);
+    tickDynamite(this.pw, scaledDt, (wx, wy, r, f) => this.explodeAt(wx, wy, r, f));
+    tickCannons(this.pw, this.renderer, (wx, wy, r, f) => this.explodeAt(wx, wy, r, f), scaledDt);
     this.accumulator += scaledDt;
     while (this.accumulator >= timestep) {
-      snapshotBodies(this.world, this.prevStates);
+      snapshotBodies(this.pw, this.prevStates);
       this.inputManager?.update();
-      applyRocketThrust(this.world, timestep);
-      applyBalloonLift(this.world);
-      applyFanForce(this.world);
-      applyMotorTorque(this.world);
-      applyRopeStabilization(this.world);
-      this.water.tick(this.world);
-      this.water.applyBuoyancy(this.world, this.gravity);
-      this.world.step(timestep, this.velocityIterations, this.positionIterations);
+      applyRocketThrust(this.pw, timestep);
+      applyBalloonLift(this.pw);
+      applyFanForce(this.pw);
+      applyMotorTorque(this.pw);
+      applyRopeStabilization(this.pw);
+      this.water.tick(this.pw);
+      this.water.applyBuoyancy(this.pw, this.gravity);
+      this.pw.step(timestep, SUB_STEPS);
       this.accumulator -= timestep;
     }
     this.interpAlpha = this.accumulator / timestep;
-    spawnRocketParticles(this.world, this.renderer);
-    spawnFanParticles(this.world, this.renderer);
+    spawnRocketParticles(this.pw, this.renderer);
+    spawnFanParticles(this.pw, this.renderer);
   }
 
   private removeOutOfBoundsBodies() {
-    const toRemove: planck.Body[] = [];
+    const toRemove: Body[] = [];
     let count = 0;
-    forEachBody(this.world, (b) => {
-      if (b.isDynamic()) {
-        if (b.getPosition().y < KILL_Y || b.getPosition().y > KILL_Y_TOP) {
+    this.pw.forEachBody((b) => {
+      if (isDynamic(b)) {
+        const pos = b.GetPosition();
+        if (pos.y < KILL_Y || pos.y > KILL_Y_TOP) {
           toRemove.push(b);
         } else {
           count++;
@@ -406,22 +436,22 @@ export class Game {
       }
     });
     for (const b of toRemove) {
-      markDestroyed(b);
-      this.world.destroyBody(b);
+      markDestroyed(this.pw, b);
+      this.pw.destroyBody(b);
     }
     this.bodyCount = count;
 
     // Prune sand tracking array of destroyed bodies
     if (toRemove.length > 0 && this.sandBodies.length > 0) {
-      this.sandBodies = this.sandBodies.filter((b) => b.isActive());
+      this.sandBodies = this.sandBodies.filter((b) => b.IsValid());
     }
   }
 
   private updateCameraFollow() {
     const sel = this.inputManager?.selectedBody ?? null;
     if (sel && sel !== this.followBody) this.followBody = sel;
-    if (this.followSelected && this.followBody?.isActive()) {
-      const pos = this.followBody.getPosition();
+    if (this.followSelected && this.followBody?.IsValid()) {
+      const pos = this.followBody.GetPosition();
       this.camera.x = pos.x;
       this.camera.y = pos.y;
     }

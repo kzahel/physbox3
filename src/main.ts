@@ -1,8 +1,12 @@
+import { initBox2D } from "./engine/Box2D";
 import { Game } from "./engine/Game";
 import { InputManager } from "./interaction/InputManager";
 import { TiltGravity } from "./interaction/TiltGravity";
 import { SettingsPane } from "./ui/SettingsPane";
 import { Toolbar } from "./ui/Toolbar";
+
+// Initialize Box2D WASM module before anything else
+await initBox2D();
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const game = new Game(canvas);
