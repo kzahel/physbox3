@@ -69,24 +69,31 @@ if (TiltGravity.isSupported()) {
 let is3D = false;
 const renderBtn = document.createElement("button");
 renderBtn.textContent = "3D";
-renderBtn.addEventListener("click", async () => {
-  if (!is3D) {
+
+async function setRendererMode(want3D: boolean) {
+  if (want3D === is3D) return;
+  if (want3D) {
     const { ThreeJSRenderer } = await import("./engine/ThreeJSRenderer");
     const renderer3d = new ThreeJSRenderer(canvas);
     game.setRenderer(renderer3d);
-    is3D = true;
-    renderBtn.classList.add("active");
-    renderBtn.textContent = "3D: ON";
   } else {
     const { Renderer } = await import("./engine/Renderer");
     const renderer2d = new Renderer(canvas);
     game.setRenderer(renderer2d);
-    is3D = false;
-    renderBtn.classList.remove("active");
-    renderBtn.textContent = "3D";
   }
-});
+  is3D = want3D;
+  renderBtn.classList.toggle("active", is3D);
+  renderBtn.textContent = is3D ? "3D: ON" : "3D";
+  localStorage.setItem("physbox-renderer", is3D ? "3d" : "2d");
+}
+
+renderBtn.addEventListener("click", () => setRendererMode(!is3D));
 bottomTools.appendChild(renderBtn);
+
+// Restore saved renderer preference
+if (localStorage.getItem("physbox-renderer") === "3d") {
+  setRendererMode(true);
+}
 
 // Light/Dark mode toggle
 const DARK_BG = "#1a1a2e";
