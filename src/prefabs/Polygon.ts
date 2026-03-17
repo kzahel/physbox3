@@ -1,7 +1,9 @@
-import * as planck from "planck";
+import type { Body } from "box2d3";
+import { b2 } from "../engine/Box2D";
 import { convexHull } from "../engine/ConvexHull";
+import type { PhysWorld } from "../engine/PhysWorld";
 
-/** Maximum vertices Planck.js allows per polygon */
+/** Maximum vertices box2d3 allows per polygon */
 const MAX_VERTS = 8;
 
 /** Minimum area (world units²) to create a polygon */
@@ -42,7 +44,7 @@ function polyArea(verts: { x: number; y: number }[]): number {
   return Math.abs(area) / 2;
 }
 
-export function createPolygon(world: planck.World, points: { x: number; y: number }[]): planck.Body | null {
+export function createPolygon(pw: PhysWorld, points: { x: number; y: number }[]): Body | null {
   if (points.length < 3) return null;
 
   let hull = convexHull(points);
@@ -65,15 +67,25 @@ export function createPolygon(world: planck.World, points: { x: number; y: numbe
   cy /= hull.length;
 
   // Create vertices relative to centroid
-  const verts = hull.map((v) => planck.Vec2(v.x - cx, v.y - cy));
+  const B2 = b2();
+  const localVerts = hull.map((v) => new B2.b2Vec2(v.x - cx, v.y - cy));
 
-  const body = world.createBody({ type: "dynamic", position: planck.Vec2(cx, cy) });
-  body.createFixture({
-    shape: planck.Polygon(verts),
-    density: 1,
-    friction: 0.4,
-    restitution: 0.2,
-  });
-  body.setUserData({ fill: "rgba(120,200,160,0.7)", label: "polygon" });
+  const bodyDef = B2.b2DefaultBodyDef();
+  bodyDef.type = B2.b2BodyType.b2_dynamicBody;
+  bodyDef.position = new B2.b2Vec2(cx, cy);
+  const body = pw.createBody(bodyDef);
+
+  const hullResult = B2.b2ComputeHull(localVerts);
+  const poly = B2.b2MakePolygon(hullResult, 0);
+
+  const shapeDef = B2.b2DefaultShapeDef();
+  shapeDef.density = 1;
+  shapeDef.material.friction = 0.4;
+  shapeDef.material.restitution = 0.2;
+  shapeDef.enableHitEvents = true;
+
+  body.CreatePolygonShape(shapeDef, poly);
+
+  pw.setUserData(body, { fill: "rgba(120,200,160,0.7)", label: "polygon" });
   return body;
 }

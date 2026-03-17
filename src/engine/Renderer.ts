@@ -1,6 +1,6 @@
-import type * as planck from "planck";
+import type { Body, b2ShapeId } from "box2d3";
 import type { ToolRenderInfo } from "../interaction/ToolHandler";
-import type { FixtureStyle } from "./BodyUserData";
+import { b2 } from "./Box2D";
 import type { Camera } from "./Camera";
 import { KILL_Y, KILL_Y_TOP } from "./Game";
 import { type Interpolation, lerpBody, lerpWorldPoint, NO_INTERP } from "./Interpolation";
@@ -8,6 +8,7 @@ import type { IRenderer } from "./IRenderer";
 import { bodyColor, OverlayRenderer } from "./OverlayRenderer";
 import { ParticleSystem } from "./ParticleSystem";
 import { forEachBody } from "./Physics";
+import type { PhysWorld } from "./PhysWorld";
 import type { WaterSystem } from "./WaterSystem";
 
 // Ocean wave parameters (frequency, amplitude pairs)
@@ -55,33 +56,37 @@ export class Renderer implements IRenderer {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
-  drawWorld(world: planck.World, camera: Camera, water?: WaterSystem, interp?: Interpolation) {
+  drawWorld(pw: PhysWorld, camera: Camera, water?: WaterSystem, interp?: Interpolation) {
     const i = interp ?? NO_INTERP;
     this.clear();
     this.drawOcean(camera);
     this.drawSky(camera);
-    this.drawBodies(world, camera, i);
-    this.drawJoints(world, camera, i);
+    this.drawBodies(pw, camera, i);
+    this.drawJoints(pw, camera, i);
     if (water) this.drawWater(water, camera);
     this.particles.tick();
     this.drawParticles(camera);
-    this.overlay.drawOverlays(world, camera, i);
+    this.overlay.drawOverlays(pw, camera, i);
   }
 
   setInputManager(input: ToolRenderInfo) {
     this.overlay.setToolInfo(input);
   }
 
-  private drawBodies(world: planck.World, camera: Camera, interp: Interpolation) {
+  private drawBodies(pw: PhysWorld, camera: Camera, interp: Interpolation) {
     const ctx = this.ctx;
+    const B2 = b2();
 
-    forEachBody(world, (body) => {
+    forEachBody(pw, (body) => {
       const { x, y, angle } = lerpBody(body, interp);
+      const ud = pw.getUserData(body);
+      const fillColor = ud?.fill ?? bodyColor(pw, body);
+      const strokeColor = ud?.stroke ?? "rgba(255,255,255,0.3)";
 
-      for (let fixture = body.getFixtureList(); fixture; fixture = fixture.getNext()) {
-        const shape = fixture.getShape();
-        const userData = fixture.getUserData() as FixtureStyle | null;
-        const isSensor = fixture.isSensor();
+      const shapeIds: b2ShapeId[] = body.GetShapes() ?? [];
+      for (const shapeId of shapeIds) {
+        const shapeType = B2.b2Shape_GetType(shapeId);
+        const isSensor = B2.b2Shape_IsSensor(shapeId);
 
         ctx.save();
 
@@ -90,16 +95,14 @@ export class Renderer implements IRenderer {
         ctx.rotate(-angle);
         ctx.scale(camera.zoom, -camera.zoom);
 
-        const fillColor = userData?.fill ?? bodyColor(body);
-        const strokeColor = userData?.stroke ?? "rgba(255,255,255,0.3)";
         ctx.fillStyle = isSensor ? "rgba(100,200,255,0.15)" : fillColor;
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 1 / camera.zoom;
 
-        if (shape.getType() === "circle") {
-          const circle = shape as planck.CircleShape;
-          const r = circle.getRadius();
-          const center = circle.getCenter();
+        if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
+          const circle = B2.b2Shape_GetCircle(shapeId);
+          const r = circle.radius;
+          const center = circle.center;
           ctx.beginPath();
           ctx.arc(center.x, center.y, r, 0, Math.PI * 2);
           ctx.fill();
@@ -108,32 +111,43 @@ export class Renderer implements IRenderer {
           ctx.moveTo(center.x, center.y);
           ctx.lineTo(center.x + r, center.y);
           ctx.stroke();
-        } else if (shape.getType() === "polygon") {
-          const poly = shape as planck.PolygonShape;
-          const verts = poly.m_vertices;
+        } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
+          const poly = B2.b2Shape_GetPolygon(shapeId);
           ctx.beginPath();
-          ctx.moveTo(verts[0].x, verts[0].y);
-          for (let i = 1; i < verts.length; i++) {
-            ctx.lineTo(verts[i].x, verts[i].y);
+          const v0 = poly.GetVertex(0);
+          ctx.moveTo(v0.x, v0.y);
+          for (let i = 1; i < poly.count; i++) {
+            const v = poly.GetVertex(i);
+            ctx.lineTo(v.x, v.y);
           }
           ctx.closePath();
           ctx.fill();
           ctx.stroke();
-        } else if (shape.getType() === "edge") {
-          const edge = shape as planck.EdgeShape;
+        } else if (shapeType.value === B2.b2ShapeType.b2_segmentShape.value) {
+          const seg = B2.b2Shape_GetSegment(shapeId);
           ctx.beginPath();
-          ctx.moveTo(edge.m_vertex1.x, edge.m_vertex1.y);
-          ctx.lineTo(edge.m_vertex2.x, edge.m_vertex2.y);
+          ctx.moveTo(seg.point1.x, seg.point1.y);
+          ctx.lineTo(seg.point2.x, seg.point2.y);
           ctx.stroke();
-        } else if (shape.getType() === "chain") {
-          const chain = shape as planck.ChainShape;
-          const verts = chain.m_vertices;
+        } else if (shapeType.value === B2.b2ShapeType.b2_capsuleShape.value) {
+          const capsule = B2.b2Shape_GetCapsule(shapeId);
+          const p1 = capsule.center1;
+          const p2 = capsule.center2;
+          const r = capsule.radius;
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const len = Math.hypot(dx, dy);
+          const capAngle = len > 0 ? Math.atan2(dy, dx) : 0;
+          ctx.save();
+          ctx.translate(p1.x, p1.y);
+          ctx.rotate(capAngle);
           ctx.beginPath();
-          ctx.moveTo(verts[0].x, verts[0].y);
-          for (let i = 1; i < verts.length; i++) {
-            ctx.lineTo(verts[i].x, verts[i].y);
-          }
+          ctx.arc(0, 0, r, Math.PI / 2, -Math.PI / 2);
+          ctx.arc(len, 0, r, -Math.PI / 2, Math.PI / 2);
+          ctx.closePath();
+          ctx.fill();
           ctx.stroke();
+          ctx.restore();
         }
 
         ctx.restore();
@@ -141,29 +155,38 @@ export class Renderer implements IRenderer {
     });
   }
 
-  private drawJoints(world: planck.World, camera: Camera, interp: Interpolation) {
+  private drawJoints(pw: PhysWorld, camera: Camera, interp: Interpolation) {
     const ctx = this.ctx;
+    const B2 = b2();
 
-    for (let joint = world.getJointList(); joint; joint = joint.getNext()) {
-      const rawA = joint.getAnchorA();
-      const rawB = joint.getAnchorB();
-      const a = lerpWorldPoint(joint.getBodyA(), rawA, interp);
-      const b = lerpWorldPoint(joint.getBodyB(), rawB, interp);
+    pw.forEachJoint((joint) => {
+      // joint.GetBodyA/B() returns BodyRef (empty interface) — cast to Body for full API
+      const bodyA = joint.GetBodyA() as unknown as Body;
+      const bodyB = joint.GetBodyB() as unknown as Body;
+      const localFrameA = joint.GetLocalFrameA();
+      const localFrameB = joint.GetLocalFrameB();
+      const worldA = bodyA.GetWorldPoint(localFrameA.p);
+      const worldB = bodyB.GetWorldPoint(localFrameB.p);
+      const a = lerpWorldPoint(bodyA, worldA, interp);
+      const b = lerpWorldPoint(bodyB, worldB, interp);
       const sa = camera.toScreen(a.x, a.y, this.canvas);
       const sb = camera.toScreen(b.x, b.y, this.canvas);
 
-      if (joint.getType() === "rope-joint") {
-        const ud = joint.getUserData() as { ropeStabilizer?: boolean } | null;
-        if (ud?.ropeStabilizer) {
-          ctx.strokeStyle = "rgba(200,180,120,0.3)";
-          ctx.lineWidth = 0.5;
-          ctx.beginPath();
-          ctx.moveTo(sa.x, sa.y);
-          ctx.lineTo(sb.x, sb.y);
-          ctx.stroke();
-        }
-        continue;
-      } else if (joint.getType() === "distance-joint") {
+      const jointType = joint.GetType();
+
+      // Check for rope stabilizer via joint userData
+      const jd = pw.getJointData(joint);
+      if (jd?.ropeStabilizer) {
+        ctx.strokeStyle = "rgba(200,180,120,0.3)";
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(sa.x, sa.y);
+        ctx.lineTo(sb.x, sb.y);
+        ctx.stroke();
+        return;
+      }
+
+      if (jointType.value === B2.b2JointType.b2_distanceJoint.value) {
         this.drawSpringCoil(sa, sb, camera.zoom);
       } else {
         ctx.strokeStyle = "rgba(150,200,255,0.4)";
@@ -182,7 +205,7 @@ export class Renderer implements IRenderer {
       ctx.beginPath();
       ctx.arc(sb.x, sb.y, r, 0, Math.PI * 2);
       ctx.fill();
-    }
+    });
   }
 
   private drawSpringCoil(sa: { x: number; y: number }, sb: { x: number; y: number }, zoom: number) {

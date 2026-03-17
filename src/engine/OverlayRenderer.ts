@@ -1,14 +1,16 @@
-import type * as planck from "planck";
+import type { Body } from "box2d3";
 import { BTN_HALF_HEIGHT, BTN_HALF_WIDTH, getSelectionButtons, hasMotor } from "../interaction/SelectionButtons";
 import type { Tool, ToolRenderInfo } from "../interaction/ToolHandler";
 import { ERASE_RADIUS_PX } from "../interaction/tools/EraseTool";
 import { GLUE_RADIUS_PX } from "../interaction/tools/GlueTool";
 import { GRAB_RADIUS_PX } from "../interaction/tools/GrabTool";
 import { getBodyUserData } from "./BodyUserData";
+import { b2 } from "./Box2D";
 import type { Camera } from "./Camera";
 import { convexHull } from "./ConvexHull";
 import { type Interpolation, lerpBody, NO_INTERP } from "./Interpolation";
 import type { IParticleSystem } from "./IRenderer";
+import type { PhysWorld } from "./PhysWorld";
 import { drawBalloonStrings, drawConveyorAnimation, drawDynamiteEffects } from "./PrefabOverlays";
 
 interface CursorStyle {
@@ -39,10 +41,11 @@ const PLATFORM_PREVIEW_COLORS: Partial<Record<Tool, string>> = {
   platform: "rgba(80, 100, 80, 0.9)",
 };
 
-export function bodyColor(body: planck.Body): string {
-  if (body.isStatic()) return "rgba(80,80,100,0.8)";
-  if (body.isKinematic()) return "rgba(100,180,100,0.6)";
-  const ud = getBodyUserData(body);
+export function bodyColor(pw: PhysWorld, body: Body): string {
+  const B2 = b2();
+  if (body.GetType().value === B2.b2BodyType.b2_staticBody.value) return "rgba(80,80,100,0.8)";
+  if (body.GetType().value === B2.b2BodyType.b2_kinematicBody.value) return "rgba(100,180,100,0.6)";
+  const ud = getBodyUserData(pw, body);
   return ud?.fill ?? "rgba(120,160,255,0.6)";
 }
 
@@ -67,12 +70,12 @@ export class OverlayRenderer {
   }
 
   /** Draw all 2D overlays. Call after the main scene is rendered. */
-  drawOverlays(world: planck.World, camera: Camera, interp: Interpolation = NO_INTERP) {
-    drawConveyorAnimation(this.ctx, this.canvas, world, camera, interp);
-    drawBalloonStrings(this.ctx, this.canvas, world, camera, interp);
-    drawDynamiteEffects(this.ctx, this.canvas, world, camera, this.particles, interp);
+  drawOverlays(pw: PhysWorld, camera: Camera, interp: Interpolation = NO_INTERP) {
+    drawConveyorAnimation(this.ctx, this.canvas, pw, camera, interp);
+    drawBalloonStrings(this.ctx, this.canvas, pw, camera, interp);
+    drawDynamiteEffects(this.ctx, this.canvas, pw, camera, this.particles, interp);
     this.drawToolOverlays(camera, interp);
-    this.drawSelectionUI(camera, interp);
+    this.drawSelectionUI(pw, camera, interp);
   }
 
   // ── Tool overlays ──
@@ -177,22 +180,24 @@ export class OverlayRenderer {
 
   // ── Selection UI ──
 
-  private drawSelectionUI(camera: Camera, interp: Interpolation) {
+  private drawSelectionUI(pw: PhysWorld, camera: Camera, interp: Interpolation) {
     if (!this.toolInfo?.selectedBody) return;
     const body = this.toolInfo.selectedBody;
     const { x, y } = lerpBody(body, interp);
     const sp = camera.toScreen(x, y, this.canvas);
     this.drawToolCursor(sp, 20, "rgba(100, 200, 255, 0.8)", "rgba(100, 200, 255, 0.08)");
-    for (const btn of getSelectionButtons(body)) {
+    const B2 = b2();
+    const isStatic = body.GetType().value === B2.b2BodyType.b2_staticBody.value;
+    for (const btn of getSelectionButtons(pw, body)) {
       switch (btn.id) {
         case "toggle":
-          this.drawToggleButton(sp, btn.offsetY, body.isStatic());
+          this.drawToggleButton(sp, btn.offsetY, isStatic);
           break;
         case "direction":
           this.drawDirectionButton(sp, btn.offsetY);
           break;
         case "motor":
-          this.drawMotorButton(sp, btn.offsetY, hasMotor(body));
+          this.drawMotorButton(sp, btn.offsetY, hasMotor(pw, body));
           break;
       }
     }

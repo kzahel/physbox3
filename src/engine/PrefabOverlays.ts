@@ -1,9 +1,11 @@
-import type * as planck from "planck";
+import type { b2ShapeId } from "box2d3";
 import { getBodyUserData, isBalloon, isConveyor, isDynamite } from "./BodyUserData";
+import { b2 } from "./Box2D";
 import type { Camera } from "./Camera";
 import { type Interpolation, lerpBody, NO_INTERP } from "./Interpolation";
 import type { IParticleSystem } from "./IRenderer";
 import { forEachBody } from "./Physics";
+import type { PhysWorld } from "./PhysWorld";
 
 // Conveyor animation
 const CONVEYOR_SPACING = 0.8;
@@ -24,22 +26,28 @@ const WICK_GLOW_RADIUS_JITTER = 3;
 export function drawConveyorAnimation(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
-  world: planck.World,
+  pw: PhysWorld,
   camera: Camera,
   interp: Interpolation = NO_INTERP,
 ) {
+  const B2 = b2();
   const time = performance.now() / 1000;
 
-  forEachBody(world, (body) => {
-    const ud = getBodyUserData(body);
+  forEachBody(pw, (body) => {
+    const ud = getBodyUserData(pw, body);
     if (!isConveyor(ud)) return;
 
     const speed = ud.speed;
     const { x, y, angle } = lerpBody(body, interp);
-    const fixture = body.getFixtureList();
-    if (!fixture) return;
-    const shape = fixture.getShape() as planck.PolygonShape;
-    const hw = Math.abs(shape.m_vertices[0].x);
+
+    // Get the first polygon shape to determine half-width
+    const shapeIds: b2ShapeId[] = body.GetShapes() ?? [];
+    if (shapeIds.length === 0) return;
+    const shapeType = B2.b2Shape_GetType(shapeIds[0]);
+    if (shapeType.value !== B2.b2ShapeType.b2_polygonShape.value) return;
+    const poly = B2.b2Shape_GetPolygon(shapeIds[0]);
+    const v0 = poly.GetVertex(0);
+    const hw = Math.abs(v0.x);
 
     ctx.save();
     const screen = camera.toScreen(x, y, canvas);
@@ -73,19 +81,25 @@ export function drawConveyorAnimation(
 export function drawBalloonStrings(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
-  world: planck.World,
+  pw: PhysWorld,
   camera: Camera,
   interp: Interpolation = NO_INTERP,
 ) {
-  forEachBody(world, (body) => {
-    const ud = getBodyUserData(body);
+  const B2 = b2();
+
+  forEachBody(pw, (body) => {
+    const ud = getBodyUserData(pw, body);
     if (!isBalloon(ud)) return;
 
     const { x: posX, y: posY, angle } = lerpBody(body, interp);
-    const fixture = body.getFixtureList();
-    if (!fixture) return;
-    const shape = fixture.getShape() as planck.CircleShape;
-    const radius = shape.getRadius();
+
+    // Get the first circle shape for radius
+    const shapeIds: b2ShapeId[] = body.GetShapes() ?? [];
+    if (shapeIds.length === 0) return;
+    const shapeType = B2.b2Shape_GetType(shapeIds[0]);
+    if (shapeType.value !== B2.b2ShapeType.b2_circleShape.value) return;
+    const circle = B2.b2Shape_GetCircle(shapeIds[0]);
+    const radius = circle.radius;
 
     const bottomX = posX - Math.sin(angle) * radius;
     const bottomY = posY - Math.cos(angle) * radius;
@@ -118,13 +132,13 @@ export function drawBalloonStrings(
 export function drawDynamiteEffects(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
-  world: planck.World,
+  pw: PhysWorld,
   camera: Camera,
   particles: IParticleSystem,
   interp: Interpolation = NO_INTERP,
 ) {
-  forEachBody(world, (body) => {
-    const ud = getBodyUserData(body);
+  forEachBody(pw, (body) => {
+    const ud = getBodyUserData(pw, body);
     if (!isDynamite(ud)) return;
 
     const remaining = Math.max(0, ud.fuseRemaining / ud.fuseDuration);

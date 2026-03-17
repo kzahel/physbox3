@@ -4,16 +4,7 @@
  * - External userData storage (v3 has no built-in userData)
  * - Event processing (polled events → callback bridge)
  */
-import type {
-  Body,
-  Joint,
-  World,
-  b2BodyDef,
-  b2ExplosionDef,
-  b2QueryFilter,
-  b2ShapeId,
-  b2Vec2,
-} from "box2d3";
+import type { Body, b2BodyDef, b2ExplosionDef, b2QueryFilter, b2ShapeId, b2Vec2, Joint, World } from "box2d3";
 import type { BodyUserData } from "./BodyUserData";
 import { b2 } from "./Box2D";
 
@@ -30,6 +21,7 @@ export class PhysWorld {
   private _bodies = new Set<Body>();
   private _joints = new Set<Joint>();
   private _bodyData = new Map<Body, BodyUserData>();
+  private _jointData = new Map<Joint, Record<string, unknown>>();
 
   // Event callbacks
   private _hitCallbacks: HitCallback[] = [];
@@ -89,6 +81,7 @@ export class PhysWorld {
   }
 
   destroyJoint(joint: Joint): void {
+    this._jointData.delete(joint);
     this._joints.delete(joint);
     if (joint.IsValid()) joint.Destroy(true);
   }
@@ -97,6 +90,14 @@ export class PhysWorld {
     for (const joint of this._joints) {
       if (joint.IsValid()) cb(joint);
     }
+  }
+
+  setJointData(joint: Joint, data: Record<string, unknown>): void {
+    this._jointData.set(joint, data);
+  }
+
+  getJointData(joint: Joint): Record<string, unknown> | null {
+    return this._jointData.get(joint) ?? null;
   }
 
   // --- Events ---
@@ -174,6 +175,7 @@ export class PhysWorld {
     }
     for (const joint of this._joints) {
       if (!joint.IsValid()) {
+        this._jointData.delete(joint);
         this._joints.delete(joint);
       }
     }
@@ -185,5 +187,6 @@ export class PhysWorld {
     this._bodies.clear();
     this._joints.clear();
     this._bodyData.clear();
+    this._jointData.clear();
   }
 }

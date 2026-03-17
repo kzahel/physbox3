@@ -2,20 +2,22 @@
 
 2D physics sandbox. Migrating from Planck.js (Box2D v2.4) to box2d3-wasm (Box2D v3, WASM+SIMD).
 
-## Status: MIGRATION IN PROGRESS — Phase 1 Complete
+## Status: MIGRATION IN PROGRESS — Phase 2 + 3A Complete
 
 See `docs/migration-plan.md` for the full plan and `docs/box2d3-wasm-reference.md` for the complete API reference.
 
 **Phase 1 done:** Game.ts, Physics.ts, Interpolation.ts, IRenderer.ts, main.ts — all migrated, 0 TS errors.
-**Next:** Phase 2 (Renderers), then Phase 3A (simple prefabs) for first visual test.
-**Remaining errors:** 176 TS errors in unmigrated files (prefabs, tools, renderers still import planck).
+**Phase 2 done:** Renderer.ts, OverlayRenderer.ts, ThreeJSRenderer.ts, PrefabOverlays.ts, SelectionButtons.ts — all migrated, 0 TS errors.
+**Phase 3A done:** Ball.ts, Box.ts, Platform.ts, Polygon.ts — simple prefabs migrated, 0 TS errors. **First visual test milestone reached.**
+**Next:** Phase 3B-D (remaining prefabs), then Phase 4 (GrabTool spike + tools).
+**Remaining errors:** 157 TS errors in unmigrated files (complex prefabs, tools, water, scene store).
 
 ## Build & Dev
 
 - `npm run dev` — start dev server
 - `npm run build` — production build
 - `npm run lint` — biome check (formatting + linting)
-- `npx tsc --noEmit` — type check (176 errors remain in unmigrated files)
+- `npx tsc --noEmit` — type check (157 errors remain in unmigrated files)
 
 ## Key Documentation
 
@@ -30,7 +32,10 @@ See `docs/migration-plan.md` for the full plan and `docs/box2d3-wasm-reference.m
 - `src/engine/Physics.ts` — body queries, explosions, scaling, joint helpers (all take `PhysWorld`)
 - `src/engine/Interpolation.ts` — frame interpolation (uses box2d3 Body type)
 - `src/engine/IRenderer.ts` — renderer interface (`drawWorld` takes `PhysWorld`)
-- `src/engine/Renderer.ts` — canvas rendering (needs migration)
+- `src/engine/Renderer.ts` — canvas rendering (migrated, uses flat shape API + PhysWorld)
+- `src/engine/OverlayRenderer.ts` — tool overlays, selection UI (migrated, takes PhysWorld)
+- `src/engine/ThreeJSRenderer.ts` — 3D WebGL renderer (migrated, same patterns as Renderer.ts)
+- `src/engine/PrefabOverlays.ts` — conveyor/balloon/dynamite overlays (migrated)
 - `src/engine/Camera.ts` — world/screen coordinate transforms, zoom, pan
 - `src/interaction/InputManager.ts` — input handling, tool logic
 - `src/ui/Toolbar.ts` — tool selection buttons + keyboard shortcuts
@@ -44,6 +49,7 @@ See `docs/migration-plan.md` for the full plan and `docs/box2d3-wasm-reference.m
 - Runtime factory import from `"box2d3-wasm"`
 - Call `b2()` to get the initialized module (throws if not init'd)
 - Body userData stored in `PhysWorld.setUserData()` / `getUserData()` (external Map)
+- Joint userData stored in `PhysWorld.setJointData()` / `getJointData()` (external Map)
 - Body/joint iteration via `PhysWorld.forEachBody()` / `forEachJoint()` (tracked Set)
 - Events polled after `world.Step()` via `PhysWorld.processEvents()`
 - No MouseJoint in v3 — use MotorJoint for grab tool
@@ -53,6 +59,7 @@ See `docs/migration-plan.md` for the full plan and `docs/box2d3-wasm-reference.m
 - `body.GetShapes()` returns **`b2ShapeId[]`** (plain ID structs), NOT `Shape[]` OOP wrappers. Use flat API: `b2Shape_GetType(id)`, `b2Shape_GetCircle(id)`, `b2Shape_TestPoint(id, point)`, etc.
 - `body.GetJoints()` returns **`b2JointId[]`** (plain ID structs), NOT `Joint[]` OOP wrappers. Use flat API: `b2Joint_GetType(id)`, `b2Joint_GetBodyA(id)`, etc.
 - `body.GetPointer()` / `world.GetPointer()` return internal indices usable with flat API functions that expect ID types.
+- `joint.GetBodyA()` / `joint.GetBodyB()` return **`BodyRef`** (empty interface), NOT `Body`. Cast via `as unknown as Body` to access full API (GetWorldPoint, GetPosition, etc.) — at runtime it's the same WASM object.
 
 ### Established Migration Patterns
 
@@ -85,6 +92,21 @@ B2.b2Rot_GetAngle(body.GetRotation())
 const shapeIds: b2ShapeId[] = body.GetShapes();
 B2.b2Shape_GetCircle(shapeId)   // → b2Circle { center, radius }
 B2.b2Shape_GetPolygon(shapeId)  // → b2Polygon { count, GetVertex(i) }
+B2.b2Shape_GetSegment(shapeId)  // → b2Segment { point1, point2 }
+B2.b2Shape_GetCapsule(shapeId)  // → b2Capsule { center1, center2, radius }
+B2.b2Shape_IsSensor(shapeId)    // → boolean
+
+// Joint anchors (world-space) — joint.GetBodyA/B() returns BodyRef, cast to Body
+const bodyA = joint.GetBodyA() as unknown as Body;
+const localFrameA = joint.GetLocalFrameA();  // → b2Transform { p, q }
+const worldAnchor = bodyA.GetWorldPoint(localFrameA.p);
+
+// Joint type check
+joint.GetType().value === B2.b2JointType.b2_distanceJoint.value
+
+// Joint userData (for rope stabilizers etc.)
+pw.setJointData(joint, { ropeStabilizer: true });
+pw.getJointData(joint)?.ropeStabilizer
 ```
 
 ### Mobile / Touch is First Class

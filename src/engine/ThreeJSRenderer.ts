@@ -1,8 +1,8 @@
-import type * as planck from "planck";
+import type { Body, b2ShapeId, Joint } from "box2d3";
 import * as THREE from "three";
 import type { ToolRenderInfo } from "../interaction/ToolHandler";
-import type { FixtureStyle } from "./BodyUserData";
 import { getBodyUserData } from "./BodyUserData";
+import { b2 } from "./Box2D";
 import type { Camera } from "./Camera";
 import { KILL_Y, KILL_Y_TOP } from "./Game";
 import { type Interpolation, lerpBody, lerpWorldPoint, NO_INTERP } from "./Interpolation";
@@ -10,6 +10,7 @@ import type { IRenderer } from "./IRenderer";
 import { bodyColor, OverlayRenderer } from "./OverlayRenderer";
 import { type Particle, ParticleSystem } from "./ParticleSystem";
 import { forEachBody } from "./Physics";
+import type { PhysWorld } from "./PhysWorld";
 
 // ── Color parsing ──
 
@@ -38,8 +39,6 @@ const EXTRUDE_DEPTH = 0.6;
 
 /**
  * Inset a convex polygon by `amount` using proper per-edge offset.
- * Each edge is moved inward by `amount` perpendicular to the edge,
- * then adjacent offset edges are intersected to find new vertices.
  */
 function insetConvexPolygon(verts: { x: number; y: number }[], amount: number): { x: number; y: number }[] {
   const n = verts.length;
@@ -130,17 +129,22 @@ function createPolygonGeometry(verts: { x: number; y: number }[]): THREE.Extrude
 
 // ── Body-to-mesh key ──
 
-function fixtureKey(body: planck.Body): string {
+function shapeKey(body: Body): string {
+  const B2 = b2();
   let key = "";
-  for (let f = body.getFixtureList(); f; f = f.getNext()) {
-    const s = f.getShape();
-    key += `${s.getType()};`;
-    if (s.getType() === "circle") {
-      const c = s as planck.CircleShape;
-      key += `${c.getRadius().toFixed(4)},`;
-    } else if (s.getType() === "polygon") {
-      const p = s as planck.PolygonShape;
-      for (const v of p.m_vertices) key += `${v.x.toFixed(4)},${v.y.toFixed(4)},`;
+  const shapeIds: b2ShapeId[] = body.GetShapes() ?? [];
+  for (const shapeId of shapeIds) {
+    const shapeType = B2.b2Shape_GetType(shapeId);
+    key += `${shapeType.value};`;
+    if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
+      const c = B2.b2Shape_GetCircle(shapeId);
+      key += `${c.radius.toFixed(4)},`;
+    } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
+      const p = B2.b2Shape_GetPolygon(shapeId);
+      for (let i = 0; i < p.count; i++) {
+        const v = p.GetVertex(i);
+        key += `${v.x.toFixed(4)},${v.y.toFixed(4)},`;
+      }
     }
   }
   return key;
@@ -165,9 +169,9 @@ export class ThreeJSRenderer implements IRenderer {
   private overlay: OverlayRenderer;
 
   // Body -> mesh sync
-  private bodyMeshes = new Map<planck.Body, { group: THREE.Group; key: string }>();
+  private bodyMeshes = new Map<Body, { group: THREE.Group; key: string }>();
   // Joint -> line sync
-  private jointLines = new Map<planck.Joint, THREE.Group>();
+  private jointLines = new Map<Joint, THREE.Group>();
 
   // Environment
   private oceanMesh: THREE.Mesh;
@@ -324,7 +328,7 @@ export class ThreeJSRenderer implements IRenderer {
     this.overlay.setToolInfo(input);
   }
 
-  drawWorld(world: planck.World, camera: Camera, _water?: unknown, interp?: Interpolation) {
+  drawWorld(pw: PhysWorld, camera: Camera, _water?: unknown, interp?: Interpolation) {
     const i = interp ?? NO_INTERP;
     const cw = this.glCanvas.clientWidth;
     const ch = this.glCanvas.clientHeight;
@@ -353,10 +357,10 @@ export class ThreeJSRenderer implements IRenderer {
     this.skyMesh.visible = skyH > 0;
 
     // Reconcile bodies
-    this.syncBodies(world, i);
+    this.syncBodies(pw, i);
 
     // Reconcile joints
-    this.syncJoints(world, i);
+    this.syncJoints(pw, i);
 
     // Update particles
     this.particles.tick();
@@ -370,18 +374,18 @@ export class ThreeJSRenderer implements IRenderer {
 
     // Clear and render 2D overlay
     this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-    this.overlay.drawOverlays(world, camera, i);
+    this.overlay.drawOverlays(pw, camera, i);
   }
 
   // ── Body sync ──
 
-  private syncBodies(world: planck.World, interp: Interpolation) {
-    const seen = new Set<planck.Body>();
+  private syncBodies(pw: PhysWorld, interp: Interpolation) {
+    const seen = new Set<Body>();
 
-    forEachBody(world, (body) => {
+    forEachBody(pw, (body) => {
       seen.add(body);
       const { x, y, angle } = lerpBody(body, interp);
-      const key = fixtureKey(body);
+      const key = shapeKey(body);
 
       const existing = this.bodyMeshes.get(body);
       if (existing && existing.key === key) {
@@ -397,7 +401,7 @@ export class ThreeJSRenderer implements IRenderer {
             }
           });
         }
-        const group = this.createBodyMeshes(body);
+        const group = this.createBodyMeshes(pw, body);
         group.position.set(x, y, 0);
         group.rotation.set(0, 0, angle);
         this.scene.add(group);
@@ -419,34 +423,33 @@ export class ThreeJSRenderer implements IRenderer {
     }
   }
 
-  private createBodyMeshes(body: planck.Body): THREE.Group {
+  private createBodyMeshes(pw: PhysWorld, body: Body): THREE.Group {
+    const B2 = b2();
     const group = new THREE.Group();
-    const ud = getBodyUserData(body);
-    const fillColor = ud?.fill ?? bodyColor(body);
+    const ud = getBodyUserData(pw, body);
+    const fillColor = ud?.fill ?? bodyColor(pw, body);
     const threeColor = rgbaToThreeColor(fillColor);
     const opacity = rgbaToOpacity(fillColor);
-    const isStatic = body.isStatic();
+    const isStatic = body.GetType().value === B2.b2BodyType.b2_staticBody.value;
 
-    for (let fixture = body.getFixtureList(); fixture; fixture = fixture.getNext()) {
-      const shape = fixture.getShape();
-      const fud = fixture.getUserData() as FixtureStyle | null;
-      const fColor = fud?.fill ? rgbaToThreeColor(fud.fill) : threeColor;
-      const fOpacity = fud?.fill ? rgbaToOpacity(fud.fill) : opacity;
-      const isSensor = fixture.isSensor();
+    const shapeIds: b2ShapeId[] = body.GetShapes() ?? [];
+    for (const shapeId of shapeIds) {
+      const shapeType = B2.b2Shape_GetType(shapeId);
+      const isSensor = B2.b2Shape_IsSensor(shapeId);
 
       const mat = new THREE.MeshStandardMaterial({
-        color: isSensor ? new THREE.Color(0.4, 0.8, 1.0) : fColor,
-        transparent: fOpacity < 1 || isSensor,
-        opacity: isSensor ? 0.15 : fOpacity,
+        color: isSensor ? new THREE.Color(0.4, 0.8, 1.0) : threeColor,
+        transparent: opacity < 1 || isSensor,
+        opacity: isSensor ? 0.15 : opacity,
         roughness: isStatic ? 0.8 : 0.4,
         metalness: isStatic ? 0.1 : 0.3,
         flatShading: true,
       });
 
-      if (shape.getType() === "circle") {
-        const circle = shape as planck.CircleShape;
-        const r = circle.getRadius();
-        const center = circle.getCenter();
+      if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
+        const circle = B2.b2Shape_GetCircle(shapeId);
+        const r = circle.radius;
+        const center = circle.center;
         const geo = new THREE.SphereGeometry(r, 8, 6);
         geo.translate(center.x, center.y, 0);
         const mesh = new THREE.Mesh(geo, mat);
@@ -460,28 +463,49 @@ export class ThreeJSRenderer implements IRenderer {
         ]);
         const spokeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
         group.add(new THREE.Line(spokeGeo, spokeMat));
-      } else if (shape.getType() === "polygon") {
-        const poly = shape as planck.PolygonShape;
-        const geo = createPolygonGeometry(poly.m_vertices);
+      } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
+        const poly = B2.b2Shape_GetPolygon(shapeId);
+        const verts: { x: number; y: number }[] = [];
+        for (let j = 0; j < poly.count; j++) {
+          const v = poly.GetVertex(j);
+          verts.push({ x: v.x, y: v.y });
+        }
+        const geo = createPolygonGeometry(verts);
         geo.translate(0, 0, -EXTRUDE_DEPTH / 2);
         const mesh = new THREE.Mesh(geo, mat);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         group.add(mesh);
-      } else if (shape.getType() === "edge") {
-        const edge = shape as planck.EdgeShape;
+      } else if (shapeType.value === B2.b2ShapeType.b2_segmentShape.value) {
+        const seg = B2.b2Shape_GetSegment(shapeId);
         const lineGeo = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(edge.m_vertex1.x, edge.m_vertex1.y, 0),
-          new THREE.Vector3(edge.m_vertex2.x, edge.m_vertex2.y, 0),
+          new THREE.Vector3(seg.point1.x, seg.point1.y, 0),
+          new THREE.Vector3(seg.point2.x, seg.point2.y, 0),
         ]);
-        const lineMat = new THREE.LineBasicMaterial({ color: fColor, transparent: true, opacity: fOpacity });
+        const lineMat = new THREE.LineBasicMaterial({ color: threeColor, transparent: true, opacity });
         group.add(new THREE.Line(lineGeo, lineMat));
-      } else if (shape.getType() === "chain") {
-        const chain = shape as planck.ChainShape;
-        const points = chain.m_vertices.map((v) => new THREE.Vector3(v.x, v.y, 0));
-        const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-        const lineMat = new THREE.LineBasicMaterial({ color: fColor, transparent: true, opacity: fOpacity });
-        group.add(new THREE.Line(lineGeo, lineMat));
+      } else if (shapeType.value === B2.b2ShapeType.b2_capsuleShape.value) {
+        // Approximate capsule as a cylinder + hemispheres
+        const capsule = B2.b2Shape_GetCapsule(shapeId);
+        const p1 = capsule.center1;
+        const p2 = capsule.center2;
+        const r = capsule.radius;
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const len = Math.hypot(dx, dy);
+
+        // Use a cylinder-like extruded shape
+        const geo = new THREE.CapsuleGeometry(r, len, 4, 8);
+        // CapsuleGeometry is along Y axis, rotate to align with p1->p2
+        const capAngle = Math.atan2(dy, dx);
+        const midX = (p1.x + p2.x) / 2;
+        const midY = (p1.y + p2.y) / 2;
+        geo.rotateZ(capAngle - Math.PI / 2);
+        geo.translate(midX, midY, 0);
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        group.add(mesh);
       }
     }
 
@@ -490,29 +514,35 @@ export class ThreeJSRenderer implements IRenderer {
 
   // ── Joint sync ──
 
-  private syncJoints(world: planck.World, interp: Interpolation) {
-    const seen = new Set<planck.Joint>();
+  private syncJoints(pw: PhysWorld, interp: Interpolation) {
+    const B2 = b2();
+    const seen = new Set<Joint>();
 
-    for (let joint = world.getJointList(); joint; joint = joint.getNext()) {
+    pw.forEachJoint((joint) => {
       seen.add(joint);
-      if (joint.getType() === "rope-joint") {
-        const ud = joint.getUserData() as { ropeStabilizer?: boolean } | null;
-        if (!ud?.ropeStabilizer) continue;
-      }
-      const rawA = joint.getAnchorA();
-      const rawB = joint.getAnchorB();
-      const a = lerpWorldPoint(joint.getBodyA(), rawA, interp);
-      const b = lerpWorldPoint(joint.getBodyB(), rawB, interp);
+
+      const jd = pw.getJointData(joint);
+      const isStabilizer = !!jd?.ropeStabilizer;
+
+      // joint.GetBodyA/B() returns BodyRef (empty interface) — cast to Body for full API
+      const bodyA = joint.GetBodyA() as unknown as Body;
+      const bodyB = joint.GetBodyB() as unknown as Body;
+      const localFrameA = joint.GetLocalFrameA();
+      const localFrameB = joint.GetLocalFrameB();
+      const worldA = bodyA.GetWorldPoint(localFrameA.p);
+      const worldB = bodyB.GetWorldPoint(localFrameB.p);
+      const a = lerpWorldPoint(bodyA, worldA, interp);
+      const b = lerpWorldPoint(bodyB, worldB, interp);
 
       const existing = this.jointLines.get(joint);
       if (existing) {
-        this.updateJointGroup(existing, joint, a, b);
+        this.updateJointGroup(existing, joint, a, b, pw);
       } else {
-        const group = this.createJointGroup(joint, a, b);
+        const group = this.createJointGroup(joint, a, b, isStabilizer, B2);
         this.scene.add(group);
         this.jointLines.set(joint, group);
       }
-    }
+    });
 
     for (const [joint, group] of this.jointLines) {
       if (!seen.has(joint)) {
@@ -528,13 +558,18 @@ export class ThreeJSRenderer implements IRenderer {
     }
   }
 
-  private createJointGroup(joint: planck.Joint, a: planck.Vec2Value, b: planck.Vec2Value): THREE.Group {
+  private createJointGroup(
+    joint: Joint,
+    a: { x: number; y: number },
+    b: { x: number; y: number },
+    isStabilizer: boolean,
+    // biome-ignore lint/suspicious/noExplicitAny: WASM module type
+    B2: any,
+  ): THREE.Group {
     const group = new THREE.Group();
-    const isSpring = joint.getType() === "distance-joint";
+    const isSpring = joint.GetType().value === B2.b2JointType.b2_distanceJoint.value;
 
-    const isStabilizer = (joint.getUserData() as Record<string, unknown>)?.ropeStabilizer;
-
-    if (isSpring) {
+    if (isSpring && !isStabilizer) {
       const points = this.computeSpringCoilPoints(a, b);
       const geo = new THREE.BufferGeometry().setFromPoints(points);
       const mat = new THREE.LineBasicMaterial({ color: 0xc8dcff, transparent: true, opacity: 0.7 });
@@ -551,7 +586,6 @@ export class ThreeJSRenderer implements IRenderer {
     }
 
     if (isStabilizer) {
-      // No anchor dots for stabilizer lines — keep them minimal
       return group;
     }
 
@@ -567,8 +601,17 @@ export class ThreeJSRenderer implements IRenderer {
     return group;
   }
 
-  private updateJointGroup(group: THREE.Group, joint: planck.Joint, a: planck.Vec2Value, b: planck.Vec2Value) {
-    const isSpring = joint.getType() === "distance-joint";
+  private updateJointGroup(
+    group: THREE.Group,
+    joint: Joint,
+    a: { x: number; y: number },
+    b: { x: number; y: number },
+    pw: PhysWorld,
+  ) {
+    const B2 = b2();
+    const jd = pw.getJointData(joint);
+    const isStabilizer = !!jd?.ropeStabilizer;
+    const isSpring = joint.GetType().value === B2.b2JointType.b2_distanceJoint.value && !isStabilizer;
     const line = group.children[0] as THREE.Line;
     if (isSpring) {
       const points = this.computeSpringCoilPoints(a, b);
@@ -587,7 +630,7 @@ export class ThreeJSRenderer implements IRenderer {
     dotB.position.set(b.x, b.y, 0.5);
   }
 
-  private computeSpringCoilPoints(a: planck.Vec2Value, b: planck.Vec2Value): THREE.Vector3[] {
+  private computeSpringCoilPoints(a: { x: number; y: number }, b: { x: number; y: number }): THREE.Vector3[] {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const len = Math.hypot(dx, dy);
