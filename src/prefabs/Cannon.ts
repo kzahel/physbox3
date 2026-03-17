@@ -1,4 +1,5 @@
 import * as planck from "planck";
+import { getBodyUserData } from "../engine/BodyUserData";
 import type { IRenderer } from "../engine/IRenderer";
 
 export function createCannon(
@@ -22,7 +23,7 @@ export function createCannon(
   body.setUserData({ fill: "rgba(80,80,90,0.9)", label: "cannon" });
 
   const fire = () => {
-    const ud = body.getUserData() as { destroyed?: boolean } | null;
+    const ud = getBodyUserData(body);
     if (ud?.destroyed) return;
     const pos = body.getPosition();
     const a = body.getAngle();
@@ -50,7 +51,7 @@ export function createCannon(
       if (fA === body || fB === body) return;
       exploded = true;
       setTimeout(() => {
-        const bud = ball.getUserData() as { destroyed?: boolean } | null;
+        const bud = getBodyUserData(ball);
         if (bud?.destroyed) return;
         explodeAt(ball.getPosition().x, ball.getPosition().y, 5, 20);
         world.destroyBody(ball);
@@ -58,7 +59,7 @@ export function createCannon(
     });
 
     setTimeout(() => {
-      const bud = ball.getUserData() as { destroyed?: boolean } | null;
+      const bud = getBodyUserData(ball);
       if (!exploded && !bud?.destroyed) world.destroyBody(ball);
     }, 5000);
 

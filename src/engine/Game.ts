@@ -12,11 +12,12 @@ import { createLauncher } from "../prefabs/Launcher";
 import { createPlatform } from "../prefabs/Platform";
 import { createRagdoll, type RagdollData } from "../prefabs/Ragdoll";
 import { applyRocketThrust, createRocket } from "../prefabs/Rocket";
-import { createChainRope, createRopeBetween } from "../prefabs/Rope";
+import { applyRopeStabilization, createChainRope, createRopeBetween } from "../prefabs/Rope";
 import { createSeesaw } from "../prefabs/Seesaw";
 import { createSpringBall } from "../prefabs/SpringBall";
 import { createTrain } from "../prefabs/Train";
 import { playBounce, playWoodHit, unlockAudio } from "./Audio";
+import { getBodyUserData } from "./BodyUserData";
 import { Camera } from "./Camera";
 import type { IRenderer } from "./IRenderer";
 import { clearDynamic, destroyBodyAt, explodeAt, markDestroyed, scaleBody } from "./Physics";
@@ -28,7 +29,7 @@ const TIMESTEP = 1 / 60;
 
 function applyMotorTorque(world: planck.World) {
   for (let b = world.getBodyList(); b; b = b.getNext()) {
-    const ud = b.getUserData() as { motorSpeed?: number } | null;
+    const ud = getBodyUserData(b);
     if (ud?.motorSpeed == null) continue;
     b.setAngularVelocity(ud.motorSpeed);
   }
@@ -305,7 +306,18 @@ export class Game {
     const dt = Math.min((time - this.lastTime) / 1000, 0.1);
     this.lastTime = time;
 
-    // FPS counter
+    this.updateFPS(dt);
+
+    if (!this.paused) {
+      this.stepPhysics(dt);
+    }
+
+    this.removeOutOfBoundsBodies();
+    this.updateCameraFollow();
+    this.renderer.drawWorld(this.world, this.camera);
+  }
+
+  private updateFPS(dt: number) {
     this.frameCount++;
     this.fpsTimer += dt;
     if (this.fpsTimer >= 1) {
@@ -313,28 +325,28 @@ export class Game {
       this.frameCount = 0;
       this.fpsTimer = 0;
     }
+  }
 
-    // Physics step
-    if (!this.paused) {
-      this.inputManager?.update();
-      applyRocketThrust(this.world, this.renderer, dt * this.timeScale);
-      applyBalloonLift(this.world);
-      applyFanForce(this.world, this.renderer);
-      applyMotorTorque(this.world);
-      this.accumulator += dt * this.timeScale;
-      while (this.accumulator >= TIMESTEP) {
-        this.world.step(TIMESTEP, this.velocityIterations, this.positionIterations);
-        this.accumulator -= TIMESTEP;
-      }
+  private stepPhysics(dt: number) {
+    this.inputManager?.update();
+    applyRocketThrust(this.world, this.renderer, dt * this.timeScale);
+    applyBalloonLift(this.world);
+    applyFanForce(this.world, this.renderer);
+    applyMotorTorque(this.world);
+    applyRopeStabilization(this.world);
+    this.accumulator += dt * this.timeScale;
+    while (this.accumulator >= TIMESTEP) {
+      this.world.step(TIMESTEP, this.velocityIterations, this.positionIterations);
+      this.accumulator -= TIMESTEP;
     }
+  }
 
-    // Kill floor
-    const killY = KILL_Y;
+  private removeOutOfBoundsBodies() {
     const toRemove: planck.Body[] = [];
     let count = 0;
     for (let b = this.world.getBodyList(); b; b = b.getNext()) {
       if (b.isDynamic()) {
-        if (b.getPosition().y < killY || b.getPosition().y > KILL_Y_TOP) {
+        if (b.getPosition().y < KILL_Y || b.getPosition().y > KILL_Y_TOP) {
           toRemove.push(b);
         } else {
           count++;
@@ -346,8 +358,9 @@ export class Game {
       this.world.destroyBody(b);
     }
     this.bodyCount = count;
+  }
 
-    // Camera follow — update followBody when selection changes
+  private updateCameraFollow() {
     const sel = this.inputManager?.selectedBody ?? null;
     if (sel && sel !== this.followBody) this.followBody = sel;
     if (this.followSelected && this.followBody?.isActive()) {
@@ -355,8 +368,5 @@ export class Game {
       this.camera.x = pos.x;
       this.camera.y = pos.y;
     }
-
-    // Render
-    this.renderer.drawWorld(this.world, this.camera);
   }
 }

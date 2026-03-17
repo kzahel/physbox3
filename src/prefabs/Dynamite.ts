@@ -1,4 +1,5 @@
 import * as planck from "planck";
+import { getBodyUserData } from "../engine/BodyUserData";
 
 export function createDynamite(
   world: planck.World,
@@ -17,7 +18,7 @@ export function createDynamite(
   });
 
   setTimeout(() => {
-    const ud = body.getUserData() as { destroyed?: boolean } | null;
+    const ud = getBodyUserData(body);
     if (ud?.destroyed) return;
     const pos = body.getPosition();
     explodeAt(pos.x, pos.y, 8, 30);

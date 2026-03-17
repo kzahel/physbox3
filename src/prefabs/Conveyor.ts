@@ -1,4 +1,5 @@
 import * as planck from "planck";
+import { getBodyUserData } from "../engine/BodyUserData";
 
 export function createConveyor(world: planck.World, x: number, y: number, w = 6, speed = 3, angle = 0): planck.Body {
   const body = world.createBody({ type: "kinematic", position: planck.Vec2(x, y), angle });
@@ -10,7 +11,7 @@ export function createConveyor(world: planck.World, x: number, y: number, w = 6,
     const bA = contact.getFixtureA().getBody();
     const bB = contact.getFixtureB().getBody();
     if (bA === body || bB === body) {
-      const ud = body.getUserData() as { speed?: number } | null;
+      const ud = getBodyUserData(body);
       contact.setTangentSpeed(ud?.speed ?? speed);
     }
   });

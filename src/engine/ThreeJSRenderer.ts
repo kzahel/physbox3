@@ -9,6 +9,8 @@ import {
   isDirectional,
   type Tool,
 } from "../interaction/InputManager";
+import type { FixtureStyle } from "./BodyUserData";
+import { getBodyUserData } from "./BodyUserData";
 import type { Camera } from "./Camera";
 import { KILL_Y, KILL_Y_TOP } from "./Game";
 import type { IRenderer } from "./IRenderer";
@@ -463,7 +465,7 @@ export class ThreeJSRenderer implements IRenderer {
 
   private createBodyMeshes(body: planck.Body): THREE.Group {
     const group = new THREE.Group();
-    const ud = body.getUserData() as { fill?: string; label?: string } | null;
+    const ud = getBodyUserData(body);
     const fillColor = ud?.fill ?? this.bodyColor(body);
     const threeColor = rgbaToThreeColor(fillColor);
     const opacity = rgbaToOpacity(fillColor);
@@ -471,7 +473,7 @@ export class ThreeJSRenderer implements IRenderer {
 
     for (let fixture = body.getFixtureList(); fixture; fixture = fixture.getNext()) {
       const shape = fixture.getShape();
-      const fud = fixture.getUserData() as { fill?: string } | null;
+      const fud = fixture.getUserData() as FixtureStyle | null;
       const fColor = fud?.fill ? rgbaToThreeColor(fud.fill) : threeColor;
       const fOpacity = fud?.fill ? rgbaToOpacity(fud.fill) : opacity;
       const isSensor = fixture.isSensor();
@@ -538,6 +540,7 @@ export class ThreeJSRenderer implements IRenderer {
 
     for (let joint = world.getJointList(); joint; joint = joint.getNext()) {
       seen.add(joint);
+      if (joint.getType() === "rope-joint") continue;
       const a = joint.getAnchorA();
       const b = joint.getAnchorB();
 
@@ -899,7 +902,7 @@ export class ThreeJSRenderer implements IRenderer {
     const time = performance.now() / 1000;
 
     for (let body = world.getBodyList(); body; body = body.getNext()) {
-      const ud = body.getUserData() as { label?: string; speed?: number } | null;
+      const ud = getBodyUserData(body);
       if (ud?.label !== "conveyor") continue;
 
       const speed = ud.speed ?? 3;
@@ -943,7 +946,7 @@ export class ThreeJSRenderer implements IRenderer {
   private drawBalloonStrings(world: planck.World, camera: Camera) {
     const ctx = this.overlayCtx;
     for (let body = world.getBodyList(); body; body = body.getNext()) {
-      const ud = body.getUserData() as { label?: string; fill?: string } | null;
+      const ud = getBodyUserData(body);
       if (ud?.label !== "balloon") continue;
 
       const pos = body.getPosition();
@@ -979,7 +982,7 @@ export class ThreeJSRenderer implements IRenderer {
     const ctx = this.overlayCtx;
 
     for (let body = world.getBodyList(); body; body = body.getNext()) {
-      const ud = body.getUserData() as { label?: string; fuseStart?: number; fuseDuration?: number } | null;
+      const ud = getBodyUserData(body);
       if (ud?.label !== "dynamite" || !ud.fuseStart || !ud.fuseDuration) continue;
 
       const elapsed = (now - ud.fuseStart) / 1000;
@@ -1019,7 +1022,7 @@ export class ThreeJSRenderer implements IRenderer {
   private bodyColor(body: planck.Body): string {
     if (body.isStatic()) return "rgba(80,80,100,0.8)";
     if (body.isKinematic()) return "rgba(100,180,100,0.6)";
-    const ud = body.getUserData() as { fill?: string } | null;
+    const ud = getBodyUserData(body);
     return ud?.fill ?? "rgba(120,160,255,0.6)";
   }
 }

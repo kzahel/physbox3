@@ -8,6 +8,8 @@ import {
   isDirectional,
   type Tool,
 } from "../interaction/InputManager";
+import type { FixtureStyle } from "./BodyUserData";
+import { getBodyUserData } from "./BodyUserData";
 import type { Camera } from "./Camera";
 import { KILL_Y, KILL_Y_TOP } from "./Game";
 import type { IRenderer } from "./IRenderer";
@@ -24,6 +26,24 @@ interface CursorStyle {
   radius: number;
   stroke: string;
   fill: string;
+}
+
+const PLATFORM_PREVIEW_COLORS: Partial<Record<Tool, string>> = {
+  fan: "rgba(120, 180, 220, 0.9)",
+  cannon: "rgba(180, 80, 80, 0.9)",
+  rocket: "rgba(200, 200, 220, 0.9)",
+  conveyor: "rgba(200, 160, 50, 0.9)",
+  platform: "rgba(80, 100, 80, 0.9)",
+};
+
+/** Ocean surface wave displacement in world units */
+function oceanWave(wx: number): number {
+  return Math.sin(wx * 0.8) * 2 + Math.sin(wx * 1.5) * 1;
+}
+
+/** Sky boundary wisp displacement in world units */
+function cloudWisp(wx: number): number {
+  return Math.sin(wx * 0.5) * 3 + Math.sin(wx * 1.2) * 1.5;
 }
 
 const TOOL_CURSORS: Partial<Record<Tool, CursorStyle>> = {
@@ -69,11 +89,21 @@ export class Renderer implements IRenderer {
 
   drawWorld(world: planck.World, camera: Camera) {
     this.clear();
-    const ctx = this.ctx;
-
-    // Draw ocean at kill floor and sky at kill ceiling
     this.drawOcean(camera);
     this.drawSky(camera);
+    this.drawBodies(world, camera);
+    this.drawJoints(world, camera);
+    this.drawConveyorAnimation(world, camera);
+    this.drawBalloonStrings(world, camera);
+    this.drawDynamiteEffects(world, camera);
+    this.particles.tick();
+    this.drawParticles(camera);
+    this.drawToolOverlays(camera);
+    this.drawSelectionUI(camera);
+  }
+
+  private drawBodies(world: planck.World, camera: Camera) {
+    const ctx = this.ctx;
 
     for (let body = world.getBodyList(); body; body = body.getNext()) {
       const pos = body.getPosition();
@@ -143,24 +173,10 @@ export class Renderer implements IRenderer {
         ctx.restore();
       }
     }
+  }
 
-    // Draw joints
-    this.drawJoints(world, camera);
-
-    // Conveyor belt animation
-    this.drawConveyorAnimation(world, camera);
-
-    // Balloon strings
-    this.drawBalloonStrings(world, camera);
-
-    // Dynamite wick + sparks
-    this.drawDynamiteEffects(world, camera);
-
-    // Particles
-    this.particles.tick();
-    this.drawParticles(camera);
-
-    // Draw tool cursor overlay
+  private drawToolOverlays(camera: Camera) {
+    // Tool cursor
     if (this.inputManager?.toolCursor) {
       const tool = this.inputManager.tool;
       const pos = this.inputManager.toolCursor;
@@ -170,66 +186,12 @@ export class Renderer implements IRenderer {
       }
     }
 
-    // Draw platform/conveyor/fan preview
+    // Platform/conveyor/fan preview
     if (this.inputManager?.platformDraw) {
-      const tool = this.inputManager.tool;
-      const isFan = tool === "fan";
-      const isCannon = tool === "cannon";
-      const isRocket = tool === "rocket";
-      const isConveyor = tool === "conveyor";
-      const { start, end } = this.inputManager.platformDraw;
-      const s = camera.toScreen(start.x, start.y, this.canvas);
-      const e = camera.toScreen(end.x, end.y, this.canvas);
-      const ctx = this.ctx;
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(s.x, s.y);
-      ctx.lineTo(e.x, e.y);
-      const color = isFan
-        ? "rgba(120, 180, 220, 0.9)"
-        : isCannon
-          ? "rgba(180, 80, 80, 0.9)"
-          : isRocket
-            ? "rgba(200, 200, 220, 0.9)"
-            : isConveyor
-              ? "rgba(200, 160, 50, 0.9)"
-              : "rgba(80, 100, 80, 0.9)";
-      ctx.strokeStyle = color;
-      ctx.lineWidth = Math.max(4, 0.3 * camera.zoom);
-      ctx.lineCap = "round";
-      ctx.setLineDash([8, 6]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      // Endpoint dots
-      ctx.fillStyle = color;
-      for (const p of [s, e]) {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      // Fan/cannon: arrow at end to show direction
-      if (isFan || isCannon || isRocket) {
-        const dx = e.x - s.x;
-        const dy = e.y - s.y;
-        const len = Math.hypot(dx, dy);
-        if (len > 10) {
-          const nx = dx / len;
-          const ny = dy / len;
-          ctx.beginPath();
-          ctx.moveTo(e.x, e.y);
-          ctx.lineTo(e.x - nx * 12 - ny * 8, e.y - ny * 12 + nx * 8);
-          ctx.moveTo(e.x, e.y);
-          ctx.lineTo(e.x - nx * 12 + ny * 8, e.y - ny * 12 - nx * 8);
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 2.5;
-          ctx.setLineDash([]);
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
+      this.drawPlatformPreview(camera);
     }
 
-    // Draw polygon draw preview
+    // Polygon draw preview
     if (this.inputManager?.tool === "draw") {
       const pts = this.inputManager.drawTool.drawPoints;
       if (pts.length >= 1) {
@@ -237,7 +199,7 @@ export class Renderer implements IRenderer {
       }
     }
 
-    // Draw rope pending highlight
+    // Rope pending highlight
     if (this.inputManager?.ropePending) {
       const rp = this.inputManager.ropePending;
       const sp = rp.body
@@ -246,7 +208,7 @@ export class Renderer implements IRenderer {
       this.drawToolCursor(sp, 16, "rgba(180, 160, 120, 0.9)", "rgba(180, 160, 120, 0.15)");
     }
 
-    // Draw attach pending highlight
+    // Attach pending highlight
     if (this.inputManager?.attachPending) {
       const body = this.inputManager.attachPending.body;
       const bpos = body.getPosition();
@@ -254,7 +216,7 @@ export class Renderer implements IRenderer {
       this.drawToolCursor(sp, 16, "rgba(255, 200, 50, 0.9)", "rgba(255, 200, 50, 0.15)");
     }
 
-    // Draw scale preview
+    // Scale preview
     if (this.inputManager?.scaleDrag) {
       const sd = this.inputManager.scaleDrag;
       const bpos = sd.body.getPosition();
@@ -269,25 +231,71 @@ export class Renderer implements IRenderer {
         this.ctx.fillText(`${sd.currentScale.toFixed(1)}x`, sp.x, sp.y - ringSize - 14);
       });
     }
+  }
 
-    // Draw select tool UI
-    if (this.inputManager?.selectedBody) {
-      const body = this.inputManager.selectedBody;
-      const bpos = body.getPosition();
-      const sp = camera.toScreen(bpos.x, bpos.y, this.canvas);
-      // Selection highlight ring
-      this.drawToolCursor(sp, 20, "rgba(100, 200, 255, 0.8)", "rgba(100, 200, 255, 0.08)");
-      // Toggle button above body
-      this.drawToggleButton(sp, body.isStatic());
-      // Direction button for cars/conveyors
-      let nextBtnY = BTN_DIRECTION_OFFSET_Y;
-      if (isDirectional(body)) {
-        this.drawDirectionButton(sp, nextBtnY);
-        nextBtnY += BTN_SPACING;
-      }
-      // Motor button
-      this.drawMotorButton(sp, nextBtnY, hasMotor(body));
+  private drawPlatformPreview(camera: Camera) {
+    const tool = this.inputManager!.tool;
+    const { start, end } = this.inputManager!.platformDraw!;
+    const s = camera.toScreen(start.x, start.y, this.canvas);
+    const e = camera.toScreen(end.x, end.y, this.canvas);
+    const color = PLATFORM_PREVIEW_COLORS[tool] ?? "rgba(80, 100, 80, 0.9)";
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y);
+    ctx.lineTo(e.x, e.y);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(4, 0.3 * camera.zoom);
+    ctx.lineCap = "round";
+    ctx.setLineDash([8, 6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Endpoint dots
+    ctx.fillStyle = color;
+    for (const p of [s, e]) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      ctx.fill();
     }
+    // Arrow at end to show direction for directional tools
+    if (tool === "fan" || tool === "cannon" || tool === "rocket") {
+      const dx = e.x - s.x;
+      const dy = e.y - s.y;
+      const len = Math.hypot(dx, dy);
+      if (len > 10) {
+        const nx = dx / len;
+        const ny = dy / len;
+        ctx.beginPath();
+        ctx.moveTo(e.x, e.y);
+        ctx.lineTo(e.x - nx * 12 - ny * 8, e.y - ny * 12 + nx * 8);
+        ctx.moveTo(e.x, e.y);
+        ctx.lineTo(e.x - nx * 12 + ny * 8, e.y - ny * 12 - nx * 8);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([]);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  private drawSelectionUI(camera: Camera) {
+    if (!this.inputManager?.selectedBody) return;
+    const body = this.inputManager.selectedBody;
+    const bpos = body.getPosition();
+    const sp = camera.toScreen(bpos.x, bpos.y, this.canvas);
+    // Selection highlight ring
+    this.drawToolCursor(sp, 20, "rgba(100, 200, 255, 0.8)", "rgba(100, 200, 255, 0.08)");
+    // Toggle button above body
+    this.drawToggleButton(sp, body.isStatic());
+    // Direction button for cars/conveyors
+    let nextBtnY = BTN_DIRECTION_OFFSET_Y;
+    if (isDirectional(body)) {
+      this.drawDirectionButton(sp, nextBtnY);
+      nextBtnY += BTN_SPACING;
+    }
+    // Motor button
+    this.drawMotorButton(sp, nextBtnY, hasMotor(body));
   }
 
   setInputManager(input: InputManager) {
@@ -376,7 +384,7 @@ export class Renderer implements IRenderer {
     ctx.moveTo(0, surface.y);
     for (let x = 0; x <= cw; x += 4) {
       const wx = (x - cw / 2) / camera.zoom + camera.x;
-      const wave = Math.sin(wx * 0.8) * 2 + Math.sin(wx * 1.5) * 1;
+      const wave = oceanWave(wx);
       const sy = camera.toScreen(0, KILL_Y + wave, this.canvas).y;
       ctx.lineTo(x, sy);
     }
@@ -391,7 +399,7 @@ export class Renderer implements IRenderer {
     ctx.moveTo(0, surface.y);
     for (let x = 0; x <= cw; x += 4) {
       const wx = (x - cw / 2) / camera.zoom + camera.x;
-      const wave = Math.sin(wx * 0.8) * 2 + Math.sin(wx * 1.5) * 1;
+      const wave = oceanWave(wx);
       const sy = camera.toScreen(0, KILL_Y + wave, this.canvas).y;
       ctx.lineTo(x, sy);
     }
@@ -427,7 +435,7 @@ export class Renderer implements IRenderer {
     ctx.moveTo(0, surface.y);
     for (let x = 0; x <= cw; x += 4) {
       const wx = (x - cw / 2) / camera.zoom + camera.x;
-      const wisp = Math.sin(wx * 0.5) * 3 + Math.sin(wx * 1.2) * 1.5;
+      const wisp = cloudWisp(wx);
       const sy = camera.toScreen(0, KILL_Y_TOP + wisp, this.canvas).y;
       ctx.lineTo(x, sy);
     }
@@ -441,7 +449,7 @@ export class Renderer implements IRenderer {
     const time = performance.now() / 1000;
 
     for (let body = world.getBodyList(); body; body = body.getNext()) {
-      const ud = body.getUserData() as { label?: string; speed?: number } | null;
+      const ud = getBodyUserData(body);
       if (ud?.label !== "conveyor") continue;
 
       const speed = ud.speed ?? 3;
@@ -489,7 +497,7 @@ export class Renderer implements IRenderer {
   private drawBalloonStrings(world: planck.World, camera: Camera) {
     const ctx = this.ctx;
     for (let body = world.getBodyList(); body; body = body.getNext()) {
-      const ud = body.getUserData() as { label?: string; fill?: string } | null;
+      const ud = getBodyUserData(body);
       if (ud?.label !== "balloon") continue;
 
       const pos = body.getPosition();
@@ -535,7 +543,7 @@ export class Renderer implements IRenderer {
   private drawDynamiteEffects(world: planck.World, camera: Camera) {
     const now = performance.now();
     for (let body = world.getBodyList(); body; body = body.getNext()) {
-      const ud = body.getUserData() as { label?: string; fuseStart?: number; fuseDuration?: number } | null;
+      const ud = getBodyUserData(body);
       if (ud?.label !== "dynamite" || !ud.fuseStart || !ud.fuseDuration) continue;
 
       const elapsed = (now - ud.fuseStart) / 1000;
@@ -592,7 +600,10 @@ export class Renderer implements IRenderer {
       const sa = camera.toScreen(a.x, a.y, this.canvas);
       const sb = camera.toScreen(b.x, b.y, this.canvas);
 
-      if (joint.getType() === "distance-joint") {
+      if (joint.getType() === "rope-joint") {
+        // Skip drawing rope stabilizer joints (invisible constraint)
+        continue;
+      } else if (joint.getType() === "distance-joint") {
         this.drawSpringCoil(sa, sb, camera.zoom);
       } else {
         ctx.strokeStyle = "rgba(150,200,255,0.4)";
@@ -728,17 +739,7 @@ export class Renderer implements IRenderer {
   private bodyColor(body: planck.Body): string {
     if (body.isStatic()) return "rgba(80,80,100,0.8)";
     if (body.isKinematic()) return "rgba(100,180,100,0.6)";
-    const ud = body.getUserData() as BodyStyle | null;
+    const ud = getBodyUserData(body);
     return ud?.fill ?? "rgba(120,160,255,0.6)";
   }
-}
-
-export interface FixtureStyle {
-  fill?: string;
-  stroke?: string;
-}
-
-export interface BodyStyle {
-  fill?: string;
-  label?: string;
 }

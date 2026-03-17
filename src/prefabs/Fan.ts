@@ -1,4 +1,5 @@
 import * as planck from "planck";
+import { getBodyUserData } from "../engine/BodyUserData";
 import type { IRenderer } from "../engine/IRenderer";
 
 export function createFan(
@@ -17,7 +18,7 @@ export function createFan(
 
 export function applyFanForce(world: planck.World, renderer: IRenderer): void {
   for (let fan = world.getBodyList(); fan; fan = fan.getNext()) {
-    const ud = fan.getUserData() as { label?: string; force?: number; range?: number } | null;
+    const ud = getBodyUserData(fan);
     if (ud?.label !== "fan") continue;
 
     const pos = fan.getPosition();

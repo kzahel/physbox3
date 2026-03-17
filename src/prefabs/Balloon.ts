@@ -1,4 +1,5 @@
 import * as planck from "planck";
+import { getBodyUserData } from "../engine/BodyUserData";
 
 export function createBalloon(world: planck.World, x: number, y: number): planck.Body {
   const r = Math.random;
@@ -27,7 +28,7 @@ export function createBalloon(world: planck.World, x: number, y: number): planck
 export function applyBalloonLift(world: planck.World): void {
   for (let b = world.getBodyList(); b; b = b.getNext()) {
     if (!b.isDynamic()) continue;
-    const ud = b.getUserData() as { label?: string; lift?: number } | null;
+    const ud = getBodyUserData(b);
     if (ud?.label !== "balloon" || !ud.lift) continue;
     b.applyForceToCenter(planck.Vec2(0, ud.lift * b.getMass()), true);
   }

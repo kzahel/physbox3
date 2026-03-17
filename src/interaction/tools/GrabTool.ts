@@ -1,4 +1,5 @@
 import * as planck from "planck";
+import { getBodyUserData } from "../../engine/BodyUserData";
 import { findClosestBody } from "../../engine/Physics";
 import type { ToolContext, ToolHandler } from "../ToolHandler";
 
@@ -96,7 +97,7 @@ export class GrabTool implements ToolHandler {
 
   /** If the click is near an endpoint of a platform/conveyor, set up endpoint drag. */
   private tryEndpointDrag(body: planck.Body, wx: number, wy: number): EndpointDrag | null {
-    const ud = body.getUserData() as { label?: string } | null;
+    const ud = getBodyUserData(body);
     if (!ud?.label || !PLATFORM_LABELS.has(ud.label)) return null;
 
     const fixture = body.getFixtureList();

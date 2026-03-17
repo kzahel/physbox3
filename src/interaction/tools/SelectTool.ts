@@ -1,4 +1,5 @@
 import type * as planck from "planck";
+import { getBodyUserData } from "../../engine/BodyUserData";
 import {
   BTN_DIRECTION_OFFSET_Y,
   BTN_HALF_HEIGHT,
@@ -57,7 +58,7 @@ export class SelectTool implements ToolHandler {
 // ── Helpers (also used by Renderer) ──
 
 export function getBodyLabel(body: import("planck").Body): string | undefined {
-  return (body.getUserData() as { label?: string } | null)?.label;
+  return getBodyUserData(body)?.label;
 }
 
 export function isDirectional(body: import("planck").Body): boolean {
@@ -66,7 +67,7 @@ export function isDirectional(body: import("planck").Body): boolean {
 }
 
 export function hasMotor(body: import("planck").Body): boolean {
-  const ud = body.getUserData() as { motorSpeed?: number } | null;
+  const ud = getBodyUserData(body);
   return ud != null && ud.motorSpeed != null;
 }
 
@@ -80,18 +81,18 @@ function reverseDirection(body: import("planck").Body, world: import("planck").W
       }
     }
   } else if (label === "conveyor") {
-    const ud = body.getUserData() as { speed?: number } | null;
+    const ud = getBodyUserData(body);
     if (ud && ud.speed != null) ud.speed = -ud.speed;
   } else if (label === "rocket") {
-    const ud = body.getUserData() as { thrust?: number } | null;
+    const ud = getBodyUserData(body);
     if (ud && ud.thrust != null) ud.thrust = -ud.thrust;
   }
-  const mud = body.getUserData() as { motorSpeed?: number } | null;
+  const mud = getBodyUserData(body);
   if (mud && mud.motorSpeed != null) mud.motorSpeed = -mud.motorSpeed;
 }
 
 function toggleMotor(body: import("planck").Body) {
-  const ud = body.getUserData() as { motorSpeed?: number } | null;
+  const ud = getBodyUserData(body);
   if (ud && ud.motorSpeed != null) {
     delete ud.motorSpeed;
   } else {
