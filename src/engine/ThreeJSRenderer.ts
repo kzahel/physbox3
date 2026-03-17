@@ -62,20 +62,106 @@ const TOOL_CURSORS: Partial<Record<Tool, CursorStyle>> = {
 const EXTRUDE_DEPTH = 0.6;
 
 /**
- * Build a polygon geometry with XY bevels visible from the front.
- * Uses ExtrudeGeometry but clamps bevel to the shape's smallest
- * half-dimension so thin shapes like platforms aren't distorted.
+ * Inset a convex polygon by `amount` using proper per-edge offset.
+ * Each edge is moved inward by `amount` perpendicular to the edge,
+ * then adjacent offset edges are intersected to find new vertices.
  */
+function insetConvexPolygon(verts: { x: number; y: number }[], amount: number): { x: number; y: number }[] {
+  const n = verts.length;
+  // Compute centroid to determine inward normal direction
+  let cx = 0,
+    cy = 0;
+  for (const v of verts) {
+    cx += v.x;
+    cy += v.y;
+  }
+  cx /= n;
+  cy /= n;
+
+  // For each edge, compute the inward normal and offset line
+  const edgeNormals: { nx: number; ny: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = verts[i];
+    const b = verts[(i + 1) % n];
+    const dx = b.x - a.x,
+      dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    // Two candidate normals: (-dy, dx) and (dy, -dx)
+    let nx = -dy / len,
+      ny = dx / len;
+    // Pick the one pointing toward centroid
+    const midX = (a.x + b.x) / 2,
+      midY = (a.y + b.y) / 2;
+    if (nx * (cx - midX) + ny * (cy - midY) < 0) {
+      nx = -nx;
+      ny = -ny;
+    }
+    edgeNormals.push({ nx, ny });
+  }
+
+  // For each vertex (intersection of edge i-1 and edge i offset lines)
+  const result: { x: number; y: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const prevEdge = (i - 1 + n) % n;
+    const currEdge = i;
+
+    // Offset line for prevEdge: passes through (verts[prevEdge] + normal * amount)
+    const a0 = verts[prevEdge];
+    const a1 = verts[i];
+    const nA = edgeNormals[prevEdge];
+    const pAx = a0.x + nA.nx * amount,
+      pAy = a0.y + nA.ny * amount;
+    const dAx = a1.x - a0.x,
+      dAy = a1.y - a0.y;
+
+    // Offset line for currEdge: passes through (verts[i] + normal * amount)
+    const b0 = verts[i];
+    const b1 = verts[(i + 1) % n];
+    const nB = edgeNormals[currEdge];
+    const pBx = b0.x + nB.nx * amount,
+      pBy = b0.y + nB.ny * amount;
+    const dBx = b1.x - b0.x,
+      dBy = b1.y - b0.y;
+
+    // 2D line intersection: P_A + t * D_A = P_B + s * D_B
+    const cross = dAx * dBy - dAy * dBx;
+    if (Math.abs(cross) < 1e-10) {
+      // Parallel edges, just offset the vertex
+      result.push({ x: a1.x + nA.nx * amount, y: a1.y + nA.ny * amount });
+    } else {
+      const t = ((pBx - pAx) * dBy - (pBy - pAy) * dBx) / cross;
+      result.push({ x: pAx + t * dAx, y: pAy + t * dAy });
+    }
+  }
+  return result;
+}
+
 function createPolygonGeometry(verts: { x: number; y: number }[]): THREE.ExtrudeGeometry {
+  const n = verts.length;
+  // Clamp bevel to smallest half-edge and half-depth
+  let minEdge = Infinity;
+  for (let i = 0; i < n; i++) {
+    const a = verts[i];
+    const b = verts[(i + 1) % n];
+    minEdge = Math.min(minEdge, Math.hypot(b.x - a.x, b.y - a.y));
+  }
+  const bevel = Math.min(minEdge * 0.12, EXTRUDE_DEPTH * 0.3, 0.08);
+
+  // Properly inset the polygon so bevel fills back to collider boundary
+  const inset = insetConvexPolygon(verts, bevel);
+
   const shape = new THREE.Shape();
-  shape.moveTo(verts[0].x, verts[0].y);
-  for (let i = 1; i < verts.length; i++) {
-    shape.lineTo(verts[i].x, verts[i].y);
+  shape.moveTo(inset[0].x, inset[0].y);
+  for (let i = 1; i < inset.length; i++) {
+    shape.lineTo(inset[i].x, inset[i].y);
   }
   shape.closePath();
   return new THREE.ExtrudeGeometry(shape, {
     depth: EXTRUDE_DEPTH,
-    bevelEnabled: false,
+    bevelEnabled: true,
+    bevelThickness: bevel,
+    bevelSize: bevel,
+    bevelSegments: 1,
   });
 }
 
