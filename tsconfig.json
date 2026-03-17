@@ -22,7 +22,10 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+    "paths": {
+      "box2d3": ["./node_modules/box2d3-wasm/build/dist/es/compat/Box2D.compat.d.ts"]
+    }
   },
   "include": [
     "src",

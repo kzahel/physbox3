@@ -1,5 +1,5 @@
 {
-  "name": "physbox2",
+  "name": "physbox3",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -22,7 +22,7 @@
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "planck": "^1.0.6",
+    "box2d3-wasm": "^5.2.0",
     "three": "^0.183.2"
   }
 }

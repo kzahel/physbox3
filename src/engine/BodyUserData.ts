@@ -1,7 +1,11 @@
 /**
- * Centralized type for body.getUserData() across the codebase.
+ * Centralized type for body userData across the codebase.
+ * In box2d3-wasm, userData is stored externally via PhysWorld.setUserData/getUserData.
  * Uses a discriminated union on `label` for type-safe access per prefab type.
  */
+
+import type { Body } from "box2d3";
+import type { PhysWorld } from "./PhysWorld";
 
 /** Shared fields present on all body user data. */
 interface BodyDataBase {
@@ -43,7 +47,7 @@ export interface CannonballData extends BodyDataBase {
   label: "cannonball";
   lifetime: number;
   exploded?: boolean;
-  parentCannon?: import("planck").Body;
+  parentCannon?: Body;
 }
 
 export interface ConveyorData extends BodyDataBase {
@@ -71,9 +75,9 @@ export type BodyUserData =
   | SandData
   | GenericBodyData;
 
-/** Type-safe accessor for body userData */
-export function getBodyUserData(body: import("planck").Body): BodyUserData | null {
-  return body.getUserData() as BodyUserData | null;
+/** Type-safe accessor for body userData via PhysWorld */
+export function getBodyUserData(pw: PhysWorld, body: Body): BodyUserData | null {
+  return pw.getUserData(body);
 }
 
 // ── Type guards for narrowing after getBodyUserData() ──
