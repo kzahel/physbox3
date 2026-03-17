@@ -1,7 +1,7 @@
 import * as planck from "planck";
 import { type CannonballData, type CannonData, getBodyUserData, isCannon, isCannonball } from "../engine/BodyUserData";
 import type { IRenderer } from "../engine/IRenderer";
-import { forEachBody, markDestroyed } from "../engine/Physics";
+import { createWorldListener, forEachBodyByLabel, markDestroyed } from "../engine/Physics";
 
 const CANNON_FIRE_INTERVAL = 1; // seconds between shots
 const CANNONBALL_SPEED = 20;
@@ -47,7 +47,7 @@ function fireCannon(world: planck.World, cannon: planck.Body, renderer: IRendere
   renderer.particles.spawnMuzzleFlash(spawnX, spawnY);
 }
 
-const registeredWorlds = new WeakSet<planck.World>();
+let ensureCannonballListener: ((world: planck.World) => void) | null = null;
 
 /**
  * Tick all cannons (fire on cooldown) and cannonball lifetimes.
@@ -60,47 +60,44 @@ export function tickCannons(
   dt: number,
 ) {
   // Register cannonball contact listener once per world instance
-  if (!registeredWorlds.has(world)) {
-    registeredWorlds.add(world);
-    world.on("begin-contact", (contact) => {
-      const fA = contact.getFixtureA().getBody();
-      const fB = contact.getFixtureB().getBody();
-      // Find which body (if any) is a cannonball
-      let ball: planck.Body | null = null;
-      let other: planck.Body | null = null;
-      const udA = getBodyUserData(fA);
-      const udB = getBodyUserData(fB);
-      if (isCannonball(udA) && !udA.exploded) {
-        ball = fA;
-        other = fB;
-      } else if (isCannonball(udB) && !udB.exploded) {
-        ball = fB;
-        other = fA;
-      }
-      if (!ball || !other) return;
-      const bud = getBodyUserData(ball)! as CannonballData;
-      // Don't explode on the cannon that fired this ball
-      if (other === bud.parentCannon) return;
-      bud.exploded = true;
-      // Defer destruction to after physics step
-      setTimeout(() => {
-        if (bud.destroyed) return;
-        explodeAt(
-          ball!.getPosition().x,
-          ball!.getPosition().y,
-          CANNONBALL_EXPLOSION_RADIUS,
-          CANNONBALL_EXPLOSION_FORCE,
-        );
-        markDestroyed(ball!);
-        world.destroyBody(ball!);
-      }, 0);
+  if (!ensureCannonballListener) {
+    ensureCannonballListener = createWorldListener((w) => {
+      w.on("begin-contact", (contact) => {
+        const fA = contact.getFixtureA().getBody();
+        const fB = contact.getFixtureB().getBody();
+        let ball: planck.Body | null = null;
+        let other: planck.Body | null = null;
+        const udA = getBodyUserData(fA);
+        const udB = getBodyUserData(fB);
+        if (isCannonball(udA) && !udA.exploded) {
+          ball = fA;
+          other = fB;
+        } else if (isCannonball(udB) && !udB.exploded) {
+          ball = fB;
+          other = fA;
+        }
+        if (!ball || !other) return;
+        const bud = getBodyUserData(ball)! as CannonballData;
+        if (other === bud.parentCannon) return;
+        bud.exploded = true;
+        setTimeout(() => {
+          if (bud.destroyed) return;
+          explodeAt(
+            ball!.getPosition().x,
+            ball!.getPosition().y,
+            CANNONBALL_EXPLOSION_RADIUS,
+            CANNONBALL_EXPLOSION_FORCE,
+          );
+          markDestroyed(ball!);
+          w.destroyBody(ball!);
+        }, 0);
+      });
     });
   }
+  ensureCannonballListener(world);
 
   // Tick cannon cooldowns and fire
-  forEachBody(world, (b) => {
-    const ud = getBodyUserData(b);
-    if (!isCannon(ud)) return;
+  forEachBodyByLabel(world, isCannon, (b, ud) => {
     ud.cannonCooldown -= dt;
     if (ud.cannonCooldown <= 0) {
       if (!ud.destroyed) fireCannon(world, b, renderer);
@@ -110,9 +107,7 @@ export function tickCannons(
 
   // Tick cannonball lifetimes
   const toDestroy: planck.Body[] = [];
-  forEachBody(world, (b) => {
-    const ud = getBodyUserData(b);
-    if (!isCannonball(ud)) return;
+  forEachBodyByLabel(world, isCannonball, (b, ud) => {
     ud.lifetime -= dt;
     if (ud.lifetime <= 0 && !ud.exploded && !ud.destroyed) {
       markDestroyed(b);

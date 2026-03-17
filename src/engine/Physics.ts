@@ -1,6 +1,12 @@
 import * as planck from "planck";
 import { playExplosion } from "./Audio";
+import { type BodyUserData, getBodyUserData } from "./BodyUserData";
 import type { IRenderer } from "./IRenderer";
+
+/** Clamp a value between min and max (inclusive). */
+export function clamp(v: number, min: number, max: number): number {
+  return v < min ? min : v > max ? max : v;
+}
 
 /** Euclidean distance between two points. */
 export function distance(a: { x: number; y: number }, b: { x: number; y: number }): number {
@@ -10,6 +16,33 @@ export function distance(a: { x: number; y: number }, b: { x: number; y: number 
 /** Iterate all bodies in the world (hides Planck's linked-list API). */
 export function forEachBody(world: planck.World, cb: (body: planck.Body) => void): void {
   for (let b = world.getBodyList(); b; b = b.getNext()) cb(b);
+}
+
+/** Iterate all bodies matching a type guard, passing the narrowed userData to the callback. */
+export function forEachBodyByLabel<T extends BodyUserData>(
+  world: planck.World,
+  guard: (ud: BodyUserData | null) => ud is T,
+  cb: (body: planck.Body, ud: T) => void,
+  dynamicOnly = false,
+): void {
+  forEachBody(world, (b) => {
+    if (dynamicOnly && !b.isDynamic()) return;
+    const ud = getBodyUserData(b);
+    if (guard(ud)) cb(b, ud);
+  });
+}
+
+/**
+ * Create a function that registers a world listener at most once per world instance.
+ * Returns a guard function: call it with a world before using the listener.
+ */
+export function createWorldListener(register: (world: planck.World) => void): (world: planck.World) => void {
+  const registered = new WeakSet<planck.World>();
+  return (world) => {
+    if (registered.has(world)) return;
+    registered.add(world);
+    register(world);
+  };
 }
 
 /** Mark a body as destroyed in its userData so timer-based prefabs (cannons, dynamite) stop. */

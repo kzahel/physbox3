@@ -1,12 +1,8 @@
 import * as planck from "planck";
 import { type ConveyorData, getBodyUserData, isConveyor } from "../engine/BodyUserData";
+import { createWorldListener } from "../engine/Physics";
 
-const registeredWorlds = new WeakSet<planck.World>();
-
-/** Register a single pre-solve listener per world to handle all conveyor contacts */
-function ensureConveyorListener(world: planck.World) {
-  if (registeredWorlds.has(world)) return;
-  registeredWorlds.add(world);
+const ensureConveyorListener = createWorldListener((world) => {
   world.on("pre-solve", (contact) => {
     const bA = contact.getFixtureA().getBody();
     const bB = contact.getFixtureB().getBody();
@@ -18,7 +14,7 @@ function ensureConveyorListener(world: planck.World) {
       contact.setTangentSpeed(udB.speed);
     }
   });
-}
+});
 
 export function createConveyor(world: planck.World, x: number, y: number, w = 6, speed = 3, angle = 0): planck.Body {
   ensureConveyorListener(world);

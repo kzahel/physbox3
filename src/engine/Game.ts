@@ -20,7 +20,7 @@ import { playBounce, playWoodHit, unlockAudio } from "./Audio";
 import { getBodyUserData } from "./BodyUserData";
 import { Camera } from "./Camera";
 import type { IRenderer } from "./IRenderer";
-import { clearDynamic, destroyBodyAt, explodeAt, forEachBody, markDestroyed, scaleBody } from "./Physics";
+import { clamp, clearDynamic, destroyBodyAt, explodeAt, forEachBody, markDestroyed, scaleBody } from "./Physics";
 import { Renderer } from "./Renderer";
 
 export const KILL_Y = -100;
@@ -111,7 +111,7 @@ export class Game {
    *  collision point is within (or near) the current viewport. */
   private collisionVolume(wx: number, wy: number): number {
     // Zoom attenuation: default zoom is 30. Fade to near-silence below ~5.
-    const zoomFactor = Math.min(1, Math.max(0, (this.camera.zoom - 2) / 28));
+    const zoomFactor = clamp((this.camera.zoom - 2) / 28, 0, 1);
     // Square the curve so it drops off faster when zoomed out
     const zoomVol = zoomFactor * zoomFactor;
 

@@ -1,9 +1,11 @@
+import { clamp } from "./Physics";
+
 let ctx: AudioContext | null = null;
 let masterVolume = 1;
 
 /** Set the global volume multiplier (0 = silent, 1 = full). */
 export function setMasterVolume(v: number) {
-  masterVolume = Math.max(0, Math.min(1, v));
+  masterVolume = clamp(v, 0, 1);
 }
 
 function getCtx(): AudioContext {

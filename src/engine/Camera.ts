@@ -1,3 +1,5 @@
+import { clamp } from "./Physics";
+
 /** Anything with clientWidth/clientHeight — works with canvas or container div */
 export interface Viewport {
   readonly clientWidth: number;
@@ -37,7 +39,7 @@ export class Camera {
   zoomAt(sx: number, sy: number, factor: number, viewport: Viewport) {
     const before = this.toWorld(sx, sy, viewport);
     this.zoom *= factor;
-    this.zoom = Math.max(1, Math.min(200, this.zoom));
+    this.zoom = clamp(this.zoom, 1, 200);
     const after = this.toWorld(sx, sy, viewport);
     this.x -= after.x - before.x;
     this.y -= after.y - before.y;

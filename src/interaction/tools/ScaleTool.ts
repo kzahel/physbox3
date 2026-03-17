@@ -1,4 +1,5 @@
 import type * as planck from "planck";
+import { clamp } from "../../engine/Physics";
 import type { ToolContext, ToolHandler } from "../ToolHandler";
 
 export class ScaleTool implements ToolHandler {
@@ -22,7 +23,7 @@ export class ScaleTool implements ToolHandler {
   onMove(_wx: number, _wy: number, _dx: number, _dy: number, _sx: number, sy: number) {
     if (this.scaleDrag) {
       const deltaY = this.scaleDrag.startScreenY - sy;
-      this.scaleDrag.currentScale = Math.max(0.2, Math.min(5, 2 ** (deltaY / 150)));
+      this.scaleDrag.currentScale = clamp(2 ** (deltaY / 150), 0.2, 5);
     }
   }
 

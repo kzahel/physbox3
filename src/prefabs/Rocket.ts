@@ -1,7 +1,7 @@
 import * as planck from "planck";
-import { getBodyUserData, isRocket, type RocketData } from "../engine/BodyUserData";
+import { isRocket, type RocketData } from "../engine/BodyUserData";
 import type { IRenderer } from "../engine/IRenderer";
-import { forEachBody } from "../engine/Physics";
+import { forEachBodyByLabel } from "../engine/Physics";
 
 export function createRocket(world: planck.World, x: number, y: number, angle = 0): planck.Body {
   const body = world.createBody({ type: "dynamic", position: planck.Vec2(x, y), angle });
@@ -24,32 +24,35 @@ export function createRocket(world: planck.World, x: number, y: number, angle = 
 
 /** Apply thrust forces and deplete fuel. Must be called inside the fixed timestep loop. */
 export function applyRocketThrust(world: planck.World, dt: number): void {
-  forEachBody(world, (b) => {
-    if (!b.isDynamic()) return;
-    const ud = getBodyUserData(b);
-    if (!isRocket(ud)) return;
-    if (ud.fuel <= 0) return;
+  forEachBodyByLabel(
+    world,
+    isRocket,
+    (b, ud) => {
+      if (ud.fuel <= 0) return;
+      ud.fuel -= dt;
 
-    ud.fuel -= dt;
-
-    const angle = b.getAngle();
-    const fx = -Math.sin(angle) * ud.thrust * b.getMass();
-    const fy = Math.cos(angle) * ud.thrust * b.getMass();
-    b.applyForceToCenter(planck.Vec2(fx, fy), true);
-  });
+      const angle = b.getAngle();
+      const fx = -Math.sin(angle) * ud.thrust * b.getMass();
+      const fy = Math.cos(angle) * ud.thrust * b.getMass();
+      b.applyForceToCenter(planck.Vec2(fx, fy), true);
+    },
+    true,
+  );
 }
 
 /** Spawn exhaust particles for active rockets. Called once per render frame. */
 export function spawnRocketParticles(world: planck.World, renderer: IRenderer): void {
-  forEachBody(world, (b) => {
-    if (!b.isDynamic()) return;
-    const ud = getBodyUserData(b);
-    if (!isRocket(ud) || ud.fuel <= 0) return;
-
-    const angle = b.getAngle();
-    const pos = b.getPosition();
-    const exhaustX = pos.x + Math.sin(angle) * 1.0;
-    const exhaustY = pos.y - Math.cos(angle) * 1.0;
-    renderer.particles.spawnFlame(exhaustX, exhaustY, angle);
-  });
+  forEachBodyByLabel(
+    world,
+    isRocket,
+    (b, ud) => {
+      if (ud.fuel <= 0) return;
+      const angle = b.getAngle();
+      const pos = b.getPosition();
+      const exhaustX = pos.x + Math.sin(angle) * 1.0;
+      const exhaustY = pos.y - Math.cos(angle) * 1.0;
+      renderer.particles.spawnFlame(exhaustX, exhaustY, angle);
+    },
+    true,
+  );
 }

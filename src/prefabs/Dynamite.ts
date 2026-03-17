@@ -1,6 +1,6 @@
 import * as planck from "planck";
 import { type DynamiteData, getBodyUserData, isDynamite } from "../engine/BodyUserData";
-import { forEachBody, markDestroyed } from "../engine/Physics";
+import { forEachBodyByLabel, markDestroyed } from "../engine/Physics";
 
 const DYNAMITE_EXPLOSION_RADIUS = 8;
 const DYNAMITE_EXPLOSION_FORCE = 30;
@@ -24,9 +24,7 @@ export function tickDynamite(
   explodeAt: (wx: number, wy: number, radius: number, force: number) => void,
 ) {
   const toExplode: planck.Body[] = [];
-  forEachBody(world, (b) => {
-    const ud = getBodyUserData(b);
-    if (!isDynamite(ud)) return;
+  forEachBodyByLabel(world, isDynamite, (b, ud) => {
     ud.fuseRemaining -= dt;
     if (ud.fuseRemaining <= 0) toExplode.push(b);
   });

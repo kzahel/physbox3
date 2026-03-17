@@ -1,7 +1,7 @@
 import * as planck from "planck";
-import { type FanData, getBodyUserData, isFan } from "../engine/BodyUserData";
+import { type FanData, isFan } from "../engine/BodyUserData";
 import type { IRenderer } from "../engine/IRenderer";
-import { distance, forEachBody } from "../engine/Physics";
+import { distance, forEachBodyByLabel } from "../engine/Physics";
 
 export function createFan(
   world: planck.World,
@@ -30,9 +30,7 @@ function forEachFan(
     dirY: number,
   ) => void,
 ) {
-  forEachBody(world, (fan) => {
-    const ud = getBodyUserData(fan);
-    if (!isFan(ud)) return;
+  forEachBodyByLabel(world, isFan, (fan, ud) => {
     const pos = fan.getPosition();
     const angle = fan.getAngle();
     cb(fan, pos, angle, ud.force, ud.range, Math.cos(angle), Math.sin(angle));
