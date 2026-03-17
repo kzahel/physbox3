@@ -198,9 +198,8 @@ export class WaterSystem {
         const shapeId = result.shapeId;
         if (!B2.b2Shape_IsSensor(shapeId)) {
           const bodyId = B2.b2Shape_GetBody(shapeId);
-          // biome-ignore lint/suspicious/noExplicitAny: bodyId is opaque ID, cast to Body for type check
-          const hitBody = bodyId as any as Body;
-          if (!isDynamic(hitBody)) {
+          const hitBody = pw.findBodyByIndex1(bodyId.index1);
+          if (hitBody && !isDynamic(hitBody)) {
             bestY = result.point.y;
           }
         }
@@ -238,9 +237,8 @@ export class WaterSystem {
     const shapeId = result.shapeId;
     if (B2.b2Shape_IsSensor(shapeId)) return false;
     const bodyId = B2.b2Shape_GetBody(shapeId);
-    // biome-ignore lint/suspicious/noExplicitAny: bodyId is opaque ID, cast to Body for type check
-    const hitBody = bodyId as any as Body;
-    return !isDynamic(hitBody);
+    const hitBody = pw.findBodyByIndex1(bodyId.index1);
+    return !!hitBody && !isDynamic(hitBody);
   }
 
   private flow() {
