@@ -32,6 +32,7 @@ export class CreationTool implements ToolHandler {
   }
 
   place(wx: number, wy: number) {
+    if (this.ctx.game.pw.isFull) return;
     CREATORS[this.variant]?.(this.ctx.game, wx, wy);
   }
 }

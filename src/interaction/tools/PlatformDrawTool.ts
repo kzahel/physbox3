@@ -58,7 +58,7 @@ export class PlatformDrawTool implements ToolHandler {
     const dx = end.x - start.x;
     const dy = end.y - start.y;
     const len = Math.hypot(dx, dy);
-    if (len > 0.3) {
+    if (len > 0.3 && !this.ctx.game.pw.isFull) {
       this.creator(this.ctx.game, {
         start,
         cx: (start.x + end.x) / 2,

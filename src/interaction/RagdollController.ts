@@ -2,9 +2,10 @@ import { b2 } from "../engine/Box2D";
 import type { Game } from "../engine/Game";
 
 const MOVE_FORCE = 25;
-const JUMP_IMPULSE = 6;
+const JUMP_IMPULSE = 4;
+const FLY_FORCE = 30;
 const MAX_SPEED = 8;
-const MAX_FLY_SPEED = 15;
+const MAX_FLY_SPEED = 12;
 
 export class RagdollController {
   private keys: Set<string>;
@@ -35,12 +36,17 @@ export class RagdollController {
         torso.ApplyForceToCenter(new B2.b2Vec2(MOVE_FORCE * torso.GetMass(), 0), true);
       }
 
-      if (jump && vel.y < MAX_FLY_SPEED) {
-        const impulse = grounded ? JUMP_IMPULSE : JUMP_IMPULSE * 0.5;
-        torso.ApplyLinearImpulse(new B2.b2Vec2(0, impulse * torso.GetMass()), torso.GetPosition(), true);
+      if (jump) {
+        if (grounded && vel.y < 1) {
+          // One-shot jump impulse when on ground
+          torso.ApplyLinearImpulse(new B2.b2Vec2(0, JUMP_IMPULSE * torso.GetMass()), torso.GetPosition(), true);
+        } else if (vel.y < MAX_FLY_SPEED) {
+          // Continuous upward force while airborne (jetpack-style)
+          torso.ApplyForceToCenter(new B2.b2Vec2(0, FLY_FORCE * torso.GetMass()), true);
+        }
       }
       if (down && vel.y > -MAX_FLY_SPEED) {
-        torso.ApplyLinearImpulse(new B2.b2Vec2(0, -JUMP_IMPULSE * 0.5 * torso.GetMass()), torso.GetPosition(), true);
+        torso.ApplyForceToCenter(new B2.b2Vec2(0, -FLY_FORCE * torso.GetMass()), true);
       }
     }
   }

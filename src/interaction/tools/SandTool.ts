@@ -36,7 +36,7 @@ export class SandTool implements ToolHandler {
     // Enforce particle cap — remove oldest if over limit
     this.enforceLimit(game);
 
-    for (let i = 0; i < PARTICLES_PER_TICK; i++) {
+    for (let i = 0; i < PARTICLES_PER_TICK && !game.pw.isFull; i++) {
       // Random position within brush radius
       const angle = Math.random() * Math.PI * 2;
       const dist = Math.random() * r;
