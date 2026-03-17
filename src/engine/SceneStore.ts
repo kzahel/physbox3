@@ -65,6 +65,7 @@ interface SerializedRope {
   y1: number; // world-space attachment point A
   x2: number;
   y2: number; // world-space attachment point B
+  links: number; // number of chain links (preserved exactly on load)
 }
 
 interface SceneData {
@@ -295,13 +296,20 @@ export function serializeScene(game: Game): SceneData {
   // Extract rope metadata from main RopeJoints
   // (second pass so all ropeBodies are identified first)
   for (let j = game.world.getJointList(); j; j = j.getNext()) {
-    const ud = j.getUserData() as { ropeStabilizer?: boolean; isMainRope?: boolean } | null;
+    const ud = j.getUserData() as {
+      ropeStabilizer?: boolean;
+      isMainRope?: boolean;
+      chainBodies?: planck.Body[];
+    } | null;
     if (!ud?.isMainRope) continue;
 
     const bA = j.getBodyA();
     const bB = j.getBodyB();
     const anchorA = bA.getWorldPoint((j as any).m_localAnchorA);
     const anchorB = bB.getWorldPoint((j as any).m_localAnchorB);
+
+    // chainBodies has links-1 interior bodies; total links = chainBodies.length + 1
+    const links = (ud.chainBodies?.length ?? 0) + 1;
 
     // bodyA/bodyB: null if rope-created anchor, will be resolved to ID below
     ropes.push({
@@ -311,6 +319,7 @@ export function serializeScene(game: Game): SceneData {
       y1: anchorA.y,
       x2: anchorB.x,
       y2: anchorB.y,
+      links,
       _bodyA: ropeBodies.has(bA) ? null : bA,
       _bodyB: ropeBodies.has(bB) ? null : bB,
     } as any);
@@ -490,7 +499,7 @@ export function deserializeScene(game: Game, data: SceneData) {
     for (const r of data.ropes) {
       const bodyA = r.bodyAId !== null ? (idToBody.get(r.bodyAId) ?? null) : null;
       const bodyB = r.bodyBId !== null ? (idToBody.get(r.bodyBId) ?? null) : null;
-      createRopeBetween(game.world, r.x1, r.y1, r.x2, r.y2, bodyA, bodyB);
+      createRopeBetween(game.world, r.x1, r.y1, r.x2, r.y2, bodyA, bodyB, r.links);
     }
   }
 

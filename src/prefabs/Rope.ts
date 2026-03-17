@@ -51,11 +51,12 @@ export function createRopeBetween(
   y2: number,
   bodyA: planck.Body | null,
   bodyB: planck.Body | null,
+  linkCount?: number,
 ): void {
   const dx = x2 - x1;
   const dy = y2 - y1;
   const dist = Math.hypot(dx, dy);
-  const links = clamp(Math.round(dist / 0.4), 2, MAX_ROPE_LINKS);
+  const links = linkCount ?? clamp(Math.round(dist / 0.4), 2, MAX_ROPE_LINKS);
   const linkLen = dist / links;
   const stepX = dx / links;
   const stepY = dy / links;
