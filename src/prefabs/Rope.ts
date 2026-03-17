@@ -14,7 +14,6 @@ const LINK_COLOR = "rgba(180,160,120,0.7)";
 const ANCHOR_RADIUS = 0.15;
 
 // Stabilizer spring parameters
-const STABILIZER_SLACK = 1.15;
 const STABILIZER_SPRING_K = 50;
 const STABILIZER_DAMPING = 5;
 
@@ -137,7 +136,8 @@ export function createRopeBetween(
   const jy = y1 + stepY * (links - 0.5);
   createRevoluteJoint(pw, prev, end, { x: jx, y: jy }, { collideConnected: true });
 
-  // Distance joint between endpoints to enforce max distance (replaces RopeJoint)
+  // Distance joint between endpoints to enforce max distance (replaces RopeJoint).
+  // Enable a soft spring so `length` is not a rigid rod — the limit enforces max length.
   const first = bodyA ?? anchorA!;
   const last = bodyB ?? end;
   if (first !== last && (isDynamic(first) || isDynamic(last))) {
@@ -146,6 +146,9 @@ export function createRopeBetween(
 
     const mainJoint = createDistanceJoint(pw, first, last, anchor1, anchor2, {
       length: dist,
+      enableSpring: true,
+      hertz: 0.5,
+      dampingRatio: 1,
       enableLimit: true,
       maxLength: dist,
       collideConnected: true,
@@ -156,48 +159,6 @@ export function createRopeBetween(
       restLength: dist,
       chainBodies: [...chainLinks],
     });
-
-    // Interior stabilizer joints for longer ropes
-    if (chainLinks.length >= 8) {
-      const SLACK = STABILIZER_SLACK;
-      const interiorPoints = chainLinks.length >= 16 ? [0.25, 0.5, 0.75] : [0.5];
-
-      for (const frac of interiorPoints) {
-        const idx = Math.floor((chainLinks.length - 1) * frac);
-        const mid = chainLinks[idx];
-        if (!mid) continue;
-
-        const subChainA = chainLinks.slice(0, idx + 1);
-        const subChainB = chainLinks.slice(idx);
-
-        if (first !== mid && (isDynamic(first) || isDynamic(mid))) {
-          const j = createDistanceJoint(
-            pw,
-            first,
-            mid,
-            anchor1,
-            { x: mid.GetPosition().x, y: mid.GetPosition().y },
-            {
-              length: dist * frac * SLACK,
-              enableLimit: true,
-              maxLength: dist * frac * SLACK,
-              collideConnected: true,
-            },
-          );
-          pw.setJointData(j, { ropeStabilizer: true, restLength: dist * frac * SLACK, chainBodies: subChainA });
-        }
-
-        if (last !== mid && (isDynamic(last) || isDynamic(mid))) {
-          const j = createDistanceJoint(pw, mid, last, { x: mid.GetPosition().x, y: mid.GetPosition().y }, anchor2, {
-            length: dist * (1 - frac) * SLACK,
-            enableLimit: true,
-            maxLength: dist * (1 - frac) * SLACK,
-            collideConnected: true,
-          });
-          pw.setJointData(j, { ropeStabilizer: true, restLength: dist * (1 - frac) * SLACK, chainBodies: subChainB });
-        }
-      }
-    }
   }
 }
 
