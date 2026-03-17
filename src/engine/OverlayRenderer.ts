@@ -272,15 +272,21 @@ export class OverlayRenderer {
     ctx.fill();
 
     if (screenPts.length >= 2) {
-      // Filled area below the line
-      const bottomY = this.canvas.height;
+      // Fill down to the lowest drawn point
+      let minY = -Infinity;
+      for (const p of pts) minY = Math.max(minY, p.y); // world Y — but screen is flipped
+      // Actually find lowest in world coords (smallest y) then convert to screen
+      let lowestWorldY = Infinity;
+      for (const p of pts) lowestWorldY = Math.min(lowestWorldY, p.y);
+      const bottomScreen = camera.toScreen(0, lowestWorldY, this.canvas);
+
       ctx.beginPath();
       ctx.moveTo(screenPts[0].x, screenPts[0].y);
       for (let i = 1; i < screenPts.length; i++) {
         ctx.lineTo(screenPts[i].x, screenPts[i].y);
       }
-      ctx.lineTo(screenPts[screenPts.length - 1].x, bottomY);
-      ctx.lineTo(screenPts[0].x, bottomY);
+      ctx.lineTo(screenPts[screenPts.length - 1].x, bottomScreen.y);
+      ctx.lineTo(screenPts[0].x, bottomScreen.y);
       ctx.closePath();
       ctx.fillStyle = "rgba(80, 100, 60, 0.15)";
       ctx.fill();

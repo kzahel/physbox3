@@ -4,8 +4,8 @@ import type { PhysWorld } from "../engine/PhysWorld";
 
 /** Minimum distance between consecutive points (world units) */
 const MIN_SEGMENT_LEN = 0.15;
-/** Backstop extends this far below the lowest terrain point */
-const BACKSTOP_DEPTH = 50;
+/** Small margin below lowest point for the backstop box */
+const BACKSTOP_MARGIN = 0.5;
 
 /**
  * Douglas-Peucker polyline simplification.
@@ -131,9 +131,10 @@ export function createTerrain(
   const chain = body.CreateChain(chainDef)!;
   const chainId: b2ChainId = chain.GetPointer() as unknown as b2ChainId;
 
-  // Create backstop box underneath the terrain surface
+  // Create a thin backstop box just below the lowest terrain point to prevent
+  // objects tunneling underneath the chain surface.
   const halfW = (maxX - minX) / 2 + 1;
-  const halfH = BACKSTOP_DEPTH / 2;
+  const halfH = BACKSTOP_MARGIN / 2;
   const centerX = (minX + maxX) / 2;
   const centerY = minY - halfH;
 

@@ -328,12 +328,13 @@ export class ThreeJSRenderer implements IRenderer {
     if (isTerrain(ud)) {
       const pts = ud.terrainPoints;
       if (pts.length >= 2) {
-        const terrainDepth = 50;
+        let minY = Infinity;
+        for (const p of pts) minY = Math.min(minY, p.y);
         const shape = new THREE.Shape();
         shape.moveTo(pts[0].x, pts[0].y);
         for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i].x, pts[i].y);
-        shape.lineTo(pts[pts.length - 1].x, pts[0].y - terrainDepth);
-        shape.lineTo(pts[0].x, pts[0].y - terrainDepth);
+        shape.lineTo(pts[pts.length - 1].x, minY);
+        shape.lineTo(pts[0].x, minY);
         shape.closePath();
         const geo = new THREE.ExtrudeGeometry(shape, { depth: EXTRUDE_DEPTH, bevelEnabled: false });
         geo.translate(0, 0, -EXTRUDE_DEPTH / 2);

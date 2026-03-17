@@ -77,7 +77,6 @@ export class Renderer implements IRenderer {
 
   private drawTerrain(pw: PhysWorld, camera: Camera) {
     const ctx = this.ctx;
-    const TERRAIN_FILL_DEPTH = 50;
 
     forEachBody(pw, (body) => {
       const ud = pw.getUserData(body);
@@ -86,9 +85,13 @@ export class Renderer implements IRenderer {
       const pts = ud.terrainPoints;
       if (pts.length < 2) return;
 
+      // Find the lowest point to use as the fill bottom
+      let minY = Infinity;
+      for (const p of pts) minY = Math.min(minY, p.y);
+
       ctx.save();
 
-      // Surface line
+      // Trace surface, then close along the bottom at minY
       ctx.beginPath();
       const s0 = camera.toScreen(pts[0].x, pts[0].y, this.canvas);
       ctx.moveTo(s0.x, s0.y);
@@ -96,12 +99,10 @@ export class Renderer implements IRenderer {
         const s = camera.toScreen(pts[i].x, pts[i].y, this.canvas);
         ctx.lineTo(s.x, s.y);
       }
-
-      // Fill below: extend down from last point, across bottom, up to first point
-      const bottomY = camera.toScreen(0, pts[0].y - TERRAIN_FILL_DEPTH, this.canvas).y;
-      const sLast = camera.toScreen(pts[pts.length - 1].x, pts[pts.length - 1].y, this.canvas);
-      ctx.lineTo(sLast.x, bottomY);
-      ctx.lineTo(s0.x, bottomY);
+      const sLast = camera.toScreen(pts[pts.length - 1].x, minY, this.canvas);
+      const sFirst = camera.toScreen(pts[0].x, minY, this.canvas);
+      ctx.lineTo(sLast.x, sLast.y);
+      ctx.lineTo(sFirst.x, sFirst.y);
       ctx.closePath();
 
       ctx.fillStyle = ud.fill ?? "rgba(80,100,60,0.9)";
