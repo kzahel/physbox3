@@ -15,7 +15,7 @@ export function createChainRope(world: planck.World, x: number, y: number, links
     link.createFixture({ shape: planck.Box(0.08, linkLen / 2), density: 2, friction: 0.4 });
     link.setUserData({ fill: "rgba(180,160,120,0.7)" });
 
-    world.createJoint(planck.RevoluteJoint({}, prev, link, planck.Vec2(x, y - i * linkLen - linkLen / 2)));
+    world.createJoint(planck.RevoluteJoint({ collideConnected: true }, prev, link, planck.Vec2(x, y - i * linkLen - linkLen / 2)));
     prev = link;
   }
   return prev;
@@ -63,7 +63,7 @@ export function createRopeBetween(
 
     const jx = x1 + stepX * (i - 0.5);
     const jy = y1 + stepY * (i - 0.5);
-    world.createJoint(planck.RevoluteJoint({}, prev, link, planck.Vec2(jx, jy)));
+    world.createJoint(planck.RevoluteJoint({ collideConnected: true }, prev, link, planck.Vec2(jx, jy)));
     prev = link;
   }
 
@@ -77,7 +77,7 @@ export function createRopeBetween(
 
   const jx = x1 + stepX * (links - 0.5);
   const jy = y1 + stepY * (links - 0.5);
-  world.createJoint(planck.RevoluteJoint({}, prev, end, planck.Vec2(jx, jy)));
+  world.createJoint(planck.RevoluteJoint({ collideConnected: true }, prev, end, planck.Vec2(jx, jy)));
 
   // Add a RopeJoint between endpoints to enforce max distance as a single efficient constraint
   const first = bodyA ?? world.getBodyList()!;
@@ -92,6 +92,7 @@ export function createRopeBetween(
         localAnchorA: localA,
         localAnchorB: localB,
         maxLength: dist,
+        collideConnected: true,
         userData: { ropeStabilizer: true, restLength: dist },
       } as planck.RopeJointDef),
     );
