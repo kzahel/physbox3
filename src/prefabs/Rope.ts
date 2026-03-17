@@ -144,19 +144,23 @@ export function createRopeBetween(
     const anchor1 = { x: x1, y: y1 };
     const anchor2 = { x: x2, y: y2 };
 
+    // Give the stabilizer 20% slack so it only pulls bodies back when
+    // they've drifted well beyond the rope length, not when the rope is
+    // merely sagging or the bodies have rotated.
+    const slack = dist * 1.2;
     const mainJoint = createDistanceJoint(pw, first, last, anchor1, anchor2, {
-      length: dist,
+      length: slack,
       enableSpring: true,
       hertz: 0.5,
       dampingRatio: 1,
       enableLimit: true,
-      maxLength: dist,
+      maxLength: slack,
       collideConnected: true,
     });
     pw.setJointData(mainJoint, {
       ropeStabilizer: true,
       isMainRope: true,
-      restLength: dist,
+      restLength: slack,
       chainBodies: [...chainLinks],
     });
   }
