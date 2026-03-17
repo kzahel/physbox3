@@ -71,8 +71,8 @@ function createPolygonGeometry(verts: { x: number; y: number }[]): THREE.Extrude
   return new THREE.ExtrudeGeometry(shape, {
     depth: EXTRUDE_DEPTH,
     bevelEnabled: true,
-    bevelThickness: 0.015,
-    bevelSize: 0.015,
+    bevelThickness: 0.08,
+    bevelSize: 0.08,
     bevelSegments: 1,
   });
 }
