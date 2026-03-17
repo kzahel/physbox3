@@ -187,25 +187,28 @@ export class WaterSystem {
       // Stagger raycasts: only update a fraction each frame
       if ((idx + this.frameCount) % RAYCAST_STAGGER !== 0) continue;
 
-      // Raycast downward from just above the current floor
-      const origin = new B2.b2Vec2(col.x, col.floor + 0.05);
-      const translation = new B2.b2Vec2(0, -200.05); // downward
+      // Raycast downward from above the water level to find static ground.
+      // Start from well above so dynamic bodies sitting on the floor don't
+      // block the ray to the actual ground.
+      const rayTop = col.level + 5;
+      const origin = new B2.b2Vec2(col.x, rayTop);
+      const translation = new B2.b2Vec2(0, -(rayTop + 200)); // downward
       const result = pw.castRayClosest(origin, translation);
 
-      let bestY = -1000;
       if (result.hit) {
-        // Check if the hit shape is on a static body (skip sensors and dynamic bodies)
         const shapeId = result.shapeId;
         if (!B2.b2Shape_IsSensor(shapeId)) {
           const bodyId = B2.b2Shape_GetBody(shapeId);
           const hitBody = pw.findBodyByIndex1(bodyId.index1);
           if (hitBody && !isDynamic(hitBody)) {
-            bestY = result.point.y;
+            col.floor = result.point.y;
           }
+          // If closest hit is dynamic, keep previous floor value
         }
+      } else {
+        // Nothing hit at all — open space below, floor drops
+        col.floor = -1000;
       }
-
-      col.floor = bestY;
       // Recompute level from volume + floor
       col.level = col.floor + col.volume / COL_WIDTH;
     }

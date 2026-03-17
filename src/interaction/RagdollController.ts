@@ -2,8 +2,9 @@ import { b2 } from "../engine/Box2D";
 import type { Game } from "../engine/Game";
 
 const MOVE_FORCE = 25;
-const JUMP_IMPULSE = 8;
+const JUMP_IMPULSE = 6;
 const MAX_SPEED = 8;
+const MAX_FLY_SPEED = 15;
 
 export class RagdollController {
   private keys: Set<string>;
@@ -33,8 +34,9 @@ export class RagdollController {
         torso.ApplyForceToCenter(new B2.b2Vec2(MOVE_FORCE * torso.GetMass(), 0), true);
       }
 
-      if (jump && grounded && vel.y < 1) {
-        torso.ApplyLinearImpulse(new B2.b2Vec2(0, JUMP_IMPULSE * torso.GetMass()), torso.GetPosition(), true);
+      if (jump && vel.y < MAX_FLY_SPEED) {
+        const impulse = grounded ? JUMP_IMPULSE : JUMP_IMPULSE * 0.5;
+        torso.ApplyLinearImpulse(new B2.b2Vec2(0, impulse * torso.GetMass()), torso.GetPosition(), true);
       }
     }
   }
