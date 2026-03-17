@@ -80,30 +80,21 @@ function createPolygonGeometry(verts: { x: number; y: number }[]): THREE.BufferG
   }
   const chamfer = Math.min(minEdge * 0.15, halfD * 0.8, 0.12);
 
-  // Inset ring: shrink each vertex inward by chamfer amount
+  // Inset ring: pull each vertex toward the centroid by chamfer amount
+  let cx = 0,
+    cy = 0;
+  for (const v of verts) {
+    cx += v.x;
+    cy += v.y;
+  }
+  cx /= n;
+  cy /= n;
   const inner: { x: number; y: number }[] = [];
-  for (let i = 0; i < n; i++) {
-    const prev = verts[(i - 1 + n) % n];
-    const curr = verts[i];
-    const next = verts[(i + 1) % n];
-    // Edge directions
-    const e1x = curr.x - prev.x,
-      e1y = curr.y - prev.y;
-    const e2x = next.x - curr.x,
-      e2y = next.y - curr.y;
-    // Inward normals (CCW winding)
-    const len1 = Math.hypot(e1x, e1y) || 1;
-    const len2 = Math.hypot(e2x, e2y) || 1;
-    const n1x = e1y / len1,
-      n1y = -e1x / len1;
-    const n2x = e2y / len2,
-      n2y = -e2x / len2;
-    const nx = n1x + n2x,
-      ny = n1y + n2y;
-    const nl = Math.hypot(nx, ny) || 1;
-    const dot = (nx / nl) * n1x + (ny / nl) * n1y;
-    const scale = dot > 0.1 ? chamfer / dot : chamfer;
-    inner.push({ x: curr.x + (nx / nl) * scale, y: curr.y + (ny / nl) * scale });
+  for (const v of verts) {
+    const dx = cx - v.x,
+      dy = cy - v.y;
+    const d = Math.hypot(dx, dy) || 1;
+    inner.push({ x: v.x + (dx / d) * chamfer, y: v.y + (dy / d) * chamfer });
   }
 
   // Triangulate using original verts for faces (these match the collider)
