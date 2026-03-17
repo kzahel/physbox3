@@ -101,10 +101,13 @@ export class GrabTool implements ToolHandler {
     frameB.q = B2.b2Rot_identity;
     def.base.localFrameB = frameB;
 
-    // Spring-based targeting parameters
-    def.linearHertz = 5;
-    def.linearDampingRatio = 0.7;
-    def.maxSpringForce = 1000 * target.GetMass();
+    // Velocity-based targeting: compute desired velocity each frame, let the
+    // motor joint apply forces to achieve it. Spring is disabled (hertz=0)
+    // because the spring only pulls toward the initial anchor, not the cursor.
+    def.linearHertz = 0;
+    def.linearDampingRatio = 0;
+    def.maxSpringForce = 0;
+    def.maxVelocityForce = 1000 * target.GetMass();
     def.angularHertz = 0;
     def.angularDampingRatio = 0;
 
