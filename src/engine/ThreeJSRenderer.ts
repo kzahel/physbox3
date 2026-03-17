@@ -62,25 +62,13 @@ const TOOL_CURSORS: Partial<Record<Tool, CursorStyle>> = {
 const EXTRUDE_DEPTH = 0.4;
 
 /**
- * Build a chamfered polygon geometry: front face, back face, and angled
- * side strips between an outer ring (at the collider boundary) and an
- * inset ring (set back by the chamfer depth). The chamfer is clamped to
- * the shortest half-edge so thin shapes like platforms stay correct.
+ * Build a polygon geometry with XY bevels visible from the front.
+ * Uses ExtrudeGeometry but clamps bevel to the shape's smallest
+ * half-dimension so thin shapes like platforms aren't distorted.
  */
-function createPolygonGeometry(verts: { x: number; y: number }[]): THREE.BufferGeometry {
+function createPolygonGeometry(verts: { x: number; y: number }[]): THREE.ExtrudeGeometry {
+  // Find the smallest distance from centroid to any vertex (≈ half the thin dimension)
   const n = verts.length;
-  const halfD = EXTRUDE_DEPTH / 2;
-
-  // Find shortest edge to clamp chamfer
-  let minEdge = Infinity;
-  for (let i = 0; i < n; i++) {
-    const a = verts[i];
-    const b = verts[(i + 1) % n];
-    minEdge = Math.min(minEdge, Math.hypot(b.x - a.x, b.y - a.y));
-  }
-  const chamfer = Math.min(minEdge * 0.15, halfD * 0.8, 0.12);
-
-  // Inset ring: pull each vertex toward the centroid by chamfer amount
   let cx = 0,
     cy = 0;
   for (const v of verts) {
@@ -89,63 +77,33 @@ function createPolygonGeometry(verts: { x: number; y: number }[]): THREE.BufferG
   }
   cx /= n;
   cy /= n;
-  const inner: { x: number; y: number }[] = [];
+  let minDist = Infinity;
   for (const v of verts) {
-    const dx = cx - v.x,
-      dy = cy - v.y;
-    const d = Math.hypot(dx, dy) || 1;
-    inner.push({ x: v.x + (dx / d) * chamfer, y: v.y + (dy / d) * chamfer });
+    minDist = Math.min(minDist, Math.hypot(v.x - cx, v.y - cy));
   }
-
-  // Triangulate using original verts for faces (these match the collider)
-  const faceIndices = THREE.ShapeUtils.triangulateShape(
-    verts.map((v) => new THREE.Vector2(v.x, v.y)),
-    [],
-  );
-
-  const positions: number[] = [];
-  const indices: number[] = [];
-
-  const addVert = (x: number, y: number, z: number) => {
-    const idx = positions.length / 3;
-    positions.push(x, y, z);
-    return idx;
-  };
-
-  // Front face (original verts at +halfD, inset from surface)
-  const cz = halfD - chamfer; // front face set back by chamfer
-  const frontBase = positions.length / 3;
-  for (const v of verts) addVert(v.x, v.y, cz);
-  for (const tri of faceIndices) indices.push(frontBase + tri[0], frontBase + tri[1], frontBase + tri[2]);
-
-  // Back face (original verts at -halfD, inset from surface)
-  const backBase = positions.length / 3;
-  for (const v of verts) addVert(v.x, v.y, -cz);
-  for (const tri of faceIndices) indices.push(backBase + tri[2], backBase + tri[1], backBase + tri[0]);
-
-  // Side strips: inner verts at z=±cz, inset verts at z=0 form the chamfer
+  // Also check shortest edge
+  let minEdge = Infinity;
   for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    // Original verts (collider boundary) at front/back z
-    const f0 = addVert(verts[i].x, verts[i].y, cz);
-    const f1 = addVert(verts[j].x, verts[j].y, cz);
-    const b0 = addVert(verts[i].x, verts[i].y, -cz);
-    const b1 = addVert(verts[j].x, verts[j].y, -cz);
-    // Inset verts at z=0 (the chamfer ridge, pulled inward)
-    const m0 = addVert(inner[i].x, inner[i].y, 0);
-    const m1 = addVert(inner[j].x, inner[j].y, 0);
-
-    // Front chamfer: front face edge -> inset ridge
-    indices.push(f0, f1, m1, f0, m1, m0);
-    // Back chamfer: inset ridge -> back face edge
-    indices.push(m0, m1, b1, m0, b1, b0);
+    const a = verts[i];
+    const b = verts[(i + 1) % n];
+    minEdge = Math.min(minEdge, Math.hypot(b.x - a.x, b.y - a.y));
   }
+  // Bevel: 10% of the smallest dimension, capped
+  const bevel = Math.min(minDist * 0.1, minEdge * 0.1, 0.06);
 
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
-  return geo;
+  const shape = new THREE.Shape();
+  shape.moveTo(verts[0].x, verts[0].y);
+  for (let i = 1; i < verts.length; i++) {
+    shape.lineTo(verts[i].x, verts[i].y);
+  }
+  shape.closePath();
+  return new THREE.ExtrudeGeometry(shape, {
+    depth: EXTRUDE_DEPTH,
+    bevelEnabled: true,
+    bevelThickness: bevel,
+    bevelSize: bevel,
+    bevelSegments: 1,
+  });
 }
 
 // ── Body-to-mesh key ──
