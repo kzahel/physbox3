@@ -1,7 +1,7 @@
-import type { Body, Joint } from "box2d3";
+import type { Body } from "box2d3";
 import { b2 } from "../engine/Box2D";
 import { clamp, createDistanceJoint, createRevoluteJoint, isDynamic } from "../engine/Physics";
-import type { PhysWorld } from "../engine/PhysWorld";
+import type { JointHandle, PhysWorld } from "../engine/PhysWorld";
 
 // Rope link physics
 const MAX_ROPE_LINKS = 30;
@@ -209,7 +209,7 @@ export function applyRopeStabilization(pw: PhysWorld) {
   const B2 = b2();
   const SPRING_K = STABILIZER_SPRING_K;
   const DAMP = STABILIZER_DAMPING;
-  const toDestroy: Joint[] = [];
+  const toDestroy: JointHandle[] = [];
 
   pw.forEachJoint((j) => {
     const ud = pw.getJointData(j) as { ropeStabilizer?: boolean; restLength?: number; chainBodies?: Body[] } | null;

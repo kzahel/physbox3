@@ -1,4 +1,4 @@
-import type { Body, b2ShapeId, Joint } from "box2d3";
+import type { Body, b2ShapeId } from "box2d3";
 import * as THREE from "three";
 import type { ToolRenderInfo } from "../interaction/ToolHandler";
 import { getBodyUserData } from "./BodyUserData";
@@ -10,7 +10,7 @@ import type { IRenderer } from "./IRenderer";
 import { bodyColor, OverlayRenderer } from "./OverlayRenderer";
 import { type Particle, ParticleSystem } from "./ParticleSystem";
 import { forEachBody } from "./Physics";
-import type { PhysWorld } from "./PhysWorld";
+import type { JointHandle, PhysWorld } from "./PhysWorld";
 
 // ── Color parsing ──
 
@@ -171,7 +171,7 @@ export class ThreeJSRenderer implements IRenderer {
   // Body -> mesh sync
   private bodyMeshes = new Map<Body, { group: THREE.Group; key: string }>();
   // Joint -> line sync
-  private jointLines = new Map<Joint, THREE.Group>();
+  private jointLines = new Map<JointHandle, THREE.Group>();
 
   // Environment
   private oceanMesh: THREE.Mesh;
@@ -516,7 +516,7 @@ export class ThreeJSRenderer implements IRenderer {
 
   private syncJoints(pw: PhysWorld, interp: Interpolation) {
     const B2 = b2();
-    const seen = new Set<Joint>();
+    const seen = new Set<JointHandle>();
 
     pw.forEachJoint((joint) => {
       seen.add(joint);
@@ -559,7 +559,7 @@ export class ThreeJSRenderer implements IRenderer {
   }
 
   private createJointGroup(
-    joint: Joint,
+    joint: JointHandle,
     a: { x: number; y: number },
     b: { x: number; y: number },
     isStabilizer: boolean,
@@ -603,7 +603,7 @@ export class ThreeJSRenderer implements IRenderer {
 
   private updateJointGroup(
     group: THREE.Group,
-    joint: Joint,
+    joint: JointHandle,
     a: { x: number; y: number },
     b: { x: number; y: number },
     pw: PhysWorld,

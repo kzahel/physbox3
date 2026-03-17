@@ -1,14 +1,22 @@
-import * as planck from "planck";
-
+import type { Body, b2ShapeId } from "box2d3";
 import { createRopeBetween } from "../prefabs/Rope";
+import { b2 } from "./Box2D";
 import type { Game } from "./Game";
-import { createWeldJoint, forEachBody, markDestroyed } from "./Physics";
+import type { JointHandle } from "./PhysWorld";
+import {
+  bodyAngle,
+  createDistanceJoint,
+  createRevoluteJoint,
+  createWeldJoint,
+  createWheelJoint,
+  markDestroyed,
+} from "./Physics";
+import type { PhysWorld } from "./PhysWorld";
 
 // ── Serialization types ──
 
-interface SerializedFixture {
-  shape: "box" | "circle" | "polygon" | "edge";
-  // Box: halfWidth, halfHeight; Circle: radius
+interface SerializedShape {
+  type: "circle" | "box" | "polygon" | "segment";
   params: number[];
   density: number;
   friction: number;
@@ -21,7 +29,7 @@ interface SerializedBody {
   x: number;
   y: number;
   angle: number;
-  fixtures: SerializedFixture[];
+  shapes: SerializedShape[];
   userData: unknown;
 }
 
@@ -31,16 +39,18 @@ interface SerializedJoint {
   bodyB: number;
   anchorX: number;
   anchorY: number;
-  // Second anchor (for distance joints etc.)
   anchorBX?: number;
   anchorBY?: number;
   // DistanceJoint
-  frequencyHz?: number;
+  hertz?: number;
   dampingRatio?: number;
   length?: number;
   collideConnected?: boolean;
-  // RevoluteJoint
+  enableSpring?: boolean;
   enableLimit?: boolean;
+  maxLength?: number;
+  // RevoluteJoint
+  enableMotorLimit?: boolean;
   lowerAngle?: number;
   upperAngle?: number;
   enableMotor?: boolean;
@@ -53,19 +63,17 @@ interface SerializedJoint {
   lowerTranslation?: number;
   upperTranslation?: number;
   maxMotorForce?: number;
-  // RopeJoint
-  maxLength?: number;
   userData?: unknown;
 }
 
 interface SerializedRope {
-  bodyAId: number | null; // null = standalone static anchor
+  bodyAId: number | null;
   bodyBId: number | null;
   x1: number;
-  y1: number; // world-space attachment point A
+  y1: number;
   x2: number;
-  y2: number; // world-space attachment point B
-  links: number; // number of chain links (preserved exactly on load)
+  y2: number;
+  links: number;
 }
 
 interface SceneData {
@@ -81,321 +89,327 @@ export interface SavedScene {
   timestamp: number;
 }
 
-// ── Joint serialization registry ──
+// ── Joint type name mapping ──
 
-interface JointCodec {
-  serialize(j: planck.Joint, sj: SerializedJoint): void;
-  deserialize(
-    sj: SerializedJoint,
-    bodyA: planck.Body,
-    bodyB: planck.Body,
-    anchorA: planck.Vec2,
-    anchorB: planck.Vec2,
-    world: planck.World,
-  ): void;
+function jointTypeName(joint: JointHandle): string {
+  const B2 = b2();
+  const t = joint.GetType().value;
+  if (t === B2.b2JointType.b2_weldJoint.value) return "weld";
+  if (t === B2.b2JointType.b2_revoluteJoint.value) return "revolute";
+  if (t === B2.b2JointType.b2_distanceJoint.value) return "distance";
+  if (t === B2.b2JointType.b2_wheelJoint.value) return "wheel";
+  if (t === B2.b2JointType.b2_prismaticJoint.value) return "prismatic";
+  if (t === B2.b2JointType.b2_motorJoint.value) return "motor";
+  return "unknown";
 }
 
-function readLocalAxis(j: planck.Joint): { x: number; y: number } | null {
-  // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
-  const axis = (j as any).m_localXAxisA;
-  return axis ? { x: axis.x, y: axis.y } : null;
+// ── Body type helpers ──
+
+function bodyTypeName(body: Body): "static" | "dynamic" | "kinematic" {
+  const B2 = b2();
+  const t = body.GetType().value;
+  if (t === B2.b2BodyType.b2_dynamicBody.value) return "dynamic";
+  if (t === B2.b2BodyType.b2_kinematicBody.value) return "kinematic";
+  return "static";
 }
 
-const JOINT_CODECS: Record<string, JointCodec> = {
-  "weld-joint": {
-    serialize() {},
-    deserialize(sj, bodyA, bodyB, anchorA, _anchorB, world) {
-      createWeldJoint(world, bodyA, bodyB, anchorA, { collideConnected: sj.collideConnected });
-    },
-  },
-  "revolute-joint": {
-    serialize(j, sj) {
-      const rj = j as planck.RevoluteJoint;
-      sj.enableLimit = rj.isLimitEnabled();
-      sj.lowerAngle = rj.getLowerLimit();
-      sj.upperAngle = rj.getUpperLimit();
-      sj.enableMotor = rj.isMotorEnabled();
-      sj.motorSpeed = rj.getMotorSpeed();
-      sj.maxMotorTorque = rj.getMaxMotorTorque();
-    },
-    deserialize(sj, bodyA, bodyB, anchorA, _anchorB, world) {
-      world.createJoint(
-        planck.RevoluteJoint(
-          {
-            collideConnected: sj.collideConnected,
-            enableLimit: sj.enableLimit,
-            lowerAngle: sj.lowerAngle,
-            upperAngle: sj.upperAngle,
-            enableMotor: sj.enableMotor,
-            motorSpeed: sj.motorSpeed,
-            maxMotorTorque: sj.maxMotorTorque,
-          },
-          bodyA,
-          bodyB,
-          anchorA,
-        ),
-      );
-    },
-  },
-  "distance-joint": {
-    serialize(j, sj) {
-      const dj = j as planck.DistanceJoint;
-      sj.frequencyHz = dj.getFrequency();
-      sj.dampingRatio = dj.getDampingRatio();
-      sj.length = dj.getLength();
-    },
-    deserialize(sj, bodyA, bodyB, anchorA, anchorB, world) {
-      const joint = planck.DistanceJoint(
-        {
-          frequencyHz: sj.frequencyHz,
-          dampingRatio: sj.dampingRatio,
-          length: sj.length,
-          collideConnected: sj.collideConnected ?? true,
-        },
+function bodyTypeEnum(name: string) {
+  const B2 = b2();
+  if (name === "dynamic") return B2.b2BodyType.b2_dynamicBody;
+  if (name === "kinematic") return B2.b2BodyType.b2_kinematicBody;
+  return B2.b2BodyType.b2_staticBody;
+}
+
+// ── Joint serialization ──
+
+function serializeJointProps(joint: JointHandle, typeName: string, sj: SerializedJoint): void {
+  // biome-ignore lint/suspicious/noExplicitAny: joint cast to specific type for property access
+  const j = joint as any;
+  switch (typeName) {
+    case "revolute":
+      sj.enableMotorLimit = j.IsLimitEnabled?.();
+      sj.lowerAngle = j.GetLowerLimit?.();
+      sj.upperAngle = j.GetUpperLimit?.();
+      sj.enableMotor = j.IsMotorEnabled?.();
+      sj.motorSpeed = j.GetMotorSpeed?.();
+      sj.maxMotorTorque = j.GetMaxMotorTorque?.();
+      break;
+    case "distance":
+      sj.hertz = j.GetSpringHertz?.();
+      sj.dampingRatio = j.GetSpringDampingRatio?.();
+      sj.length = j.GetLength?.();
+      sj.enableSpring = j.IsSpringEnabled?.();
+      break;
+    case "wheel":
+      sj.enableMotor = j.IsMotorEnabled?.();
+      sj.motorSpeed = j.GetMotorSpeed?.();
+      sj.maxMotorTorque = j.GetMaxMotorTorque?.();
+      sj.hertz = j.GetSpringHertz?.();
+      sj.dampingRatio = j.GetSpringDampingRatio?.();
+      // Recover axis direction from localFrameA rotation
+      {
+        const frameA = joint.GetLocalFrameA();
+        const angle = b2().b2Rot_GetAngle(frameA.q);
+        sj.axisX = Math.cos(angle);
+        sj.axisY = Math.sin(angle);
+      }
+      break;
+    case "prismatic":
+      sj.enableMotorLimit = j.IsLimitEnabled?.();
+      sj.lowerTranslation = j.GetLowerLimit?.();
+      sj.upperTranslation = j.GetUpperLimit?.();
+      sj.enableMotor = j.IsMotorEnabled?.();
+      sj.motorSpeed = j.GetMotorSpeed?.();
+      sj.maxMotorForce = j.GetMaxMotorForce?.();
+      // Recover axis direction from localFrameA rotation
+      {
+        const frameA = joint.GetLocalFrameA();
+        const angle = b2().b2Rot_GetAngle(frameA.q);
+        sj.axisX = Math.cos(angle);
+        sj.axisY = Math.sin(angle);
+      }
+      break;
+  }
+}
+
+function deserializeJoint(pw: PhysWorld, sj: SerializedJoint, bodyA: Body, bodyB: Body): void {
+  const anchorA = { x: sj.anchorX, y: sj.anchorY };
+  const anchorB = { x: sj.anchorBX ?? sj.anchorX, y: sj.anchorBY ?? sj.anchorY };
+
+  switch (sj.type) {
+    case "weld":
+      createWeldJoint(pw, bodyA, bodyB, anchorA);
+      break;
+    case "revolute":
+      createRevoluteJoint(pw, bodyA, bodyB, anchorA, {
+        collideConnected: sj.collideConnected,
+        enableLimit: sj.enableMotorLimit,
+        lowerAngle: sj.lowerAngle,
+        upperAngle: sj.upperAngle,
+        enableMotor: sj.enableMotor,
+        motorSpeed: sj.motorSpeed,
+        maxMotorTorque: sj.maxMotorTorque,
+      });
+      break;
+    case "distance":
+      createDistanceJoint(pw, bodyA, bodyB, anchorA, anchorB, {
+        length: sj.length,
+        collideConnected: sj.collideConnected,
+        enableSpring: sj.enableSpring,
+        hertz: sj.hertz,
+        dampingRatio: sj.dampingRatio,
+      });
+      break;
+    case "wheel":
+      createWheelJoint(
+        pw,
         bodyA,
         bodyB,
-        anchorA,
         anchorB,
+        { x: sj.axisX ?? 0, y: sj.axisY ?? 1 },
+        {
+          enableMotor: sj.enableMotor,
+          motorSpeed: sj.motorSpeed,
+          maxMotorTorque: sj.maxMotorTorque,
+          hertz: sj.hertz,
+          dampingRatio: sj.dampingRatio,
+        },
       );
-      // Set local anchors precisely (mirrors Game.addSpring)
-      const localA = bodyA.getLocalPoint(anchorA);
-      const localB = bodyB.getLocalPoint(anchorB);
-      // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
-      (joint as any).m_localAnchorA = localA;
-      // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
-      (joint as any).m_localAnchorB = localB;
-      world.createJoint(joint);
-    },
-  },
-  "wheel-joint": {
-    serialize(j, sj) {
-      const wj = j as planck.WheelJoint;
-      sj.enableMotor = wj.isMotorEnabled();
-      sj.motorSpeed = wj.getMotorSpeed();
-      sj.maxMotorTorque = wj.getMaxMotorTorque();
-      sj.frequencyHz = wj.getSpringFrequencyHz();
-      sj.dampingRatio = wj.getSpringDampingRatio();
-      const axis = readLocalAxis(wj);
-      if (axis) {
-        sj.axisX = axis.x;
-        sj.axisY = axis.y;
+      break;
+    case "prismatic":
+      // Prismatic joint creation helper doesn't exist yet — use flat API
+      {
+        const B2 = b2();
+        const def = B2.b2DefaultPrismaticJointDef();
+        const anchor = new B2.b2Vec2(anchorA.x, anchorA.y);
+
+        def.base.bodyIdA = pw.getBodyId(bodyA);
+        def.base.bodyIdB = pw.getBodyId(bodyB);
+
+        const localAxis = bodyA.GetLocalVector(new B2.b2Vec2(sj.axisX ?? 1, sj.axisY ?? 0));
+        const axisAngle = Math.atan2(localAxis.y, localAxis.x);
+
+        const frameA = new B2.b2Transform();
+        frameA.p = bodyA.GetLocalPoint(anchor);
+        frameA.q = B2.b2MakeRot(axisAngle);
+        def.base.localFrameA = frameA;
+
+        const frameB = new B2.b2Transform();
+        frameB.p = bodyB.GetLocalPoint(anchor);
+        frameB.q = B2.b2Rot_identity;
+        def.base.localFrameB = frameB;
+
+        if (sj.collideConnected) def.base.collideConnected = true;
+        if (sj.enableMotorLimit) {
+          def.enableLimit = true;
+          if (sj.lowerTranslation != null) def.lowerTranslation = sj.lowerTranslation;
+          if (sj.upperTranslation != null) def.upperTranslation = sj.upperTranslation;
+        }
+        if (sj.enableMotor) {
+          def.enableMotor = true;
+          if (sj.motorSpeed != null) def.motorSpeed = sj.motorSpeed;
+          if (sj.maxMotorForce != null) def.maxMotorForce = sj.maxMotorForce;
+        }
+
+        const jointId = B2.b2CreatePrismaticJoint(pw.worldId, def);
+        pw.addJointId(jointId);
       }
-    },
-    deserialize(sj, bodyA, bodyB, _anchorA, anchorB, world) {
-      world.createJoint(
-        planck.WheelJoint(
-          {
-            enableMotor: sj.enableMotor,
-            motorSpeed: sj.motorSpeed,
-            maxMotorTorque: sj.maxMotorTorque,
-            frequencyHz: sj.frequencyHz,
-            dampingRatio: sj.dampingRatio,
-            collideConnected: sj.collideConnected,
-          },
-          bodyA,
-          bodyB,
-          anchorB,
-          planck.Vec2(sj.axisX ?? 0, sj.axisY ?? 1),
-        ),
-      );
-    },
-  },
-  "rope-joint": {
-    serialize(j, sj) {
-      const rj = j as planck.RopeJoint;
-      sj.maxLength = rj.getMaxLength();
-      sj.userData = j.getUserData();
-    },
-    deserialize(sj, bodyA, bodyB, anchorA, anchorB, world) {
-      const localA = bodyA.getLocalPoint(anchorA);
-      const localB = bodyB.getLocalPoint(anchorB);
-      world.createJoint(
-        new planck.RopeJoint({
-          bodyA,
-          bodyB,
-          localAnchorA: localA,
-          localAnchorB: localB,
-          maxLength: sj.maxLength ?? 0,
-          collideConnected: sj.collideConnected,
-          userData: sj.userData,
-        } as planck.RopeJointDef),
-      );
-    },
-  },
-  "prismatic-joint": {
-    serialize(j, sj) {
-      const pj = j as planck.PrismaticJoint;
-      sj.enableLimit = pj.isLimitEnabled();
-      sj.lowerTranslation = pj.getLowerLimit();
-      sj.upperTranslation = pj.getUpperLimit();
-      sj.enableMotor = pj.isMotorEnabled();
-      sj.motorSpeed = pj.getMotorSpeed();
-      sj.maxMotorForce = pj.getMaxMotorForce();
-      const axis = readLocalAxis(pj);
-      if (axis) {
-        sj.axisX = axis.x;
-        sj.axisY = axis.y;
-      }
-    },
-    deserialize(sj, bodyA, bodyB, anchorA, _anchorB, world) {
-      world.createJoint(
-        planck.PrismaticJoint(
-          {
-            enableLimit: sj.enableLimit,
-            lowerTranslation: sj.lowerTranslation,
-            upperTranslation: sj.upperTranslation,
-            enableMotor: sj.enableMotor,
-            motorSpeed: sj.motorSpeed,
-            maxMotorForce: sj.maxMotorForce,
-            collideConnected: sj.collideConnected,
-          },
-          bodyA,
-          bodyB,
-          anchorA,
-          planck.Vec2(sj.axisX ?? 1, sj.axisY ?? 0),
-        ),
-      );
-    },
-  },
-};
+      break;
+  }
+}
 
 // ── Serialize / Deserialize ──
 
-/** Check if a body is part of a rope's internal structure */
-function isRopeInternal(b: planck.Body): boolean {
-  const ud = b.getUserData() as { label?: string } | null;
+function isRopeInternal(pw: PhysWorld, b: Body): boolean {
+  const ud = pw.getUserData(b);
   return ud?.label === "ropeLink" || ud?.label === "ropeAnchor";
 }
 
 export function serializeScene(game: Game): SceneData {
+  const pw = game.pw;
+  const B2 = b2();
+
   // ── Identify rope components to exclude from normal serialization ──
-  const ropeBodies = new Set<planck.Body>();
-  const ropeJoints = new Set<planck.Joint>();
+  const ropeBodies = new Set<Body>();
+  const ropeJoints = new Set<JointHandle>();
   const ropes: SerializedRope[] = [];
 
-  // First: find all rope-internal bodies
-  forEachBody(game.world, (b) => {
-    if (isRopeInternal(b)) ropeBodies.add(b);
+  // Find all rope-internal bodies
+  pw.forEachBody((b) => {
+    if (isRopeInternal(pw, b)) ropeBodies.add(b);
   });
 
-  // Find main RopeJoints to extract rope metadata, and mark all rope-related joints
-  for (let j = game.world.getJointList(); j; j = j.getNext()) {
-    const ud = j.getUserData() as { ropeStabilizer?: boolean; isMainRope?: boolean } | null;
+  // Find rope-related joints and extract rope metadata
+  const ropeMetadata: {
+    joint: JointHandle;
+    bodyA: Body;
+    bodyB: Body;
+  }[] = [];
 
-    // All stabilizer/rope joints (main + interior) are rope-internal
+  pw.forEachJoint((j) => {
+    const ud = pw.getJointData(j);
     if (ud?.ropeStabilizer) {
       ropeJoints.add(j);
-      continue;
+      return;
     }
-
-    // RevoluteJoints between rope links are rope-internal
-    const bA = j.getBodyA();
-    const bB = j.getBodyB();
+    if (ud?.isMainRope) {
+      ropeJoints.add(j);
+      ropeMetadata.push({
+        joint: j,
+        bodyA: j.GetBodyA() as unknown as Body,
+        bodyB: j.GetBodyB() as unknown as Body,
+      });
+      return;
+    }
+    // RevoluteJoints between rope links
+    const bA = j.GetBodyA() as unknown as Body;
+    const bB = j.GetBodyB() as unknown as Body;
     if (ropeBodies.has(bA) || ropeBodies.has(bB)) {
       ropeJoints.add(j);
     }
-  }
+  });
 
-  // Extract rope metadata from main RopeJoints
-  // (second pass so all ropeBodies are identified first)
-  for (let j = game.world.getJointList(); j; j = j.getNext()) {
-    const ud = j.getUserData() as {
-      ropeStabilizer?: boolean;
-      isMainRope?: boolean;
-      chainBodies?: planck.Body[];
-    } | null;
-    if (!ud?.isMainRope) continue;
+  // Extract rope metadata
+  for (const rm of ropeMetadata) {
+    const { joint, bodyA, bodyB } = rm;
+    const frameA = joint.GetLocalFrameA();
+    const frameB = joint.GetLocalFrameB();
+    const anchorA = bodyA.GetWorldPoint(frameA.p);
+    const anchorB = bodyB.GetWorldPoint(frameB.p);
 
-    const bA = j.getBodyA();
-    const bB = j.getBodyB();
-    // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
-    const anchorA = bA.getWorldPoint((j as any).m_localAnchorA);
-    // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
-    const anchorB = bB.getWorldPoint((j as any).m_localAnchorB);
+    const ud = pw.getJointData(joint);
+    const chainBodies = (ud?.chainBodies as Body[] | undefined) ?? [];
+    const links = chainBodies.length + 1;
 
-    // chainBodies has links-1 interior bodies; total links = chainBodies.length + 1
-    const links = (ud.chainBodies?.length ?? 0) + 1;
-
-    // bodyA/bodyB: null if rope-created anchor, will be resolved to ID below
     ropes.push({
-      bodyAId: ropeBodies.has(bA) ? null : -1, // placeholder, resolved after bodyMap built
-      bodyBId: ropeBodies.has(bB) ? null : -1,
+      bodyAId: ropeBodies.has(bodyA) ? null : -1, // placeholder
+      bodyBId: ropeBodies.has(bodyB) ? null : -1,
       x1: anchorA.x,
       y1: anchorA.y,
       x2: anchorB.x,
       y2: anchorB.y,
       links,
-      _bodyA: ropeBodies.has(bA) ? null : bA,
-      _bodyB: ropeBodies.has(bB) ? null : bB,
-    } as SerializedRope & { _bodyA?: planck.Body | null; _bodyB?: planck.Body | null });
+      // Temp refs for ID resolution
+      _bodyA: ropeBodies.has(bodyA) ? null : bodyA,
+      _bodyB: ropeBodies.has(bodyB) ? null : bodyB,
+    } as SerializedRope & { _bodyA?: Body | null; _bodyB?: Body | null });
   }
 
   // ── Serialize non-rope bodies ──
-  const bodyMap = new Map<planck.Body, number>();
+  const bodyMap = new Map<Body, number>();
   const bodies: SerializedBody[] = [];
   let nextId = 0;
 
-  forEachBody(game.world, (b) => {
+  pw.forEachBody((b) => {
     if (ropeBodies.has(b)) return;
 
     const id = nextId++;
     bodyMap.set(b, id);
 
-    const fixtures: SerializedFixture[] = [];
-    for (let f = b.getFixtureList(); f; f = f.getNext()) {
-      const shape = f.getShape();
-      const fd: SerializedFixture = {
-        shape: "box",
+    const shapes: SerializedShape[] = [];
+    const shapeIds: b2ShapeId[] = b.GetShapes() ?? [];
+    for (const shapeId of shapeIds) {
+      const shapeType = B2.b2Shape_GetType(shapeId);
+      const sd: SerializedShape = {
+        type: "box",
         params: [],
-        density: f.getDensity(),
-        friction: f.getFriction(),
-        restitution: f.getRestitution(),
+        density: B2.b2Shape_GetDensity(shapeId),
+        friction: B2.b2Shape_GetFriction(shapeId),
+        restitution: B2.b2Shape_GetRestitution(shapeId),
       };
 
-      if (shape.getType() === "circle") {
-        fd.shape = "circle";
-        fd.params = [(shape as planck.CircleShape).getRadius()];
-      } else if (shape.getType() === "polygon") {
-        const poly = shape as planck.PolygonShape;
-        const verts = poly.m_vertices;
+      if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
+        const circle = B2.b2Shape_GetCircle(shapeId);
+        sd.type = "circle";
+        sd.params = [circle.radius];
+      } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
+        const poly = B2.b2Shape_GetPolygon(shapeId);
         // Detect axis-aligned box (4 verts, symmetric about origin)
-        if (verts.length === 4) {
-          let maxX = 0,
-            maxY = 0;
-          for (const v of verts) {
+        if (poly.count === 4) {
+          let maxX = 0;
+          let maxY = 0;
+          for (let i = 0; i < 4; i++) {
+            const v = poly.GetVertex(i);
             maxX = Math.max(maxX, Math.abs(v.x));
             maxY = Math.max(maxY, Math.abs(v.y));
           }
-          fd.shape = "box";
-          fd.params = [maxX, maxY];
+          sd.type = "box";
+          sd.params = [maxX, maxY];
         } else {
-          fd.shape = "polygon";
-          fd.params = verts.flatMap((v) => [v.x, v.y]);
+          sd.type = "polygon";
+          const verts: number[] = [];
+          for (let i = 0; i < poly.count; i++) {
+            const v = poly.GetVertex(i);
+            verts.push(v.x, v.y);
+          }
+          sd.params = verts;
         }
-      } else if (shape.getType() === "edge") {
-        fd.shape = "edge";
-        const edge = shape as planck.EdgeShape;
-        fd.params = [edge.m_vertex1.x, edge.m_vertex1.y, edge.m_vertex2.x, edge.m_vertex2.y];
+      } else if (shapeType.value === B2.b2ShapeType.b2_segmentShape.value) {
+        const seg = B2.b2Shape_GetSegment(shapeId);
+        sd.type = "segment";
+        sd.params = [seg.point1.x, seg.point1.y, seg.point2.x, seg.point2.y];
+      } else {
+        continue;
       }
 
-      fixtures.push(fd);
+      shapes.push(sd);
     }
 
-    const pos = b.getPosition();
+    const pos = b.GetPosition();
     bodies.push({
       id,
-      type: b.getType() as "static" | "dynamic" | "kinematic",
+      type: bodyTypeName(b),
       x: pos.x,
       y: pos.y,
-      angle: b.getAngle(),
-      fixtures,
-      userData: b.getUserData(),
+      angle: bodyAngle(b),
+      shapes,
+      userData: pw.getUserData(b),
     });
   });
 
   // Resolve rope body references to IDs
   for (const r of ropes) {
-    const raw = r as SerializedRope & { _bodyA?: planck.Body | null; _bodyB?: planck.Body | null };
+    const raw = r as SerializedRope & { _bodyA?: Body | null; _bodyB?: Body | null };
     r.bodyAId = raw._bodyA ? (bodyMap.get(raw._bodyA) ?? null) : null;
     r.bodyBId = raw._bodyB ? (bodyMap.get(raw._bodyB) ?? null) : null;
     delete raw._bodyA;
@@ -404,86 +418,105 @@ export function serializeScene(game: Game): SceneData {
 
   // ── Serialize non-rope joints ──
   const joints: SerializedJoint[] = [];
-  for (let j = game.world.getJointList(); j; j = j.getNext()) {
-    if (ropeJoints.has(j)) continue;
+  pw.forEachJoint((j) => {
+    if (ropeJoints.has(j)) return;
 
-    const bodyAId = bodyMap.get(j.getBodyA());
-    const bodyBId = bodyMap.get(j.getBodyB());
-    if (bodyAId === undefined || bodyBId === undefined) continue;
+    const bA = j.GetBodyA() as unknown as Body;
+    const bB = j.GetBodyB() as unknown as Body;
+    const bodyAId = bodyMap.get(bA);
+    const bodyBId = bodyMap.get(bB);
+    if (bodyAId === undefined || bodyBId === undefined) return;
 
-    const anchorA = j.getAnchorA();
-    const anchorB = j.getAnchorB();
+    // Get world-space anchors from local frames
+    const frameA = j.GetLocalFrameA();
+    const frameB = j.GetLocalFrameB();
+    const worldAnchorA = bA.GetWorldPoint(frameA.p);
+    const worldAnchorB = bB.GetWorldPoint(frameB.p);
+
+    const typeName = jointTypeName(j);
     const sj: SerializedJoint = {
-      type: j.getType(),
+      type: typeName,
       bodyA: bodyAId,
       bodyB: bodyBId,
-      anchorX: anchorA.x,
-      anchorY: anchorA.y,
-      anchorBX: anchorB.x,
-      anchorBY: anchorB.y,
-      collideConnected: j.getCollideConnected(),
+      anchorX: worldAnchorA.x,
+      anchorY: worldAnchorA.y,
+      anchorBX: worldAnchorB.x,
+      anchorBY: worldAnchorB.y,
+      collideConnected: j.GetCollideConnected(),
     };
 
-    JOINT_CODECS[j.getType()]?.serialize(j, sj);
-
+    serializeJointProps(j, typeName, sj);
     joints.push(sj);
-  }
+  });
 
   return { bodies, joints, ropes: ropes.length > 0 ? ropes : undefined, gravity: game.gravity };
 }
 
 export function deserializeScene(game: Game, data: SceneData) {
+  const pw = game.pw;
+  const B2 = b2();
+
   // Clear everything
-  const bodiesToRemove: planck.Body[] = [];
-  forEachBody(game.world, (b) => bodiesToRemove.push(b));
+  const bodiesToRemove: Body[] = [];
+  pw.forEachBody((b) => bodiesToRemove.push(b));
   for (const b of bodiesToRemove) {
-    markDestroyed(b);
-    game.world.destroyBody(b);
+    markDestroyed(pw, b);
+    pw.destroyBody(b);
   }
 
   game.setGravity(data.gravity);
 
-  const idToBody = new Map<number, planck.Body>();
+  const idToBody = new Map<number, Body>();
 
   for (const sb of data.bodies) {
-    const body = game.world.createBody({
-      type: sb.type,
-      position: planck.Vec2(sb.x, sb.y),
-      angle: sb.angle,
-    });
+    const bodyDef = B2.b2DefaultBodyDef();
+    bodyDef.type = bodyTypeEnum(sb.type);
+    bodyDef.position = new B2.b2Vec2(sb.x, sb.y);
+    bodyDef.rotation = B2.b2MakeRot(sb.angle);
+    const body = pw.createBody(bodyDef);
 
-    for (const sf of sb.fixtures) {
-      let shape: planck.Shape;
-      switch (sf.shape) {
-        case "circle":
-          shape = planck.Circle(sf.params[0]);
-          break;
-        case "box":
-          shape = planck.Box(sf.params[0], sf.params[1]);
-          break;
-        case "polygon": {
-          const verts: planck.Vec2Value[] = [];
-          for (let i = 0; i < sf.params.length; i += 2) {
-            verts.push(planck.Vec2(sf.params[i], sf.params[i + 1]));
-          }
-          shape = planck.Polygon(verts);
+    for (const ss of sb.shapes) {
+      const shapeDef = B2.b2DefaultShapeDef();
+      shapeDef.density = ss.density;
+      shapeDef.material.friction = ss.friction;
+      shapeDef.material.restitution = ss.restitution;
+      shapeDef.enableHitEvents = true;
+
+      switch (ss.type) {
+        case "circle": {
+          const circle = new B2.b2Circle();
+          circle.center = new B2.b2Vec2(0, 0);
+          circle.radius = ss.params[0];
+          body.CreateCircleShape(shapeDef, circle);
           break;
         }
-        case "edge":
-          shape = planck.Edge(planck.Vec2(sf.params[0], sf.params[1]), planck.Vec2(sf.params[2], sf.params[3]));
+        case "box": {
+          const poly = B2.b2MakeBox(ss.params[0], ss.params[1]);
+          body.CreatePolygonShape(shapeDef, poly);
           break;
-        default:
-          continue;
+        }
+        case "polygon": {
+          const verts = [];
+          for (let i = 0; i < ss.params.length; i += 2) {
+            verts.push(new B2.b2Vec2(ss.params[i], ss.params[i + 1]));
+          }
+          const hull = B2.b2ComputeHull(verts);
+          const poly = B2.b2MakePolygon(hull, 0);
+          body.CreatePolygonShape(shapeDef, poly);
+          break;
+        }
+        case "segment": {
+          const seg = new B2.b2Segment();
+          seg.point1 = new B2.b2Vec2(ss.params[0], ss.params[1]);
+          seg.point2 = new B2.b2Vec2(ss.params[2], ss.params[3]);
+          body.CreateSegmentShape(shapeDef, seg);
+          break;
+        }
       }
-      body.createFixture({
-        shape,
-        density: sf.density,
-        friction: sf.friction,
-        restitution: sf.restitution,
-      });
     }
 
-    if (sb.userData) body.setUserData(sb.userData);
+    // biome-ignore lint/suspicious/noExplicitAny: userData from deserialized scene data
+    if (sb.userData) pw.setUserData(body, sb.userData as any);
     idToBody.set(sb.id, body);
   }
 
@@ -492,33 +525,27 @@ export function deserializeScene(game: Game, data: SceneData) {
     const bodyA = idToBody.get(sj.bodyA);
     const bodyB = idToBody.get(sj.bodyB);
     if (!bodyA || !bodyB) continue;
-
-    const anchorA = planck.Vec2(sj.anchorX, sj.anchorY);
-    const anchorB = planck.Vec2(sj.anchorBX ?? sj.anchorX, sj.anchorBY ?? sj.anchorY);
-
-    JOINT_CODECS[sj.type]?.deserialize(sj, bodyA, bodyB, anchorA, anchorB, game.world);
+    deserializeJoint(pw, sj, bodyA, bodyB);
   }
 
-  // Recreate ropes from metadata (recipe-based, not physics state)
+  // Recreate ropes
   if (data.ropes) {
     for (const r of data.ropes) {
       const bodyA = r.bodyAId !== null ? (idToBody.get(r.bodyAId) ?? null) : null;
       const bodyB = r.bodyBId !== null ? (idToBody.get(r.bodyBId) ?? null) : null;
-      createRopeBetween(game.world, r.x1, r.y1, r.x2, r.y2, bodyA, bodyB, r.links);
+      createRopeBetween(pw, r.x1, r.y1, r.x2, r.y2, bodyA, bodyB, r.links);
     }
   }
 
-  // Re-create the InputManager ground body
+  // Re-create the InputManager ground body (old one was destroyed with all bodies)
   if (game.inputManager) {
-    (game.inputManager as unknown as { groundBody: planck.Body }).groundBody = game.world.createBody({
-      type: "static",
-    });
+    game.inputManager.resetGroundBody();
   }
 }
 
 // ── IndexedDB persistence ──
 
-const DB_NAME = "physbox2";
+const DB_NAME = "physbox3";
 const STORE_NAME = "scenes";
 const DB_VERSION = 1;
 
@@ -536,7 +563,6 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-/** Run a callback against the object store and resolve when the transaction completes. */
 async function dbTransaction<T>(
   mode: IDBTransactionMode,
   fn: (store: IDBObjectStore) => IDBRequest | undefined,

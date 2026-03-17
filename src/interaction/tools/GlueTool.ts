@@ -1,5 +1,6 @@
-import type { Body, Joint } from "box2d3";
+import type { Body } from "box2d3";
 import { b2 } from "../../engine/Box2D";
+import type { JointHandle } from "../../engine/PhysWorld";
 import { areWelded, bodyRadius, createWeldJoint, distance } from "../../engine/Physics";
 import { BrushTool } from "./BrushTool";
 
@@ -37,8 +38,8 @@ export class UnGlueTool extends BrushTool {
     const B2 = b2();
     const pw = this.ctx.game.pw;
     const bodySet = new Set(bodies);
-    const toDestroy: Joint[] = [];
-    const seen = new Set<Joint>();
+    const toDestroy: JointHandle[] = [];
+    const seen = new Set<JointHandle>();
 
     pw.forEachJoint((joint) => {
       if (joint.GetType().value !== B2.b2JointType.b2_weldJoint.value) return;

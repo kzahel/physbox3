@@ -1,5 +1,5 @@
-import type { Joint } from "box2d3";
 import { b2 } from "../../engine/Box2D";
+import type { JointHandle } from "../../engine/PhysWorld";
 import type { ToolContext, ToolHandler } from "../ToolHandler";
 
 export class DetachTool implements ToolHandler {
@@ -15,7 +15,7 @@ export class DetachTool implements ToolHandler {
 
     const B2 = b2();
     const pw = this.ctx.game.pw;
-    const toRemove: Joint[] = [];
+    const toRemove: JointHandle[] = [];
     pw.forEachJoint((joint) => {
       if (joint.GetType().value !== B2.b2JointType.b2_weldJoint.value) return;
       if (joint.GetBodyA() === body || joint.GetBodyB() === body) {
