@@ -10,7 +10,7 @@ import { createDynamite, tickDynamite } from "../prefabs/Dynamite";
 import { applyFanForce, createFan, spawnFanParticles } from "../prefabs/Fan";
 import { createLauncher } from "../prefabs/Launcher";
 import { createPlatform } from "../prefabs/Platform";
-import { createRagdoll, updateRagdollFootContacts, type RagdollData } from "../prefabs/Ragdoll";
+import { createRagdoll, type RagdollData, updateRagdollFootContacts } from "../prefabs/Ragdoll";
 import { applyRocketThrust, createRocket, spawnRocketParticles } from "../prefabs/Rocket";
 import { applyRopeStabilization, createChainRope, createRopeBetween } from "../prefabs/Rope";
 import { createSeesaw } from "../prefabs/Seesaw";

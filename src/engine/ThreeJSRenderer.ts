@@ -4,6 +4,7 @@ import type { ToolRenderInfo } from "../interaction/ToolHandler";
 import { getBodyUserData } from "./BodyUserData";
 import { b2 } from "./Box2D";
 import type { Camera } from "./Camera";
+import { colorOpacity, parseColor } from "./ColorUtils";
 import { KILL_Y, KILL_Y_TOP } from "./Game";
 import { type Interpolation, lerpBody, lerpWorldPoint, NO_INTERP } from "./Interpolation";
 import type { IRenderer } from "./IRenderer";
@@ -11,120 +12,11 @@ import { bodyColor, OverlayRenderer } from "./OverlayRenderer";
 import { type Particle, ParticleSystem } from "./ParticleSystem";
 import { forEachBody } from "./Physics";
 import type { JointHandle, PhysWorld } from "./PhysWorld";
-
-// ── Color parsing ──
-
-const _colorCtx = document.createElement("canvas").getContext("2d")!;
-
-function parseColor(color: string): { r: number; g: number; b: number; a: number } {
-  _colorCtx.clearRect(0, 0, 1, 1);
-  _colorCtx.fillStyle = color;
-  _colorCtx.fillRect(0, 0, 1, 1);
-  const d = _colorCtx.getImageData(0, 0, 1, 1).data;
-  return { r: d[0] / 255, g: d[1] / 255, b: d[2] / 255, a: d[3] / 255 };
-}
+import { createPolygonGeometry, EXTRUDE_DEPTH } from "./ThreeGeometryUtils";
 
 function rgbaToThreeColor(color: string): THREE.Color {
   const c = parseColor(color);
   return new THREE.Color(c.r, c.g, c.b);
-}
-
-function rgbaToOpacity(color: string): number {
-  return parseColor(color).a;
-}
-
-// ── Geometry helpers ──
-
-const EXTRUDE_DEPTH = 0.6;
-
-/**
- * Inset a convex polygon by `amount` using proper per-edge offset.
- */
-function insetConvexPolygon(verts: { x: number; y: number }[], amount: number): { x: number; y: number }[] {
-  const n = verts.length;
-  let cx = 0,
-    cy = 0;
-  for (const v of verts) {
-    cx += v.x;
-    cy += v.y;
-  }
-  cx /= n;
-  cy /= n;
-
-  const edgeNormals: { nx: number; ny: number }[] = [];
-  for (let i = 0; i < n; i++) {
-    const a = verts[i];
-    const b = verts[(i + 1) % n];
-    const dx = b.x - a.x,
-      dy = b.y - a.y;
-    const len = Math.hypot(dx, dy) || 1;
-    let nx = -dy / len,
-      ny = dx / len;
-    const midX = (a.x + b.x) / 2,
-      midY = (a.y + b.y) / 2;
-    if (nx * (cx - midX) + ny * (cy - midY) < 0) {
-      nx = -nx;
-      ny = -ny;
-    }
-    edgeNormals.push({ nx, ny });
-  }
-
-  const result: { x: number; y: number }[] = [];
-  for (let i = 0; i < n; i++) {
-    const prevEdge = (i - 1 + n) % n;
-
-    const a0 = verts[prevEdge];
-    const a1 = verts[i];
-    const nA = edgeNormals[prevEdge];
-    const pAx = a0.x + nA.nx * amount,
-      pAy = a0.y + nA.ny * amount;
-    const dAx = a1.x - a0.x,
-      dAy = a1.y - a0.y;
-
-    const b0 = verts[i];
-    const b1 = verts[(i + 1) % n];
-    const nB = edgeNormals[i];
-    const pBx = b0.x + nB.nx * amount,
-      pBy = b0.y + nB.ny * amount;
-    const dBx = b1.x - b0.x,
-      dBy = b1.y - b0.y;
-
-    const cross = dAx * dBy - dAy * dBx;
-    if (Math.abs(cross) < 1e-10) {
-      result.push({ x: a1.x + nA.nx * amount, y: a1.y + nA.ny * amount });
-    } else {
-      const t = ((pBx - pAx) * dBy - (pBy - pAy) * dBx) / cross;
-      result.push({ x: pAx + t * dAx, y: pAy + t * dAy });
-    }
-  }
-  return result;
-}
-
-function createPolygonGeometry(verts: { x: number; y: number }[]): THREE.ExtrudeGeometry {
-  const n = verts.length;
-  let minEdge = Infinity;
-  for (let i = 0; i < n; i++) {
-    const a = verts[i];
-    const b = verts[(i + 1) % n];
-    minEdge = Math.min(minEdge, Math.hypot(b.x - a.x, b.y - a.y));
-  }
-  const bevel = Math.min(minEdge * 0.12, EXTRUDE_DEPTH * 0.3, 0.08);
-
-  const inset = insetConvexPolygon(verts, bevel);
-
-  const shape = new THREE.Shape();
-  shape.moveTo(inset[0].x, inset[0].y);
-  for (let i = 1; i < inset.length; i++) {
-    shape.lineTo(inset[i].x, inset[i].y);
-  }
-  shape.closePath();
-  return new THREE.ExtrudeGeometry(shape, {
-    depth: EXTRUDE_DEPTH,
-    bevelEnabled: true,
-    bevelThickness: bevel,
-    bevelSize: bevel,
-    bevelSegments: 1,
-  });
 }
 
 // ── Body-to-mesh key ──
@@ -429,7 +321,7 @@ export class ThreeJSRenderer implements IRenderer {
     const ud = getBodyUserData(pw, body);
     const fillColor = ud?.fill ?? bodyColor(pw, body);
     const threeColor = rgbaToThreeColor(fillColor);
-    const opacity = rgbaToOpacity(fillColor);
+    const opacity = colorOpacity(fillColor);
     const isStatic = body.GetType().value === B2.b2BodyType.b2_staticBody.value;
 
     const shapeIds: b2ShapeId[] = body.GetShapes() ?? [];
