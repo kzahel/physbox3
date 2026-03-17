@@ -91,10 +91,19 @@ function createPolygonGeometry(verts: { x: number; y: number }[]): THREE.Extrude
   // Bevel: 10% of the smallest dimension, capped
   const bevel = Math.min(minDist * 0.1, minEdge * 0.1, 0.06);
 
+  // Shrink verts inward by bevel amount so bevel fills back to collider boundary
+  const inset: { x: number; y: number }[] = [];
+  for (const v of verts) {
+    const dx = cx - v.x,
+      dy = cy - v.y;
+    const d = Math.hypot(dx, dy) || 1;
+    inset.push({ x: v.x + (dx / d) * bevel, y: v.y + (dy / d) * bevel });
+  }
+
   const shape = new THREE.Shape();
-  shape.moveTo(verts[0].x, verts[0].y);
-  for (let i = 1; i < verts.length; i++) {
-    shape.lineTo(verts[i].x, verts[i].y);
+  shape.moveTo(inset[0].x, inset[0].y);
+  for (let i = 1; i < inset.length; i++) {
+    shape.lineTo(inset[i].x, inset[i].y);
   }
   shape.closePath();
   return new THREE.ExtrudeGeometry(shape, {
