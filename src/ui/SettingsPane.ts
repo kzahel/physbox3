@@ -1,3 +1,4 @@
+import { isDeluxe } from "../engine/Box2D";
 import type { Game } from "../engine/Game";
 import { deleteScene, listScenes, loadScene, saveScene } from "../engine/SceneStore";
 
@@ -30,7 +31,18 @@ export class SettingsPane {
       </div>
       <div id="s-scenes-list" class="scenes-list"></div>
 
-      <div id="stats"></div>
+      <div class="section-title debug-toggle" id="s-debug-toggle">Debug Stats &#9660;</div>
+      <div id="debug-panel" class="debug-panel" style="display:none">
+        <div class="debug-row" id="d-engine"></div>
+        <div class="debug-row" id="d-fps"></div>
+        <div class="debug-row" id="d-step"></div>
+        <div class="debug-bar-section">
+          <div class="debug-label">Step breakdown (ms)</div>
+          <div class="debug-bars" id="d-bars"></div>
+        </div>
+        <div class="debug-row" id="d-counts"></div>
+        <div class="debug-row" id="d-mem"></div>
+      </div>
     `;
 
     const bindSlider = (id: string, handler: (v: number) => void, parse = parseFloat) => {
@@ -131,10 +143,62 @@ export class SettingsPane {
 
     this.refreshScenesList();
 
+    // Debug panel toggle
+    const debugToggle = container.querySelector<HTMLElement>("#s-debug-toggle")!;
+    const debugPanel = container.querySelector<HTMLElement>("#debug-panel")!;
+    debugToggle.addEventListener("click", () => {
+      const open = debugPanel.style.display !== "none";
+      debugPanel.style.display = open ? "none" : "block";
+      debugToggle.innerHTML = `Debug Stats ${open ? "&#9660;" : "&#9650;"}`;
+    });
+
+    // Engine info (static)
+    const engineEl = container.querySelector<HTMLElement>("#d-engine")!;
+    const flavor = isDeluxe ? "Deluxe (SIMD + threads)" : "Compat (no SIMD)";
+    const workers = game.pw.workerCount;
+    engineEl.textContent = `${flavor} | ${workers > 0 ? `${workers} workers` : "single-threaded"}`;
+
     // Stats update
-    const statsEl = container.querySelector("#stats")!;
+    const fpsEl = container.querySelector<HTMLElement>("#d-fps")!;
+    const stepEl = container.querySelector<HTMLElement>("#d-step")!;
+    const barsEl = container.querySelector<HTMLElement>("#d-bars")!;
+    const countsEl = container.querySelector<HTMLElement>("#d-counts")!;
+    const memEl = container.querySelector<HTMLElement>("#d-mem")!;
+
+    const barColors: Record<string, string> = {
+      collide: "#e88",
+      solve: "#8be",
+      bullets: "#eb8",
+      sensors: "#8e8",
+    };
+
     setInterval(() => {
-      statsEl.textContent = `FPS: ${game.fps} | Bodies: ${game.bodyCount} | Sand: ${game.sandBodies.length}`;
+      const p = game.profile;
+      fpsEl.textContent = `FPS: ${game.fps} | Bodies: ${game.bodyCount} | Sand: ${game.sandBodies.length}`;
+      if (!p) return;
+
+      stepEl.textContent = `Step: ${p.step.toFixed(2)}ms | Awake: ${p.awakeBodyCount}`;
+
+      // Bar chart
+      const parts = [
+        { key: "collide", val: p.collide },
+        { key: "solve", val: p.solve },
+        { key: "bullets", val: p.bullets },
+        { key: "sensors", val: p.sensors },
+      ];
+      const total = Math.max(
+        parts.reduce((s, x) => s + x.val, 0),
+        0.01,
+      );
+      barsEl.innerHTML = parts
+        .map((x) => {
+          const pct = Math.max((x.val / total) * 100, 0);
+          return `<div class="debug-bar" style="width:${pct.toFixed(1)}%;background:${barColors[x.key]}" title="${x.key}: ${x.val.toFixed(2)}ms"></div>`;
+        })
+        .join("");
+
+      countsEl.textContent = `Shapes: ${p.shapeCount} | Contacts: ${p.contactCount} | Joints: ${p.jointCount} | Islands: ${p.islandCount}`;
+      memEl.textContent = `WASM mem: ${(p.byteCount / 1024).toFixed(0)}KB | Tasks: ${p.taskCount}`;
     }, 500);
   }
 

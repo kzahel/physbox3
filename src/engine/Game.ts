@@ -24,7 +24,7 @@ import type { Interpolation } from "./Interpolation";
 import { snapshotBodies } from "./Interpolation";
 import type { IRenderer } from "./IRenderer";
 import { clamp, clearDynamic, destroyBodyAt, explodeAt, isDynamic, markDestroyed, scaleBody } from "./Physics";
-import { PhysWorld } from "./PhysWorld";
+import { type PhysProfile, PhysWorld } from "./PhysWorld";
 import { Renderer } from "./Renderer";
 import { WaterSystem } from "./WaterSystem";
 
@@ -76,6 +76,8 @@ export class Game {
   // Stats
   fps = 0;
   bodyCount = 0;
+  /** Latest physics profiling snapshot (updated each physics step). */
+  profile: PhysProfile | null = null;
 
   private lastTime = 0;
   private accumulator = 0;
@@ -427,6 +429,7 @@ export class Game {
       this.accumulator -= timestep;
     }
     this.interpAlpha = this.accumulator / timestep;
+    this.profile = this.pw.getProfile();
     spawnRocketParticles(this.pw, this.renderer);
     spawnFanParticles(this.pw, this.renderer);
   }

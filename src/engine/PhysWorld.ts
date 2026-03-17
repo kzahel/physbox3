@@ -19,7 +19,7 @@ import type {
   World,
 } from "box2d3";
 import type { BodyUserData } from "./BodyUserData";
-import { b2 } from "./Box2D";
+import { b2, isDeluxe } from "./Box2D";
 
 /**
  * Lightweight JS wrapper around b2JointId that provides OOP-like methods
@@ -80,6 +80,23 @@ export type HitCallback = (
   approachSpeed: number,
 ) => void;
 
+/** Snapshot of per-step profiling data. All times in milliseconds. */
+export interface PhysProfile {
+  step: number;
+  collide: number;
+  solve: number;
+  bullets: number;
+  sensors: number;
+  bodyCount: number;
+  shapeCount: number;
+  contactCount: number;
+  jointCount: number;
+  islandCount: number;
+  byteCount: number;
+  taskCount: number;
+  awakeBodyCount: number;
+}
+
 export class PhysWorld {
   readonly world: World;
   /** Cached b2WorldId for flat API calls. */
@@ -94,12 +111,19 @@ export class PhysWorld {
   // Event callbacks
   private _hitCallbacks: HitCallback[] = [];
 
+  /** Number of worker threads the solver is using (0 = single-threaded). */
+  readonly workerCount: number;
+
   constructor(gravityX: number, gravityY: number) {
     const B2 = b2();
     const worldDef = B2.b2DefaultWorldDef();
     worldDef.gravity = new B2.b2Vec2(gravityX, gravityY);
     worldDef.enableSleep = true;
     worldDef.enableContinuous = true;
+    if (isDeluxe) {
+      worldDef.workerCount = Math.min(navigator.hardwareConcurrency ?? 4, 4);
+    }
+    this.workerCount = worldDef.workerCount ?? 0;
     this.world = new B2.World(worldDef);
     this._captureWorldId();
   }
@@ -312,6 +336,27 @@ export class PhysWorld {
     const B2 = b2();
     // biome-ignore lint/suspicious/noExplicitAny: WASM AABB type
     B2.b2World_OverlapAABB(this._worldId, aabb as any, filter, callback);
+  }
+
+  /** Grab a snapshot of profiling data (profile + counters). */
+  getProfile(): PhysProfile {
+    const profile = this.world.GetProfile();
+    const counters = this.world.GetCounters();
+    return {
+      step: profile.step,
+      collide: profile.collide,
+      solve: profile.solve,
+      bullets: profile.bullets,
+      sensors: profile.sensors,
+      bodyCount: counters.bodyCount,
+      shapeCount: counters.shapeCount,
+      contactCount: counters.contactCount,
+      jointCount: counters.jointCount,
+      islandCount: counters.islandCount,
+      byteCount: counters.byteCount,
+      taskCount: counters.taskCount,
+      awakeBodyCount: this.world.GetAwakeBodyCount(),
+    };
   }
 
   // --- Cleanup ---

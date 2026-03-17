@@ -256,11 +256,46 @@ body {
   line-height: 1;
 }
 
-#stats {
+.debug-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.debug-panel {
   font-size: 11px;
-  color: #888;
-  margin-top: 8px;
+  color: #aaa;
   font-variant-numeric: tabular-nums;
+  line-height: 1.6;
+}
+
+.debug-row {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.debug-bar-section {
+  margin: 4px 0;
+}
+
+.debug-label {
+  font-size: 10px;
+  color: #666;
+  margin-bottom: 2px;
+}
+
+.debug-bars {
+  display: flex;
+  height: 10px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #222;
+}
+
+.debug-bar {
+  height: 100%;
+  min-width: 1px;
+  transition: width 0.3s ease;
 }
 
 /* ── Mobile: hamburger + slide-out sidebar ── */
