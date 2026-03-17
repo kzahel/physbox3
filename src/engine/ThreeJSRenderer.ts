@@ -97,11 +97,15 @@ function insetPolygon(verts: { x: number; y: number }[], amount: number): { x: n
     const next = verts[(i + 1) % n];
 
     // Inward normals of the two edges meeting at this vertex
-    const e1x = curr.x - prev.x, e1y = curr.y - prev.y;
-    const e2x = next.x - curr.x, e2y = next.y - curr.y;
+    const e1x = curr.x - prev.x,
+      e1y = curr.y - prev.y;
+    const e2x = next.x - curr.x,
+      e2y = next.y - curr.y;
     // Inward normals (assuming CCW winding from Planck)
-    const n1x = e1y, n1y = -e1x;
-    const n2x = e2y, n2y = -e2x;
+    const n1x = e1y,
+      n1y = -e1x;
+    const n2x = e2y,
+      n2y = -e2x;
     const len1 = Math.hypot(n1x, n1y) || 1;
     const len2 = Math.hypot(n2x, n2y) || 1;
     // Average inward direction
@@ -330,12 +334,12 @@ export class ThreeJSRenderer implements IRenderer {
 
     // Update ocean/sky to always cover the visible viewport
     const viewW = halfW * 2 + 2; // slight padding
-    const oceanH = Math.max(0, (camera.y - KILL_Y) + halfH);
+    const oceanH = Math.max(0, camera.y - KILL_Y + halfH);
     this.oceanMesh.scale.set(viewW, oceanH, 1);
     this.oceanMesh.position.set(camera.x, KILL_Y - oceanH / 2, -1);
     this.oceanMesh.visible = oceanH > 0;
 
-    const skyH = Math.max(0, (KILL_Y_TOP - camera.y) + halfH);
+    const skyH = Math.max(0, KILL_Y_TOP - camera.y + halfH);
     this.skyMesh.scale.set(viewW, skyH, 1);
     this.skyMesh.position.set(camera.x, KILL_Y_TOP + skyH / 2, -1);
     this.skyMesh.visible = skyH > 0;
