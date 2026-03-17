@@ -68,11 +68,18 @@ function createPolygonGeometry(verts: { x: number; y: number }[]): THREE.Extrude
     shape.lineTo(verts[i].x, verts[i].y);
   }
   shape.closePath();
+  // Scale bevel proportionally to the shape size
+  let maxDist = 0;
+  for (const v of verts) {
+    const d = Math.hypot(v.x, v.y);
+    if (d > maxDist) maxDist = d;
+  }
+  const bevel = maxDist * 0.08;
   return new THREE.ExtrudeGeometry(shape, {
     depth: EXTRUDE_DEPTH,
     bevelEnabled: true,
-    bevelThickness: 0.08,
-    bevelSize: 0.08,
+    bevelThickness: bevel,
+    bevelSize: bevel,
     bevelSegments: 1,
   });
 }
