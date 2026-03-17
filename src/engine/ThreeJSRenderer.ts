@@ -215,6 +215,7 @@ export class ThreeJSRenderer implements IRenderer {
     });
     this.pointsMesh = new THREE.Points(this.pointsGeometry, this.pointsMaterial);
     this.pointsMesh.position.z = 1;
+    this.pointsMesh.frustumCulled = false;
     this.scene.add(this.pointsMesh);
 
     // Overlay canvas for 2D UI (tool cursors, buttons, text)
