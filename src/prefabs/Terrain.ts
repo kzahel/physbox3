@@ -79,6 +79,31 @@ export function createTerrain(
 
   const B2 = b2();
 
+  // Box2D v3 chain shapes are one-sided: the solid side is to the RIGHT of
+  // the edge direction (in Y-up coords). For terrain where objects should rest
+  // ON TOP, we need the chain to go from right-to-left so the right-hand
+  // normal points upward. Ensure consistent winding by checking x-direction.
+  if (simplified[simplified.length - 1].x > simplified[0].x) {
+    simplified.reverse();
+  }
+
+  // Extend endpoints with ghost points to prevent fall-through at the ends.
+  // Each ghost extends the first/last segment direction by a short distance.
+  const ghostLen = 2;
+  const first = simplified[0];
+  const second = simplified[1];
+  const dxF = first.x - second.x;
+  const dyF = first.y - second.y;
+  const lenF = Math.hypot(dxF, dyF) || 1;
+  simplified.unshift({ x: first.x + (dxF / lenF) * ghostLen, y: first.y + (dyF / lenF) * ghostLen });
+
+  const last = simplified[simplified.length - 1];
+  const prev = simplified[simplified.length - 2];
+  const dxL = last.x - prev.x;
+  const dyL = last.y - prev.y;
+  const lenL = Math.hypot(dxL, dyL) || 1;
+  simplified.push({ x: last.x + (dxL / lenL) * ghostLen, y: last.y + (dyL / lenL) * ghostLen });
+
   // Compute bounding box of the terrain surface
   let minX = Infinity;
   let maxX = -Infinity;
