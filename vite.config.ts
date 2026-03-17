@@ -5,6 +5,9 @@ export default defineConfig({
     optimizeDeps: {
         exclude: ['box2d3-wasm'],
     },
+    worker: {
+        format: 'es',
+    },
     server: {
         headers: {
             // Required for SharedArrayBuffer (box2d3-wasm threading)
