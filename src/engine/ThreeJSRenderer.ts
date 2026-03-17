@@ -1,7 +1,7 @@
 import type { Body, b2ShapeId } from "box2d3";
 import * as THREE from "three";
 import type { ToolRenderInfo } from "../interaction/ToolHandler";
-import { getBodyUserData } from "./BodyUserData";
+import { getBodyUserData, isSand } from "./BodyUserData";
 import { b2 } from "./Box2D";
 import type { Camera } from "./Camera";
 import { colorOpacity, parseColor } from "./ColorUtils";
@@ -342,19 +342,26 @@ export class ThreeJSRenderer implements IRenderer {
         const circle = B2.b2Shape_GetCircle(shapeId);
         const r = circle.radius;
         const center = circle.center;
-        const geo = new THREE.SphereGeometry(r, 8, 6);
+        const sand = isSand(ud);
+
+        // Sand grains use a simple box for minimal poly count
+        const geo = sand
+          ? new THREE.BoxGeometry(r * 1.6, r * 1.6, r * 1.6)
+          : new THREE.SphereGeometry(r, 8, 6);
         geo.translate(center.x, center.y, 0);
         const mesh = new THREE.Mesh(geo, mat);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
+        mesh.castShadow = !sand;
+        mesh.receiveShadow = !sand;
         group.add(mesh);
 
-        const spokeGeo = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(center.x, center.y, r + 0.01),
-          new THREE.Vector3(center.x + r, center.y, r + 0.01),
-        ]);
-        const spokeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
-        group.add(new THREE.Line(spokeGeo, spokeMat));
+        if (!sand) {
+          const spokeGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(center.x, center.y, r + 0.01),
+            new THREE.Vector3(center.x + r, center.y, r + 0.01),
+          ]);
+          const spokeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
+          group.add(new THREE.Line(spokeGeo, spokeMat));
+        }
       } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
         const poly = B2.b2Shape_GetPolygon(shapeId);
         const verts: { x: number; y: number }[] = [];
