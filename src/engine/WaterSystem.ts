@@ -1,4 +1,7 @@
-import * as planck from "planck";
+import type { Body, b2ShapeId } from "box2d3";
+import { b2 } from "./Box2D";
+import { isDynamic } from "./Physics";
+import type { PhysWorld } from "./PhysWorld";
 
 /**
  * Column-based water simulation. Water is a heightfield: an array of vertical
@@ -97,12 +100,12 @@ export class WaterSystem {
   }
 
   /** Tick the simulation. Call once per physics step. */
-  tick(world: planck.World) {
+  tick(pw: PhysWorld) {
     this.frameCount++;
     if (this.columns.size === 0) return;
 
-    this.updateFloors(world);
-    this.updateWalls(world);
+    this.updateFloors(pw);
+    this.updateWalls(pw);
     for (let i = 0; i < FLOW_ITERS; i++) {
       this.flow();
     }
@@ -110,17 +113,19 @@ export class WaterSystem {
   }
 
   /** Apply buoyancy forces to all dynamic bodies overlapping water */
-  applyBuoyancy(world: planck.World, gravity: number) {
+  applyBuoyancy(pw: PhysWorld, gravity: number) {
     if (this.columns.size === 0) return;
 
-    for (let body = world.getBodyList(); body; body = body.getNext()) {
-      if (!body.isDynamic()) continue;
+    const B2 = b2();
+
+    pw.forEachBody((body) => {
+      if (!isDynamic(body)) return;
 
       const aabb = this.bodyAABB(body);
-      if (!aabb) continue;
+      if (!aabb) return;
 
-      const minIdx = colIndex(aabb.lowerBound.x);
-      const maxIdx = colIndex(aabb.upperBound.x);
+      const minIdx = colIndex(aabb.lx);
+      const maxIdx = colIndex(aabb.ux);
 
       let totalSubmergedArea = 0;
 
@@ -129,8 +134,8 @@ export class WaterSystem {
         if (!col || col.volume <= MIN_DEPTH * COL_WIDTH) continue;
 
         const waterTop = col.level;
-        const bodyBottom = aabb.lowerBound.y;
-        const bodyTop = aabb.upperBound.y;
+        const bodyBottom = aabb.ly;
+        const bodyTop = aabb.uy;
 
         if (bodyBottom >= waterTop) continue; // above water
 
@@ -144,15 +149,15 @@ export class WaterSystem {
       if (totalSubmergedArea > 0) {
         // Buoyancy = ρ_water × g × submerged_volume (2D: area)
         const force = totalSubmergedArea * Math.abs(gravity) * BUOYANCY_SCALE;
-        body.applyForceToCenter(planck.Vec2(0, force), true);
+        body.ApplyForceToCenter(new B2.b2Vec2(0, force), true);
 
         // Water drag — dampen velocity proportional to submersion
-        const vel = body.getLinearVelocity();
+        const vel = body.GetLinearVelocity();
         const dragFactor = 0.98;
-        body.setLinearVelocity(planck.Vec2(vel.x * dragFactor, vel.y * dragFactor));
-        body.setAngularVelocity(body.getAngularVelocity() * dragFactor);
+        body.SetLinearVelocity(new B2.b2Vec2(vel.x * dragFactor, vel.y * dragFactor));
+        body.SetAngularVelocity(body.GetAngularVelocity() * dragFactor);
       }
-    }
+    });
   }
 
   /** Get water level at a world X, or null if no water there */
@@ -176,27 +181,30 @@ export class WaterSystem {
 
   // ── Internal ──
 
-  private updateFloors(world: planck.World) {
+  private updateFloors(pw: PhysWorld) {
+    const B2 = b2();
     for (const [idx, col] of this.columns) {
       // Stagger raycasts: only update a fraction each frame
       if ((idx + this.frameCount) % RAYCAST_STAGGER !== 0) continue;
 
-      // Raycast downward from just above the current floor — NOT from the water
-      // surface.  This way a platform placed *into* the water (above the floor)
-      // is invisible to floor detection.  The floor can drop (ground broke) but
-      // never jump upward due to something inserted above it.
-      const from = planck.Vec2(col.x, col.floor + 0.05);
-      const to = planck.Vec2(col.x, col.floor - 200);
-      let bestY = -1000; // default floor if nothing hit
+      // Raycast downward from just above the current floor
+      const origin = new B2.b2Vec2(col.x, col.floor + 0.05);
+      const translation = new B2.b2Vec2(0, -200.05); // downward
+      const result = pw.castRayClosest(origin, translation);
 
-      world.rayCast(from, to, (fixture, point, _normal, fraction) => {
-        if (fixture.isSensor()) return -1; // skip sensors
-        if (fixture.getBody().isDynamic()) return -1; // skip dynamic bodies
-        if (point.y > bestY) {
-          bestY = point.y;
+      let bestY = -1000;
+      if (result.hit) {
+        // Check if the hit shape is on a static body (skip sensors and dynamic bodies)
+        const shapeId = result.shapeId;
+        if (!B2.b2Shape_IsSensor(shapeId)) {
+          const bodyId = B2.b2Shape_GetBody(shapeId);
+          // biome-ignore lint/suspicious/noExplicitAny: bodyId is opaque ID, cast to Body for type check
+          const hitBody = bodyId as any as Body;
+          if (!isDynamic(hitBody)) {
+            bestY = result.point.y;
+          }
         }
-        return fraction; // continue to find closest
-      });
+      }
 
       col.floor = bestY;
       // Recompute level from volume + floor
@@ -204,7 +212,7 @@ export class WaterSystem {
     }
   }
 
-  private updateWalls(world: planck.World) {
+  private updateWalls(pw: PhysWorld) {
     for (const [idx, col] of this.columns) {
       // Stagger wall checks too
       if ((idx + this.frameCount + 2) % RAYCAST_STAGGER !== 0) continue;
@@ -214,20 +222,25 @@ export class WaterSystem {
       const halfCol = COL_WIDTH * 0.5;
 
       // Check left wall
-      col.wallLeft = this.hasWall(world, col.x - halfCol, col.x - halfCol - COL_WIDTH, midY);
+      col.wallLeft = this.hasWall(pw, col.x - halfCol, col.x - halfCol - COL_WIDTH, midY);
       // Check right wall
-      col.wallRight = this.hasWall(world, col.x + halfCol, col.x + halfCol + COL_WIDTH, midY);
+      col.wallRight = this.hasWall(pw, col.x + halfCol, col.x + halfCol + COL_WIDTH, midY);
     }
   }
 
-  private hasWall(world: planck.World, fromX: number, toX: number, y: number): boolean {
-    let hit = false;
-    world.rayCast(planck.Vec2(fromX, y), planck.Vec2(toX, y), (fixture) => {
-      if (fixture.isSensor() || fixture.getBody().isDynamic()) return -1;
-      hit = true;
-      return 0; // stop
-    });
-    return hit;
+  private hasWall(pw: PhysWorld, fromX: number, toX: number, y: number): boolean {
+    const B2 = b2();
+    const origin = new B2.b2Vec2(fromX, y);
+    const translation = new B2.b2Vec2(toX - fromX, 0);
+    const result = pw.castRayClosest(origin, translation);
+
+    if (!result.hit) return false;
+    const shapeId = result.shapeId;
+    if (B2.b2Shape_IsSensor(shapeId)) return false;
+    const bodyId = B2.b2Shape_GetBody(shapeId);
+    // biome-ignore lint/suspicious/noExplicitAny: bodyId is opaque ID, cast to Body for type check
+    const hitBody = bodyId as any as Body;
+    return !isDynamic(hitBody);
   }
 
   private flow() {
@@ -335,17 +348,27 @@ export class WaterSystem {
     }
   }
 
-  private bodyAABB(body: planck.Body): planck.AABB | null {
-    let combined: planck.AABB | null = null;
-    for (let f = body.getFixtureList(); f; f = f.getNext()) {
-      const aabb = new planck.AABB();
-      f.getShape().computeAABB(aabb, body.getTransform(), 0);
-      if (!combined) {
-        combined = aabb;
-      } else {
-        combined.combine(aabb);
-      }
+  /** Compute a simple AABB for a body by unioning all shape AABBs via flat API. */
+  private bodyAABB(body: Body): { lx: number; ly: number; ux: number; uy: number } | null {
+    const B2 = b2();
+    const shapeIds: b2ShapeId[] = body.GetShapes() ?? [];
+    if (shapeIds.length === 0) return null;
+
+    let lx = Infinity;
+    let ly = Infinity;
+    let ux = -Infinity;
+    let uy = -Infinity;
+
+    for (const shapeId of shapeIds) {
+      const aabb = B2.b2Shape_GetAABB(shapeId);
+      const lb = aabb.lowerBound;
+      const ub = aabb.upperBound;
+      if (lb.x < lx) lx = lb.x;
+      if (lb.y < ly) ly = lb.y;
+      if (ub.x > ux) ux = ub.x;
+      if (ub.y > uy) uy = ub.y;
     }
-    return combined;
+
+    return { lx, ly, ux, uy };
   }
 }

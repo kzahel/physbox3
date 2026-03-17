@@ -1,6 +1,7 @@
-import type { Body, Joint } from "box2d3";
+import type { Body } from "box2d3";
 import { b2 } from "../../engine/Box2D";
 import { findClosestBody, isDynamic } from "../../engine/Physics";
+import type { JointHandle } from "../../engine/PhysWorld";
 import type { ToolContext, ToolHandler } from "../ToolHandler";
 import { EndpointDragHandler } from "./EndpointDragHandler";
 
@@ -9,7 +10,7 @@ export const GRAB_RADIUS_PX = 30;
 export class GrabTool implements ToolHandler {
   immediateTouch = true as const;
   touchDragMode = "drag" as const;
-  private motorJoint: Joint | null = null;
+  private motorJoint: JointHandle | null = null;
   private grabbedBody: Body | null = null;
   private grabbedStatic: Body | null = null;
   private targetX = 0;
@@ -83,10 +84,11 @@ export class GrabTool implements ToolHandler {
 
   private createMotorJoint(target: Body, wx: number, wy: number) {
     const B2 = b2();
+    const pw = this.ctx.game.pw;
     const def = B2.b2DefaultMotorJointDef();
 
-    def.base.bodyIdA = this.ctx.groundBody.GetPointer();
-    def.base.bodyIdB = target.GetPointer();
+    def.base.bodyIdA = pw.getBodyId(this.ctx.groundBody);
+    def.base.bodyIdB = pw.getBodyId(target);
 
     // Set local frames: ground anchor at target position, body anchor at origin
     const frameA = new B2.b2Transform();
@@ -106,15 +108,8 @@ export class GrabTool implements ToolHandler {
     def.angularHertz = 0;
     def.angularDampingRatio = 0;
 
-    // biome-ignore lint/suspicious/noExplicitAny: .d.ts incomplete — CreateMotorJoint exists per reference
-    const world = this.ctx.game.pw.world as any;
-    const joint: Joint =
-      typeof world.CreateMotorJoint === "function"
-        ? world.CreateMotorJoint(def)
-        : B2.b2CreateMotorJoint(this.ctx.game.pw.world.GetPointer(), def);
-    this.ctx.game.pw.addJoint(joint);
-
-    this.motorJoint = joint;
+    const jointId = B2.b2CreateMotorJoint(pw.worldId, def);
+    this.motorJoint = pw.addJointId(jointId);
     this.grabbedBody = target;
     this.targetX = wx;
     this.targetY = wy;
@@ -128,10 +123,7 @@ export class GrabTool implements ToolHandler {
     const hertz = 5;
     const vx = (this.targetX - pos.x) * hertz;
     const vy = (this.targetY - pos.y) * hertz;
-    // biome-ignore lint/suspicious/noExplicitAny: MotorJoint methods not fully typed in .d.ts
-    const mj = this.motorJoint as any;
-    if (typeof mj.SetLinearVelocity === "function") {
-      mj.SetLinearVelocity(new B2.b2Vec2(vx, vy));
-    }
+    // Use flat API for motor joint velocity control
+    B2.b2MotorJoint_SetLinearVelocity(this.motorJoint.id, new B2.b2Vec2(vx, vy));
   }
 }

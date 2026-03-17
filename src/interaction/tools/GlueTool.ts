@@ -1,7 +1,7 @@
 import type { Body } from "box2d3";
 import { b2 } from "../../engine/Box2D";
-import type { JointHandle } from "../../engine/PhysWorld";
 import { areWelded, bodyRadius, createWeldJoint, distance } from "../../engine/Physics";
+import type { JointHandle } from "../../engine/PhysWorld";
 import { BrushTool } from "./BrushTool";
 
 export const GLUE_RADIUS_PX = 28;

@@ -108,13 +108,13 @@ export function tickCannons(
         // Get the other body from contact shapes
         const bodyIdA = B2.b2Shape_GetBody(contact.shapeIdA);
         const bodyIdB = B2.b2Shape_GetBody(contact.shapeIdB);
-        const ballPtr = b.GetPointer();
+        const ballId = pw.getBodyId(b);
 
         // Determine which body ID is the "other"
-        const otherBodyId = B2.B2_ID_EQUALS(bodyIdA, ballPtr) ? bodyIdB : bodyIdA;
+        const otherBodyId = B2.B2_ID_EQUALS(bodyIdA, ballId) ? bodyIdB : bodyIdA;
 
         // Skip if contacting parent cannon
-        if (ud.parentCannon?.IsValid() && B2.B2_ID_EQUALS(otherBodyId, ud.parentCannon.GetPointer())) {
+        if (ud.parentCannon?.IsValid() && B2.B2_ID_EQUALS(otherBodyId, pw.getBodyId(ud.parentCannon))) {
           continue;
         }
 

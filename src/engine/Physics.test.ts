@@ -1,5 +1,5 @@
-import * as planck from "planck";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { b2, initBox2D } from "./Box2D";
 import {
   areWelded,
   bodyRadius,
@@ -10,6 +10,11 @@ import {
   markDestroyed,
   queryBodiesInRadius,
 } from "./Physics";
+import { PhysWorld } from "./PhysWorld";
+
+beforeAll(async () => {
+  await initBox2D();
+});
 
 describe("clamp", () => {
   it("returns value when within range", () => {
@@ -60,82 +65,141 @@ describe("distance", () => {
 
 describe("markDestroyed", () => {
   it("sets destroyed flag on body userData", () => {
-    const world = new planck.World();
-    const body = world.createBody({ type: "dynamic", position: planck.Vec2(0, 0) });
-    body.setUserData({ label: "test" });
-    markDestroyed(body);
-    expect((body.getUserData() as Record<string, unknown>).destroyed).toBe(true);
+    const pw = new PhysWorld(0, -10);
+    const B2 = b2();
+    const bodyDef = B2.b2DefaultBodyDef();
+    bodyDef.type = B2.b2BodyType.b2_dynamicBody;
+    bodyDef.position = new B2.b2Vec2(0, 0);
+    const body = pw.createBody(bodyDef);
+    pw.setUserData(body, { label: "test" });
+    markDestroyed(pw, body);
+    expect(pw.getUserData(body)?.destroyed).toBe(true);
   });
 
   it("creates userData if none exists", () => {
-    const world = new planck.World();
-    const body = world.createBody({ type: "dynamic", position: planck.Vec2(0, 0) });
-    markDestroyed(body);
-    expect((body.getUserData() as Record<string, unknown>).destroyed).toBe(true);
+    const pw = new PhysWorld(0, -10);
+    const B2 = b2();
+    const bodyDef = B2.b2DefaultBodyDef();
+    bodyDef.type = B2.b2BodyType.b2_dynamicBody;
+    bodyDef.position = new B2.b2Vec2(0, 0);
+    const body = pw.createBody(bodyDef);
+    markDestroyed(pw, body);
+    expect(pw.getUserData(body)?.destroyed).toBe(true);
   });
 });
 
 describe("weld joint helpers", () => {
   function twoBodyWorld() {
-    const world = new planck.World();
-    const a = world.createBody({ type: "dynamic", position: planck.Vec2(0, 0) });
-    a.createFixture({ shape: planck.Circle(0.5), density: 1 });
-    const b = world.createBody({ type: "dynamic", position: planck.Vec2(1, 0) });
-    b.createFixture({ shape: planck.Circle(0.5), density: 1 });
-    return { world, a, b };
+    const pw = new PhysWorld(0, -10);
+    const B2 = b2();
+
+    const defA = B2.b2DefaultBodyDef();
+    defA.type = B2.b2BodyType.b2_dynamicBody;
+    defA.position = new B2.b2Vec2(0, 0);
+    const a = pw.createBody(defA);
+    const shapeDefA = B2.b2DefaultShapeDef();
+    shapeDefA.density = 1;
+    const circA = new B2.b2Circle();
+    circA.center = new B2.b2Vec2(0, 0);
+    circA.radius = 0.5;
+    a.CreateCircleShape(shapeDefA, circA);
+
+    const defB = B2.b2DefaultBodyDef();
+    defB.type = B2.b2BodyType.b2_dynamicBody;
+    defB.position = new B2.b2Vec2(1, 0);
+    const b = pw.createBody(defB);
+    const shapeDefB = B2.b2DefaultShapeDef();
+    shapeDefB.density = 1;
+    const circB = new B2.b2Circle();
+    circB.center = new B2.b2Vec2(0, 0);
+    circB.radius = 0.5;
+    b.CreateCircleShape(shapeDefB, circB);
+
+    return { pw, a, b };
   }
 
   it("areWelded returns false when no joint exists", () => {
-    const { a, b } = twoBodyWorld();
-    expect(areWelded(a, b)).toBe(false);
+    const { pw, a, b } = twoBodyWorld();
+    expect(areWelded(pw, a, b)).toBe(false);
   });
 
   it("areWelded returns true after creating weld joint", () => {
-    const { world, a, b } = twoBodyWorld();
-    createWeldJoint(world, a, b, planck.Vec2(0.5, 0));
-    expect(areWelded(a, b)).toBe(true);
-    expect(areWelded(b, a)).toBe(true);
+    const { pw, a, b } = twoBodyWorld();
+    createWeldJoint(pw, a, b, { x: 0.5, y: 0 });
+    expect(areWelded(pw, a, b)).toBe(true);
+    expect(areWelded(pw, b, a)).toBe(true);
   });
 
   it("getWeldJoints returns empty array when no welds", () => {
-    const { a } = twoBodyWorld();
-    expect(getWeldJoints(a)).toHaveLength(0);
+    const { pw, a } = twoBodyWorld();
+    expect(getWeldJoints(pw, a)).toHaveLength(0);
   });
 
   it("getWeldJoints returns weld joints", () => {
-    const { world, a, b } = twoBodyWorld();
-    createWeldJoint(world, a, b, planck.Vec2(0.5, 0));
-    expect(getWeldJoints(a)).toHaveLength(1);
-    expect(getWeldJoints(b)).toHaveLength(1);
+    const { pw, a, b } = twoBodyWorld();
+    createWeldJoint(pw, a, b, { x: 0.5, y: 0 });
+    expect(getWeldJoints(pw, a)).toHaveLength(1);
+    expect(getWeldJoints(pw, b)).toHaveLength(1);
   });
 });
 
 describe("bodyRadius", () => {
   it("returns circle radius", () => {
-    const world = new planck.World();
-    const body = world.createBody({ type: "dynamic" });
-    body.createFixture({ shape: planck.Circle(2.5), density: 1 });
+    const pw = new PhysWorld(0, -10);
+    const B2 = b2();
+    const bodyDef = B2.b2DefaultBodyDef();
+    bodyDef.type = B2.b2BodyType.b2_dynamicBody;
+    const body = pw.createBody(bodyDef);
+    const shapeDef = B2.b2DefaultShapeDef();
+    shapeDef.density = 1;
+    const circ = new B2.b2Circle();
+    circ.center = new B2.b2Vec2(0, 0);
+    circ.radius = 2.5;
+    body.CreateCircleShape(shapeDef, circ);
     expect(bodyRadius(body)).toBe(2.5);
   });
 
-  it("returns max radius across multiple fixtures", () => {
-    const world = new planck.World();
-    const body = world.createBody({ type: "dynamic" });
-    body.createFixture({ shape: planck.Circle(1), density: 1 });
-    body.createFixture({ shape: planck.Circle(3), density: 1 });
+  it("returns max radius across multiple shapes", () => {
+    const pw = new PhysWorld(0, -10);
+    const B2 = b2();
+    const bodyDef = B2.b2DefaultBodyDef();
+    bodyDef.type = B2.b2BodyType.b2_dynamicBody;
+    const body = pw.createBody(bodyDef);
+    const shapeDef = B2.b2DefaultShapeDef();
+    shapeDef.density = 1;
+
+    const c1 = new B2.b2Circle();
+    c1.center = new B2.b2Vec2(0, 0);
+    c1.radius = 1;
+    body.CreateCircleShape(shapeDef, c1);
+
+    const c2 = new B2.b2Circle();
+    c2.center = new B2.b2Vec2(0, 0);
+    c2.radius = 3;
+    body.CreateCircleShape(shapeDef, c2);
+
     expect(bodyRadius(body)).toBe(3);
   });
 
-  it("returns 0 for body with no fixtures", () => {
-    const world = new planck.World();
-    const body = world.createBody({ type: "dynamic" });
+  it("returns 0 for body with no shapes", () => {
+    const pw = new PhysWorld(0, -10);
+    const B2 = b2();
+    const bodyDef = B2.b2DefaultBodyDef();
+    bodyDef.type = B2.b2BodyType.b2_dynamicBody;
+    const body = pw.createBody(bodyDef);
     expect(bodyRadius(body)).toBe(0);
   });
 
-  it("computes radius for polygon fixtures", () => {
-    const world = new planck.World();
-    const body = world.createBody({ type: "dynamic" });
-    body.createFixture({ shape: planck.Box(2, 1), density: 1 });
+  it("computes radius for polygon shapes", () => {
+    const pw = new PhysWorld(0, -10);
+    const B2 = b2();
+    const bodyDef = B2.b2DefaultBodyDef();
+    bodyDef.type = B2.b2BodyType.b2_dynamicBody;
+    const body = pw.createBody(bodyDef);
+    const shapeDef = B2.b2DefaultShapeDef();
+    shapeDef.density = 1;
+    const poly = B2.b2MakeBox(2, 1);
+    body.CreatePolygonShape(shapeDef, poly);
     const r = bodyRadius(body);
     // Box(2,1) → half-extents 2×1, diagonal ≈ √(4²+2²)/2 = √20/2 ≈ 2.236
     expect(r).toBeGreaterThan(2);
@@ -145,24 +209,52 @@ describe("bodyRadius", () => {
 
 describe("queryBodiesInRadius", () => {
   it("finds bodies within radius", () => {
-    const world = new planck.World();
-    const body = world.createBody({ type: "dynamic", position: planck.Vec2(1, 0) });
-    body.createFixture({ shape: planck.Circle(0.5), density: 1 });
-    // Far away body
-    const far = world.createBody({ type: "dynamic", position: planck.Vec2(100, 0) });
-    far.createFixture({ shape: planck.Circle(0.5), density: 1 });
+    const pw = new PhysWorld(0, -10);
+    const B2 = b2();
 
-    const found = queryBodiesInRadius(world, 0, 0, 5);
+    const def1 = B2.b2DefaultBodyDef();
+    def1.type = B2.b2BodyType.b2_dynamicBody;
+    def1.position = new B2.b2Vec2(1, 0);
+    const body = pw.createBody(def1);
+    const sd1 = B2.b2DefaultShapeDef();
+    sd1.density = 1;
+    const c1 = new B2.b2Circle();
+    c1.center = new B2.b2Vec2(0, 0);
+    c1.radius = 0.5;
+    body.CreateCircleShape(sd1, c1);
+
+    const def2 = B2.b2DefaultBodyDef();
+    def2.type = B2.b2BodyType.b2_dynamicBody;
+    def2.position = new B2.b2Vec2(100, 0);
+    const far = pw.createBody(def2);
+    const sd2 = B2.b2DefaultShapeDef();
+    sd2.density = 1;
+    const c2 = new B2.b2Circle();
+    c2.center = new B2.b2Vec2(0, 0);
+    c2.radius = 0.5;
+    far.CreateCircleShape(sd2, c2);
+
+    const found = queryBodiesInRadius(pw, 0, 0, 5);
     expect(found).toContain(body);
     expect(found).not.toContain(far);
   });
 
   it("respects exclude parameter", () => {
-    const world = new planck.World();
-    const body = world.createBody({ type: "dynamic", position: planck.Vec2(0, 0) });
-    body.createFixture({ shape: planck.Circle(0.5), density: 1 });
+    const pw = new PhysWorld(0, -10);
+    const B2 = b2();
 
-    const found = queryBodiesInRadius(world, 0, 0, 5, body);
+    const def1 = B2.b2DefaultBodyDef();
+    def1.type = B2.b2BodyType.b2_dynamicBody;
+    def1.position = new B2.b2Vec2(0, 0);
+    const body = pw.createBody(def1);
+    const sd = B2.b2DefaultShapeDef();
+    sd.density = 1;
+    const c = new B2.b2Circle();
+    c.center = new B2.b2Vec2(0, 0);
+    c.radius = 0.5;
+    body.CreateCircleShape(sd, c);
+
+    const found = queryBodiesInRadius(pw, 0, 0, 5, body);
     expect(found).not.toContain(body);
   });
 });

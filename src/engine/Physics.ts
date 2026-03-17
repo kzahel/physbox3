@@ -1,9 +1,9 @@
-import type { Body, b2JointId, b2ShapeId, Joint } from "box2d3";
+import type { Body, b2JointId, b2ShapeId } from "box2d3";
 import { playExplosion } from "./Audio";
 import { type BodyUserData, getBodyUserData } from "./BodyUserData";
 import { b2 } from "./Box2D";
 import type { IRenderer } from "./IRenderer";
-import type { PhysWorld } from "./PhysWorld";
+import type { JointHandle, PhysWorld } from "./PhysWorld";
 
 /** Clamp a value between min and max (inclusive). */
 export function clamp(v: number, min: number, max: number): number {
@@ -215,9 +215,7 @@ export function destroyBodyAt(pw: PhysWorld, wx: number, wy: number, radius = 0.
   return false;
 }
 
-/** Create a weld joint between two bodies at the given anchor point (world space).
- *  Uses OOP world.CreateWeldJoint which returns a WeldJoint wrapper.
- *  The .d.ts is incomplete — CreateWeldJoint exists at runtime per box2d3-wasm reference. */
+/** Create a weld joint between two bodies at the given anchor point (world space). */
 export function createWeldJoint(pw: PhysWorld, a: Body, b: Body, anchor: { x: number; y: number }) {
   const B2 = b2();
   const def = B2.b2DefaultWeldJointDef();
@@ -237,33 +235,23 @@ export function createWeldJoint(pw: PhysWorld, a: Body, b: Body, anchor: { x: nu
   frameB.q = B2.b2Rot_identity;
   def.base.localFrameB = frameB;
 
-  // Try OOP API first (world.CreateWeldJoint), fall back to flat API
-  // biome-ignore lint/suspicious/noExplicitAny: .d.ts incomplete — CreateWeldJoint exists per reference
-  const world = pw.world as any;
-  if (typeof world.CreateWeldJoint === "function") {
-    // OOP API: bodyIdA/bodyIdB set via the def; World extracts them
-    def.base.bodyIdA = a.GetPointer();
-    def.base.bodyIdB = b.GetPointer();
-    return world.CreateWeldJoint(def);
-  }
-  // Flat API fallback
-  def.base.bodyIdA = a.GetPointer();
-  def.base.bodyIdB = b.GetPointer();
-  return B2.b2CreateWeldJoint(pw.world.GetPointer(), def);
+  def.base.bodyIdA = pw.getBodyId(a);
+  def.base.bodyIdB = pw.getBodyId(b);
+  const jointId = B2.b2CreateWeldJoint(pw.worldId, def);
+  return pw.addJointId(jointId);
 }
 
 /** Check if two bodies are connected by a weld joint.
  *  body.GetJoints() returns b2JointId[] — use flat API for joint queries. */
-export function areWelded(_pw: PhysWorld, a: Body, b: Body): boolean {
+export function areWelded(pw: PhysWorld, a: Body, b: Body): boolean {
   const B2 = b2();
-  const bPtr = b.GetPointer();
-  // body.GetJoints() returns b2JointId[] (plain ID objects, not OOP Joint wrappers)
+  const bId = pw.getBodyId(b);
   const jointIds: b2JointId[] = a.GetJoints() ?? [];
   for (const jointId of jointIds) {
     if (B2.b2Joint_GetType(jointId).value !== B2.b2JointType.b2_weldJoint.value) continue;
     const bodyAId = B2.b2Joint_GetBodyA(jointId);
     const bodyBId = B2.b2Joint_GetBodyB(jointId);
-    if (B2.B2_ID_EQUALS(bodyAId, bPtr) || B2.B2_ID_EQUALS(bodyBId, bPtr)) {
+    if (B2.B2_ID_EQUALS(bodyAId, bId) || B2.B2_ID_EQUALS(bodyBId, bId)) {
       return true;
     }
   }
@@ -325,13 +313,13 @@ export function createRevoluteJoint(
     motorSpeed?: number;
     maxMotorTorque?: number;
   },
-): Joint {
+): JointHandle {
   const B2 = b2();
   const def = B2.b2DefaultRevoluteJointDef();
   const anchorVec = new B2.b2Vec2(worldAnchor.x, worldAnchor.y);
 
-  def.base.bodyIdA = bodyA.GetPointer();
-  def.base.bodyIdB = bodyB.GetPointer();
+  def.base.bodyIdA = pw.getBodyId(bodyA);
+  def.base.bodyIdB = pw.getBodyId(bodyB);
 
   const frameA = new B2.b2Transform();
   frameA.p = bodyA.GetLocalPoint(anchorVec);
@@ -355,14 +343,8 @@ export function createRevoluteJoint(
     if (opts.maxMotorTorque != null) def.maxMotorTorque = opts.maxMotorTorque;
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: .d.ts incomplete — CreateRevoluteJoint exists per reference
-  const world = pw.world as any;
-  const joint: Joint =
-    typeof world.CreateRevoluteJoint === "function"
-      ? world.CreateRevoluteJoint(def)
-      : B2.b2CreateRevoluteJoint(pw.world.GetPointer(), def);
-  pw.addJoint(joint);
-  return joint;
+  const jointId = B2.b2CreateRevoluteJoint(pw.worldId, def);
+  return pw.addJointId(jointId);
 }
 
 /** Create a distance joint between two world-space anchor points, optionally with spring. */
@@ -381,14 +363,14 @@ export function createDistanceJoint(
     enableLimit?: boolean;
     maxLength?: number;
   },
-): Joint {
+): JointHandle {
   const B2 = b2();
   const def = B2.b2DefaultDistanceJointDef();
   const ancA = new B2.b2Vec2(worldAnchorA.x, worldAnchorA.y);
   const ancB = new B2.b2Vec2(worldAnchorB.x, worldAnchorB.y);
 
-  def.base.bodyIdA = bodyA.GetPointer();
-  def.base.bodyIdB = bodyB.GetPointer();
+  def.base.bodyIdA = pw.getBodyId(bodyA);
+  def.base.bodyIdB = pw.getBodyId(bodyB);
 
   const frameA = new B2.b2Transform();
   frameA.p = bodyA.GetLocalPoint(ancA);
@@ -412,14 +394,8 @@ export function createDistanceJoint(
     if (opts.maxLength != null) def.maxLength = opts.maxLength;
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: .d.ts incomplete — CreateDistanceJoint exists per reference
-  const world = pw.world as any;
-  const joint: Joint =
-    typeof world.CreateDistanceJoint === "function"
-      ? world.CreateDistanceJoint(def)
-      : B2.b2CreateDistanceJoint(pw.world.GetPointer(), def);
-  pw.addJoint(joint);
-  return joint;
+  const jointId = B2.b2CreateDistanceJoint(pw.worldId, def);
+  return pw.addJointId(jointId);
 }
 
 /** Create a wheel joint for vehicle suspension. Axis is in world space (typically (0,1) for vertical). */
@@ -437,13 +413,13 @@ export function createWheelJoint(
     motorSpeed?: number;
     maxMotorTorque?: number;
   },
-): Joint {
+): JointHandle {
   const B2 = b2();
   const def = B2.b2DefaultWheelJointDef();
   const posVec = new B2.b2Vec2(wheelWorldPos.x, wheelWorldPos.y);
 
-  def.base.bodyIdA = chassis.GetPointer();
-  def.base.bodyIdB = wheel.GetPointer();
+  def.base.bodyIdA = pw.getBodyId(chassis);
+  def.base.bodyIdB = pw.getBodyId(wheel);
 
   // Axis direction encoded in localFrameA rotation
   const localAxis = chassis.GetLocalVector(new B2.b2Vec2(worldAxis.x, worldAxis.y));
@@ -470,14 +446,8 @@ export function createWheelJoint(
     if (opts.maxMotorTorque != null) def.maxMotorTorque = opts.maxMotorTorque;
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: .d.ts incomplete — CreateWheelJoint exists per reference
-  const world = pw.world as any;
-  const joint: Joint =
-    typeof world.CreateWheelJoint === "function"
-      ? world.CreateWheelJoint(def)
-      : B2.b2CreateWheelJoint(pw.world.GetPointer(), def);
-  pw.addJoint(joint);
-  return joint;
+  const jointId = B2.b2CreateWheelJoint(pw.worldId, def);
+  return pw.addJointId(jointId);
 }
 
 export function clearDynamic(pw: PhysWorld): void {

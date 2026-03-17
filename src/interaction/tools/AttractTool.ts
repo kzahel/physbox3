@@ -65,10 +65,10 @@ export class AttractTool implements ToolHandler {
     for (const cd of contacts) {
       const bodyIdA = B2.b2Shape_GetBody(cd.shapeIdA);
       const bodyIdB = B2.b2Shape_GetBody(cd.shapeIdB);
-      const ptrA = bodyA.GetPointer();
-      const ptrB = bodyB.GetPointer();
-      const matchA = B2.B2_ID_EQUALS(bodyIdA, ptrA) || B2.B2_ID_EQUALS(bodyIdA, ptrB);
-      const matchB = B2.B2_ID_EQUALS(bodyIdB, ptrA) || B2.B2_ID_EQUALS(bodyIdB, ptrB);
+      const idA = this.ctx.game.pw.getBodyId(bodyA);
+      const idB = this.ctx.game.pw.getBodyId(bodyB);
+      const matchA = B2.B2_ID_EQUALS(bodyIdA, idA) || B2.B2_ID_EQUALS(bodyIdA, idB);
+      const matchB = B2.B2_ID_EQUALS(bodyIdB, idA) || B2.B2_ID_EQUALS(bodyIdB, idB);
       if (matchA && matchB) {
         // Contact found — weld at contact point
         const mp = cd.manifold.pointCount > 0 ? cd.manifold.GetPoint(0) : null;

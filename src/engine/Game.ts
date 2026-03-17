@@ -142,7 +142,7 @@ export class Game {
   private bindCollisionSounds() {
     const B2 = b2();
     // Set hit event threshold to our minimum impulse
-    B2.b2World_SetHitEventThreshold(this.pw.world.GetPointer(), COLLISION_MIN_IMPULSE);
+    B2.b2World_SetHitEventThreshold(this.pw.worldId, COLLISION_MIN_IMPULSE);
 
     this.pw.onHit((_point, _normal, shapeIdA, shapeIdB, approachSpeed) => {
       if (approachSpeed < COLLISION_MIN_IMPULSE) return;
@@ -242,8 +242,8 @@ export class Game {
     const localB = b_.GetLocalPoint(anchorB);
 
     const def = B2.b2DefaultDistanceJointDef();
-    def.base.bodyIdA = a.GetPointer();
-    def.base.bodyIdB = b_.GetPointer();
+    def.base.bodyIdA = this.pw.getBodyId(a);
+    def.base.bodyIdB = this.pw.getBodyId(b_);
     def.length = dist;
     def.enableSpring = true;
     def.hertz = 3;
@@ -260,14 +260,8 @@ export class Game {
     frameB.q = B2.b2Rot_identity;
     def.base.localFrameB = frameB;
 
-    // Try OOP API (world.CreateDistanceJoint), fall back to flat API
-    // biome-ignore lint/suspicious/noExplicitAny: .d.ts incomplete — Create*Joint exists per reference
-    const world = this.pw.world as any;
-    if (typeof world.CreateDistanceJoint === "function") {
-      world.CreateDistanceJoint(def);
-    } else {
-      B2.b2CreateDistanceJoint(this.pw.world.GetPointer(), def);
-    }
+    const jointId = B2.b2CreateDistanceJoint(this.pw.worldId, def);
+    this.pw.addJointId(jointId);
   }
 
   addSpringBall(x: number, y: number) {

@@ -2,7 +2,6 @@ import type { Body, b2ShapeId } from "box2d3";
 import { createRopeBetween } from "../prefabs/Rope";
 import { b2 } from "./Box2D";
 import type { Game } from "./Game";
-import type { JointHandle } from "./PhysWorld";
 import {
   bodyAngle,
   createDistanceJoint,
@@ -11,7 +10,7 @@ import {
   createWheelJoint,
   markDestroyed,
 } from "./Physics";
-import type { PhysWorld } from "./PhysWorld";
+import type { JointHandle, PhysWorld } from "./PhysWorld";
 
 // ── Serialization types ──
 
@@ -123,48 +122,46 @@ function bodyTypeEnum(name: string) {
 // ── Joint serialization ──
 
 function serializeJointProps(joint: JointHandle, typeName: string, sj: SerializedJoint): void {
-  // biome-ignore lint/suspicious/noExplicitAny: joint cast to specific type for property access
-  const j = joint as any;
+  const B2 = b2();
+  const id = joint.id;
   switch (typeName) {
     case "revolute":
-      sj.enableMotorLimit = j.IsLimitEnabled?.();
-      sj.lowerAngle = j.GetLowerLimit?.();
-      sj.upperAngle = j.GetUpperLimit?.();
-      sj.enableMotor = j.IsMotorEnabled?.();
-      sj.motorSpeed = j.GetMotorSpeed?.();
-      sj.maxMotorTorque = j.GetMaxMotorTorque?.();
+      sj.enableMotorLimit = B2.b2RevoluteJoint_IsLimitEnabled(id);
+      sj.lowerAngle = B2.b2RevoluteJoint_GetLowerLimit(id);
+      sj.upperAngle = B2.b2RevoluteJoint_GetUpperLimit(id);
+      sj.enableMotor = B2.b2RevoluteJoint_IsMotorEnabled(id);
+      sj.motorSpeed = B2.b2RevoluteJoint_GetMotorSpeed(id);
+      sj.maxMotorTorque = B2.b2RevoluteJoint_GetMaxMotorTorque(id);
       break;
     case "distance":
-      sj.hertz = j.GetSpringHertz?.();
-      sj.dampingRatio = j.GetSpringDampingRatio?.();
-      sj.length = j.GetLength?.();
-      sj.enableSpring = j.IsSpringEnabled?.();
+      sj.hertz = B2.b2DistanceJoint_GetSpringHertz(id);
+      sj.dampingRatio = B2.b2DistanceJoint_GetSpringDampingRatio(id);
+      sj.length = B2.b2DistanceJoint_GetLength(id);
+      sj.enableSpring = B2.b2DistanceJoint_IsSpringEnabled(id);
       break;
     case "wheel":
-      sj.enableMotor = j.IsMotorEnabled?.();
-      sj.motorSpeed = j.GetMotorSpeed?.();
-      sj.maxMotorTorque = j.GetMaxMotorTorque?.();
-      sj.hertz = j.GetSpringHertz?.();
-      sj.dampingRatio = j.GetSpringDampingRatio?.();
-      // Recover axis direction from localFrameA rotation
+      sj.enableMotor = B2.b2WheelJoint_IsMotorEnabled(id);
+      sj.motorSpeed = B2.b2WheelJoint_GetMotorSpeed(id);
+      sj.maxMotorTorque = B2.b2WheelJoint_GetMaxMotorTorque(id);
+      sj.hertz = B2.b2WheelJoint_GetSpringHertz(id);
+      sj.dampingRatio = B2.b2WheelJoint_GetSpringDampingRatio(id);
       {
         const frameA = joint.GetLocalFrameA();
-        const angle = b2().b2Rot_GetAngle(frameA.q);
+        const angle = B2.b2Rot_GetAngle(frameA.q);
         sj.axisX = Math.cos(angle);
         sj.axisY = Math.sin(angle);
       }
       break;
     case "prismatic":
-      sj.enableMotorLimit = j.IsLimitEnabled?.();
-      sj.lowerTranslation = j.GetLowerLimit?.();
-      sj.upperTranslation = j.GetUpperLimit?.();
-      sj.enableMotor = j.IsMotorEnabled?.();
-      sj.motorSpeed = j.GetMotorSpeed?.();
-      sj.maxMotorForce = j.GetMaxMotorForce?.();
-      // Recover axis direction from localFrameA rotation
+      sj.enableMotorLimit = B2.b2PrismaticJoint_IsLimitEnabled(id);
+      sj.lowerTranslation = B2.b2PrismaticJoint_GetLowerLimit(id);
+      sj.upperTranslation = B2.b2PrismaticJoint_GetUpperLimit(id);
+      sj.enableMotor = B2.b2PrismaticJoint_IsMotorEnabled(id);
+      sj.motorSpeed = B2.b2PrismaticJoint_GetMotorSpeed(id);
+      sj.maxMotorForce = B2.b2PrismaticJoint_GetMaxMotorForce(id);
       {
         const frameA = joint.GetLocalFrameA();
-        const angle = b2().b2Rot_GetAngle(frameA.q);
+        const angle = B2.b2Rot_GetAngle(frameA.q);
         sj.axisX = Math.cos(angle);
         sj.axisY = Math.sin(angle);
       }
@@ -292,19 +289,20 @@ export function serializeScene(game: Game): SceneData {
       ropeJoints.add(j);
       return;
     }
+    // Resolve body references via index1 lookup
+    const bIdA = j.GetBodyA() as unknown as { index1: number };
+    const bIdB = j.GetBodyB() as unknown as { index1: number };
+    const bA = pw.findBodyByIndex1(bIdA.index1);
+    const bB = pw.findBodyByIndex1(bIdB.index1);
     if (ud?.isMainRope) {
       ropeJoints.add(j);
-      ropeMetadata.push({
-        joint: j,
-        bodyA: j.GetBodyA() as unknown as Body,
-        bodyB: j.GetBodyB() as unknown as Body,
-      });
+      if (bA && bB) {
+        ropeMetadata.push({ joint: j, bodyA: bA, bodyB: bB });
+      }
       return;
     }
     // RevoluteJoints between rope links
-    const bA = j.GetBodyA() as unknown as Body;
-    const bB = j.GetBodyB() as unknown as Body;
-    if (ropeBodies.has(bA) || ropeBodies.has(bB)) {
+    if ((bA && ropeBodies.has(bA)) || (bB && ropeBodies.has(bB))) {
       ropeJoints.add(j);
     }
   });

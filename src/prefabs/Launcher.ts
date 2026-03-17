@@ -46,8 +46,8 @@ export function createLauncher(pw: PhysWorld, x: number, y: number): Body {
   // Prismatic joint: base → rod (vertical piston)
   const prisDef = B2.b2DefaultPrismaticJointDef();
   const anchorVec = new B2.b2Vec2(x, y);
-  prisDef.base.bodyIdA = base.GetPointer();
-  prisDef.base.bodyIdB = rod.GetPointer();
+  prisDef.base.bodyIdA = pw.getBodyId(base);
+  prisDef.base.bodyIdB = pw.getBodyId(rod);
 
   // Axis direction (0,1) = vertical, encoded in localFrameA rotation
   const localAxis = base.GetLocalVector(new B2.b2Vec2(0, 1));
@@ -70,25 +70,18 @@ export function createLauncher(pw: PhysWorld, x: number, y: number): Body {
   prisDef.maxMotorForce = 200;
   prisDef.motorSpeed = 5;
 
-  // biome-ignore lint/suspicious/noExplicitAny: .d.ts incomplete — CreatePrismaticJoint exists per reference
-  const world = pw.world as any;
-  const piston =
-    typeof world.CreatePrismaticJoint === "function"
-      ? world.CreatePrismaticJoint(prisDef)
-      : B2.b2CreatePrismaticJoint(pw.world.GetPointer(), prisDef);
-  pw.addJoint(piston);
+  const pistonId = B2.b2CreatePrismaticJoint(pw.worldId, prisDef);
+  const piston = pw.addJointId(pistonId);
 
   // Oscillate the piston motor
   const oscillate = () => {
     if (!piston.IsValid()) return;
-    // biome-ignore lint/suspicious/noExplicitAny: .d.ts incomplete — PrismaticJoint methods exist per reference
-    const p = piston as any;
-    const t = typeof p.GetTranslation === "function" ? p.GetTranslation() : 0;
+    const t = B2.b2PrismaticJoint_GetTranslation(piston.id);
     const upper = 3;
     if (t >= upper * 0.95) {
-      if (typeof p.SetMotorSpeed === "function") p.SetMotorSpeed(-8);
+      B2.b2PrismaticJoint_SetMotorSpeed(piston.id, -8);
     } else if (t <= 0.05) {
-      if (typeof p.SetMotorSpeed === "function") p.SetMotorSpeed(5);
+      B2.b2PrismaticJoint_SetMotorSpeed(piston.id, 5);
     }
     requestAnimationFrame(oscillate);
   };

@@ -13,7 +13,7 @@ export interface RagdollData {
 }
 
 /** Compute the current foot-ground contact count by polling contact data. */
-export function updateRagdollFootContacts(ragdoll: RagdollData): void {
+export function updateRagdollFootContacts(pw: PhysWorld, ragdoll: RagdollData): void {
   let count = 0;
   const innerSet = new Set(ragdoll.innerBodies);
   const B2 = b2();
@@ -29,8 +29,8 @@ export function updateRagdollFootContacts(ragdoll: RagdollData): void {
       let otherIsInner = false;
       for (const inner of innerSet) {
         if (!inner.IsValid()) continue;
-        const innerPtr = inner.GetPointer();
-        if (B2.B2_ID_EQUALS(bodyIdA, innerPtr) || B2.B2_ID_EQUALS(bodyIdB, innerPtr)) {
+        const innerId = pw.getBodyId(inner);
+        if (B2.B2_ID_EQUALS(bodyIdA, innerId) || B2.B2_ID_EQUALS(bodyIdB, innerId)) {
           otherIsInner = true;
           break;
         }
