@@ -59,7 +59,7 @@ const TOOL_CURSORS: Partial<Record<Tool, CursorStyle>> = {
 
 // ── Geometry helpers ──
 
-const EXTRUDE_DEPTH = 0.4;
+const EXTRUDE_DEPTH = 0.6;
 
 /**
  * Build a polygon geometry with XY bevels visible from the front.
@@ -67,51 +67,15 @@ const EXTRUDE_DEPTH = 0.4;
  * half-dimension so thin shapes like platforms aren't distorted.
  */
 function createPolygonGeometry(verts: { x: number; y: number }[]): THREE.ExtrudeGeometry {
-  // Find the smallest distance from centroid to any vertex (≈ half the thin dimension)
-  const n = verts.length;
-  let cx = 0,
-    cy = 0;
-  for (const v of verts) {
-    cx += v.x;
-    cy += v.y;
-  }
-  cx /= n;
-  cy /= n;
-  let minDist = Infinity;
-  for (const v of verts) {
-    minDist = Math.min(minDist, Math.hypot(v.x - cx, v.y - cy));
-  }
-  // Also check shortest edge
-  let minEdge = Infinity;
-  for (let i = 0; i < n; i++) {
-    const a = verts[i];
-    const b = verts[(i + 1) % n];
-    minEdge = Math.min(minEdge, Math.hypot(b.x - a.x, b.y - a.y));
-  }
-  // Bevel: 10% of the smallest dimension, capped
-  const bevel = Math.min(minDist * 0.1, minEdge * 0.1, 0.06);
-
-  // Shrink verts inward by bevel amount so bevel fills back to collider boundary
-  const inset: { x: number; y: number }[] = [];
-  for (const v of verts) {
-    const dx = cx - v.x,
-      dy = cy - v.y;
-    const d = Math.hypot(dx, dy) || 1;
-    inset.push({ x: v.x + (dx / d) * bevel, y: v.y + (dy / d) * bevel });
-  }
-
   const shape = new THREE.Shape();
-  shape.moveTo(inset[0].x, inset[0].y);
-  for (let i = 1; i < inset.length; i++) {
-    shape.lineTo(inset[i].x, inset[i].y);
+  shape.moveTo(verts[0].x, verts[0].y);
+  for (let i = 1; i < verts.length; i++) {
+    shape.lineTo(verts[i].x, verts[i].y);
   }
   shape.closePath();
   return new THREE.ExtrudeGeometry(shape, {
     depth: EXTRUDE_DEPTH,
-    bevelEnabled: true,
-    bevelThickness: bevel,
-    bevelSize: bevel,
-    bevelSegments: 1,
+    bevelEnabled: false,
   });
 }
 
