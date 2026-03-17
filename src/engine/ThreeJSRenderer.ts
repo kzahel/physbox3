@@ -205,8 +205,8 @@ export class ThreeJSRenderer implements IRenderer {
     // Particle points system
     this.pointsGeometry = new THREE.BufferGeometry();
     this.pointsMaterial = new THREE.PointsMaterial({
-      size: 0.5,
-      sizeAttenuation: true,
+      size: 6,
+      sizeAttenuation: false,
       vertexColors: true,
       transparent: true,
       depthWrite: false,
