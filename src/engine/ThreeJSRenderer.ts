@@ -62,19 +62,6 @@ const TOOL_CURSORS: Partial<Record<Tool, CursorStyle>> = {
 
 const EXTRUDE_DEPTH = 0.4;
 
-function createCircleGeometry(radius: number, centerX: number, centerY: number): THREE.ExtrudeGeometry {
-  const shape = new THREE.Shape();
-  shape.absarc(centerX, centerY, radius, 0, Math.PI * 2, false);
-  return new THREE.ExtrudeGeometry(shape, {
-    depth: EXTRUDE_DEPTH,
-    bevelEnabled: true,
-    bevelThickness: 0.02,
-    bevelSize: 0.02,
-    bevelSegments: 2,
-    curveSegments: 24,
-  });
-}
-
 function createPolygonGeometry(verts: { x: number; y: number }[]): THREE.ExtrudeGeometry {
   const shape = new THREE.Shape();
   shape.moveTo(verts[0].x, verts[0].y);
@@ -406,8 +393,8 @@ export class ThreeJSRenderer implements IRenderer {
         const circle = shape as planck.CircleShape;
         const r = circle.getRadius();
         const center = circle.getCenter();
-        const geo = createCircleGeometry(r, center.x, center.y);
-        geo.translate(0, 0, -EXTRUDE_DEPTH / 2);
+        const geo = new THREE.SphereGeometry(r, 16, 12);
+        geo.translate(center.x, center.y, 0);
         const mesh = new THREE.Mesh(geo, mat);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
@@ -415,8 +402,8 @@ export class ThreeJSRenderer implements IRenderer {
 
         // Spoke line for rotation visibility
         const spokeGeo = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(center.x, center.y, EXTRUDE_DEPTH / 2 + 0.01),
-          new THREE.Vector3(center.x + r, center.y, EXTRUDE_DEPTH / 2 + 0.01),
+          new THREE.Vector3(center.x, center.y, r + 0.01),
+          new THREE.Vector3(center.x + r, center.y, r + 0.01),
         ]);
         const spokeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
         group.add(new THREE.Line(spokeGeo, spokeMat));
