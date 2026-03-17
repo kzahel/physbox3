@@ -32,23 +32,24 @@ export class SettingsPane {
       <div id="stats"></div>
     `;
 
-    const gravSlider = container.querySelector<HTMLInputElement>("#s-gravity")!;
-    gravSlider.addEventListener("input", () => game.setGravity(parseFloat(gravSlider.value)));
+    const bindSlider = (id: string, handler: (v: number) => void, parse = parseFloat) => {
+      const el = container.querySelector<HTMLInputElement>(id)!;
+      el.addEventListener("input", () => handler(parse(el.value)));
+    };
 
-    const speedSlider = container.querySelector<HTMLInputElement>("#s-speed")!;
-    speedSlider.addEventListener("input", () => {
-      game.timeScale = parseFloat(speedSlider.value);
+    bindSlider("#s-gravity", (v) => game.setGravity(v));
+    bindSlider("#s-speed", (v) => {
+      game.timeScale = v;
     });
-
-    const bounceSlider = container.querySelector<HTMLInputElement>("#s-bounce")!;
-    bounceSlider.addEventListener("input", () => game.setBounciness(parseFloat(bounceSlider.value)));
-
-    const itersSlider = container.querySelector<HTMLInputElement>("#s-iters")!;
-    itersSlider.addEventListener("input", () => {
-      const v = parseInt(itersSlider.value, 10);
-      game.positionIterations = v;
-      game.velocityIterations = Math.max(v * 2, 4);
-    });
+    bindSlider("#s-bounce", (v) => game.setBounciness(v));
+    bindSlider(
+      "#s-iters",
+      (v) => {
+        game.positionIterations = v;
+        game.velocityIterations = Math.max(v * 2, 4);
+      },
+      (s) => parseInt(s, 10),
+    );
 
     container.querySelector("#s-clear")!.addEventListener("click", () => game.clearDynamic());
     container.querySelector("#s-reset")!.addEventListener("click", () => game.reset());
@@ -103,6 +104,19 @@ export class SettingsPane {
     });
     nameInput.addEventListener("keyup", (e) => e.stopPropagation());
 
+    this.scenesListEl.addEventListener("click", async (e) => {
+      const target = e.target as HTMLElement;
+      const item = target.closest(".scene-item") as HTMLElement | null;
+      if (!item) return;
+      const name = item.dataset.name!;
+      if (target.closest(".scene-load")) {
+        await loadScene(name, this.game);
+      } else if (target.closest(".scene-delete")) {
+        await deleteScene(name);
+        this.refreshScenesList();
+      }
+    });
+
     this.refreshScenesList();
 
     // Stats update
@@ -132,22 +146,5 @@ export class SettingsPane {
     `,
       )
       .join("");
-
-    this.scenesListEl.querySelectorAll(".scene-load").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        const item = (e.target as HTMLElement).closest(".scene-item") as HTMLElement;
-        const name = item.dataset.name!;
-        await loadScene(name, this.game);
-      });
-    });
-
-    this.scenesListEl.querySelectorAll(".scene-delete").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        const item = (e.target as HTMLElement).closest(".scene-item") as HTMLElement;
-        const name = item.dataset.name!;
-        await deleteScene(name);
-        this.refreshScenesList();
-      });
-    });
   }
 }

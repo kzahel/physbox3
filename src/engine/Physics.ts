@@ -112,15 +112,17 @@ export function queryBodiesInRadius(
   exclude?: planck.Body,
 ): planck.Body[] {
   const center = planck.Vec2(wx, wy);
+  const seen = new Set<planck.Body>();
   const bodies: planck.Body[] = [];
 
   world.queryAABB(
     planck.AABB(planck.Vec2(wx - radius, wy - radius), planck.Vec2(wx + radius, wy + radius)),
     (fixture) => {
       const body = fixture.getBody();
-      if (body === exclude) return true;
+      if (body === exclude || seen.has(body)) return true;
       if (planck.Vec2.lengthOf(planck.Vec2.sub(body.getPosition(), center)) < radius) {
-        if (!bodies.includes(body)) bodies.push(body);
+        seen.add(body);
+        bodies.push(body);
       }
       return true;
     },

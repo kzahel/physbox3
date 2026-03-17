@@ -9,6 +9,10 @@ import {
 } from "../../engine/OverlayRenderer";
 import type { ToolContext, ToolHandler } from "../ToolHandler";
 
+function hitButton(sx: number, sy: number, cx: number, cy: number): boolean {
+  return Math.abs(sx - cx) < BTN_HALF_WIDTH && Math.abs(sy - cy) < BTN_HALF_HEIGHT;
+}
+
 export class SelectTool implements ToolHandler {
   /** Visible to Renderer for UI overlay */
   selectedBody: planck.Body | null = null;
@@ -25,7 +29,7 @@ export class SelectTool implements ToolHandler {
 
       // Fixed/Free button
       const btnY = sp.y - BTN_TOGGLE_OFFSET_Y;
-      if (Math.abs(sx - sp.x) < BTN_HALF_WIDTH && Math.abs(sy - btnY) < BTN_HALF_HEIGHT) {
+      if (hitButton(sx, sy, sp.x, btnY)) {
         const isStatic = this.selectedBody.isStatic();
         this.selectedBody.setType(isStatic ? "dynamic" : "static");
         return;
@@ -34,7 +38,7 @@ export class SelectTool implements ToolHandler {
       // Direction button (below fixed/free, only for directional bodies)
       let nextY = sp.y - BTN_DIRECTION_OFFSET_Y;
       if (isDirectional(this.selectedBody)) {
-        if (Math.abs(sx - sp.x) < BTN_HALF_WIDTH && Math.abs(sy - nextY) < BTN_HALF_HEIGHT) {
+        if (hitButton(sx, sy, sp.x, nextY)) {
           reverseDirection(this.selectedBody, this.ctx.game.world);
           return;
         }
@@ -42,7 +46,7 @@ export class SelectTool implements ToolHandler {
       }
 
       // Motor button
-      if (Math.abs(sx - sp.x) < BTN_HALF_WIDTH && Math.abs(sy - nextY) < BTN_HALF_HEIGHT) {
+      if (hitButton(sx, sy, sp.x, nextY)) {
         toggleMotor(this.selectedBody);
         return;
       }
