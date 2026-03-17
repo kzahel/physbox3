@@ -2,25 +2,71 @@
 
 Complete reference for the box2d3-wasm JavaScript/TypeScript API as exposed via emscripten bindings.
 
-**Source repos:**
-- WASM wrapper: https://github.com/Birch-san/box2d3-wasm (`reference/box2d3-wasm/`)
-- Box2D v3 C library: https://github.com/erincatto/box2d (`reference/box2d3-wasm/box2d/`)
-- C++ wrapper: https://github.com/HolyBlackCat/box2cpp (`reference/box2d3-wasm/box2cpp/`)
+## Projects & Authors
 
-**Key source files:**
-- C headers: `reference/box2d3-wasm/box2d/include/box2d/` (box2d.h, types.h, collision.h, math_functions.h)
-- Emscripten glue: `reference/box2d3-wasm/box2d3-wasm/csrc/glue.cpp` (defines what's exposed to JS)
-- Build scripts: `reference/box2d3-wasm/box2d3-wasm/shell/` (CMake + emscripten build pipeline)
-- Type definitions: `node_modules/box2d3-wasm/build/dist/es/compat/Box2D.compat.d.ts` (1,646 lines)
+This stack is built from four independent projects by different authors:
 
-## Architecture
+**Box2D v3** — [github.com/erincatto/box2d](https://github.com/erincatto/box2d)
+Author: **Erin Catto**. The core 2D physics engine written in pure C. Erin created the
+original Box2D (~2007), which became one of the most widely used physics engines in games
+(Angry Birds, Limbo, Crayon Physics Deluxe, etc.). Box2D v3 is a ground-up rewrite — not an
+incremental upgrade from v2 — redesigned around data-oriented principles with SIMD support,
+multithreaded solving, and a handle-based C API (no classes, no linked lists). The v2→v3
+rewrite is why the API is so different from Planck.js (which wrapped v2).
+
+**box2cpp** — [github.com/HolyBlackCat/box2cpp](https://github.com/HolyBlackCat/box2cpp)
+Author: **HolyBlackCat**. A C++ RAII wrapper over Box2D v3's C API. Box2D v3 uses opaque
+handle IDs (`b2BodyId`, `b2ShapeId`) and free functions (`b2Body_GetPosition(bodyId)`), which
+is idiomatic C but awkward to bind to JavaScript. box2cpp wraps these into C++ classes
+(`Body`, `Shape`, `Joint`) with constructors/destructors, which map cleanly to emscripten's
+`class_<>` binding system. This is why the JS API has `body.GetPosition()` rather than
+`b2Body_GetPosition(bodyId)`.
+
+**enkiTS** — [github.com/dougbinks/enkiTS](https://github.com/dougbinks/enkiTS)
+Author: **Doug Binks**. A lightweight C/C++ task scheduler. Box2D v3 supports multithreaded
+physics solving — enkiTS provides the parallel task dispatch, which in the WASM build maps
+to Web Workers via SharedArrayBuffer.
+
+**box2d3-wasm** — [github.com/Birch-san/box2d3-wasm](https://github.com/Birch-san/box2d3-wasm)
+Authors: **Alex Birch & Erik Sombroek**. The emscripten build that compiles all of the above
+into WebAssembly. This includes: the emscripten compilation pipeline, `glue.cpp` (which
+defines every class/method exposed to JavaScript via `EMSCRIPTEN_BINDINGS`), two WASM
+flavors (deluxe with SIMD+threading, compat for older browsers), and utility modules for
+debug drawing, camera, touch, and keyboard. Published to npm as `box2d3-wasm`.
+
+The other three projects are included as git submodules in box2d3-wasm.
+
+## Dependency Chain
 
 ```
-Box2D v3 (C)  →  box2cpp (C++ wrapper)  →  emscripten bindings (glue.cpp)  →  WASM + JS API
+erincatto/box2d        (C physics engine — the algorithms)
+     ↓
+HolyBlackCat/box2cpp   (C++ class wrapper — ergonomic API)
+     ↓
+dougbinks/enkiTS        (task scheduler — multithreaded solving)
+     ↓
+Birch-san/box2d3-wasm   (emscripten build — WASM + JS bindings)
+     ↓
+npm: box2d3-wasm        (what we import)
 ```
 
-The WASM module uses **box2cpp** as an intermediate C++ wrapper that provides RAII-style classes
-(World, Body, Shape, Joint, Chain) on top of the C API's handle-based design (b2WorldId, b2BodyId, etc.).
+## Source Repos
+
+Cloned into `reference/box2d3-wasm/` (gitignored):
+
+| Path | Contents |
+|------|----------|
+| `box2d/include/box2d/` | C API headers: box2d.h, types.h, collision.h, math_functions.h (~4600 lines) |
+| `box2cpp/include/box2cpp/` | C++ wrapper: box2cpp.h |
+| `enkiTS/` | Task scheduler source |
+| `box2d3-wasm/csrc/glue.cpp` | Emscripten bindings — defines what's exposed to JS (~1300 lines) |
+| `box2d3-wasm/shell/` | Build scripts (CMake + emscripten) |
+
+**Key source files for understanding the API:**
+- `glue.cpp` is the definitive source for what methods exist in JS
+- `box2d/include/box2d/box2d.h` has the full C API with doc comments
+- `box2d/include/box2d/types.h` has all struct/enum definitions
+- `node_modules/box2d3-wasm/build/dist/es/compat/Box2D.compat.d.ts` has TypeScript types (1,646 lines)
 
 ## Import Pattern
 
