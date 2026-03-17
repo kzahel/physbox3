@@ -9,7 +9,7 @@ const CANNON_FIRE_INTERVAL = 1;
 const CANNONBALL_SPEED = 20;
 const CANNONBALL_LIFETIME = 5;
 const CANNONBALL_EXPLOSION_RADIUS = 5;
-const CANNONBALL_EXPLOSION_FORCE = 20;
+const CANNONBALL_EXPLOSION_FORCE = 2;
 
 export function createCannon(pw: PhysWorld, x: number, y: number, angle: number): Body {
   const B2 = b2();
