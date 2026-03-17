@@ -192,8 +192,8 @@ export class ThreeJSRenderer implements IRenderer {
     rimLight.position.set(-5, -3, 15);
     this.scene.add(rimLight);
 
-    // Ocean plane
-    const oceanGeo = new THREE.PlaneGeometry(300, 200);
+    // Ocean plane (resized each frame to fill viewport)
+    const oceanGeo = new THREE.PlaneGeometry(1, 1);
     const oceanMat = new THREE.MeshStandardMaterial({
       color: 0x1a3c78,
       transparent: true,
@@ -201,12 +201,11 @@ export class ThreeJSRenderer implements IRenderer {
       side: THREE.DoubleSide,
     });
     this.oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
-    this.oceanMesh.position.set(0, KILL_Y - 100, -1);
     this.oceanMesh.receiveShadow = true;
     this.scene.add(this.oceanMesh);
 
-    // Sky plane
-    const skyGeo = new THREE.PlaneGeometry(300, 200);
+    // Sky plane (resized each frame to fill viewport)
+    const skyGeo = new THREE.PlaneGeometry(1, 1);
     const skyMat = new THREE.MeshStandardMaterial({
       color: 0x283c78,
       transparent: true,
@@ -214,7 +213,6 @@ export class ThreeJSRenderer implements IRenderer {
       side: THREE.DoubleSide,
     });
     this.skyMesh = new THREE.Mesh(skyGeo, skyMat);
-    this.skyMesh.position.set(0, KILL_Y_TOP + 100, -1);
     this.scene.add(this.skyMesh);
 
     // Particle points system
@@ -299,6 +297,18 @@ export class ThreeJSRenderer implements IRenderer {
     this.camera3d.position.set(camera.x, camera.y, 50);
     this.camera3d.lookAt(camera.x, camera.y, 0);
     this.camera3d.updateProjectionMatrix();
+
+    // Update ocean/sky to always cover the visible viewport
+    const viewW = halfW * 2 + 2; // slight padding
+    const oceanH = Math.max(0, (camera.y - KILL_Y) + halfH);
+    this.oceanMesh.scale.set(viewW, oceanH, 1);
+    this.oceanMesh.position.set(camera.x, KILL_Y - oceanH / 2, -1);
+    this.oceanMesh.visible = oceanH > 0;
+
+    const skyH = Math.max(0, (KILL_Y_TOP - camera.y) + halfH);
+    this.skyMesh.scale.set(viewW, skyH, 1);
+    this.skyMesh.position.set(camera.x, KILL_Y_TOP + skyH / 2, -1);
+    this.skyMesh.visible = skyH > 0;
 
     // Reconcile bodies
     this.syncBodies(world);
