@@ -532,7 +532,7 @@ export class ThreeJSRenderer implements IRenderer {
     const group = new THREE.Group();
     const isSpring = joint.getType() === "distance-joint";
 
-    const isStabilizer = (joint.getUserData() as any)?.ropeStabilizer;
+    const isStabilizer = (joint.getUserData() as Record<string, unknown>)?.ropeStabilizer;
 
     if (isSpring) {
       const points = this.computeSpringCoilPoints(a, b);

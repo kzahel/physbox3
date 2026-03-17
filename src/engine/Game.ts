@@ -228,7 +228,9 @@ export class Game {
       anchorA,
       anchorB,
     );
+    // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
     (joint as any).m_localAnchorA = localA;
+    // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
     (joint as any).m_localAnchorB = localB;
     this.world.createJoint(joint);
   }

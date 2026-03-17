@@ -9,12 +9,7 @@ const GRAIN_RADIUS = 0.06;
 /** Max sand particles in the world */
 const MAX_SAND = 1000;
 
-const SAND_COLORS = [
-  "rgba(210,180,100,0.9)",
-  "rgba(194,164,90,0.9)",
-  "rgba(220,190,110,0.9)",
-  "rgba(180,155,85,0.9)",
-];
+const SAND_COLORS = ["rgba(210,180,100,0.9)", "rgba(194,164,90,0.9)", "rgba(220,190,110,0.9)", "rgba(180,155,85,0.9)"];
 
 export class SandTool implements ToolHandler {
   immediateTouch = true as const;
@@ -67,9 +62,7 @@ export class SandTool implements ToolHandler {
       body.setUserData({ fill: color, label: "sand" });
 
       // Tiny random velocity so grains spread naturally
-      body.setLinearVelocity(
-        planck.Vec2((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5),
-      );
+      body.setLinearVelocity(planck.Vec2((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5));
 
       game.sandBodies.push(body);
     }

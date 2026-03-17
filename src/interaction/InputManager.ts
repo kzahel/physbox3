@@ -13,9 +13,9 @@ import { GlueTool, UnGlueTool } from "./tools/GlueTool";
 import { GrabTool } from "./tools/GrabTool";
 import { PlatformDrawTool } from "./tools/PlatformDrawTool";
 import { RopeTool, SpringTool } from "./tools/RopeTool";
+import { SandTool } from "./tools/SandTool";
 import { ScaleTool } from "./tools/ScaleTool";
 import { SelectTool } from "./tools/SelectTool";
-import { SandTool } from "./tools/SandTool";
 import { WaterTool } from "./tools/WaterTool";
 
 // Re-export Tool type that other modules need

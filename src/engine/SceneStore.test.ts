@@ -6,15 +6,16 @@ import { deserializeScene, serializeScene } from "./SceneStore";
 /** Minimal Game-compatible object for testing serialization */
 function createTestGame(gravityY = -10) {
   const world = new planck.World(planck.Vec2(0, gravityY));
-  return {
+  const obj = {
     world,
     gravity: gravityY,
     setGravity(g: number) {
-      this.gravity = g;
+      obj.gravity = g;
       world.setGravity(planck.Vec2(0, g));
     },
     inputManager: null,
-  } as any;
+  };
+  return obj as unknown as import("./Game").Game;
 }
 
 function countBodies(world: planck.World): number {
@@ -73,7 +74,7 @@ describe("SceneStore round-trip serialization", () => {
     expect(restored!.getPosition().x).toBeCloseTo(3);
     expect(restored!.getPosition().y).toBeCloseTo(5);
     expect(restored!.getAngle()).toBeCloseTo(0.5);
-    expect((restored!.getUserData() as any).label).toBe("ball");
+    expect((restored!.getUserData() as Record<string, unknown>).label).toBe("ball");
 
     const fixture = restored!.getFixtureList()!;
     expect(fixture.getDensity()).toBe(2);

@@ -191,14 +191,16 @@ export function applyRopeStabilization(world: planck.World) {
     if (!ud?.ropeStabilizer) continue;
 
     // If any body in the dependent chain has been destroyed, remove this stabilizer
-    if (ud.chainBodies?.some((b) => (b.getUserData() as any)?.destroyed)) {
+    if (ud.chainBodies?.some((b) => (b.getUserData() as Record<string, unknown>)?.destroyed)) {
       toDestroy.push(j);
       continue;
     }
 
     const bodyA = j.getBodyA();
     const bodyB = j.getBodyB();
+    // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
     const anchorA = bodyA.getWorldPoint((j as any).m_localAnchorA);
+    // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
     const anchorB = bodyB.getWorldPoint((j as any).m_localAnchorB);
     const d = planck.Vec2.sub(anchorB, anchorA);
     const currentLen = planck.Vec2.lengthOf(d);

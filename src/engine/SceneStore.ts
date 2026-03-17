@@ -96,6 +96,7 @@ interface JointCodec {
 }
 
 function readLocalAxis(j: planck.Joint): { x: number; y: number } | null {
+  // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
   const axis = (j as any).m_localXAxisA;
   return axis ? { x: axis.x, y: axis.y } : null;
 }
@@ -159,7 +160,9 @@ const JOINT_CODECS: Record<string, JointCodec> = {
       // Set local anchors precisely (mirrors Game.addSpring)
       const localA = bodyA.getLocalPoint(anchorA);
       const localB = bodyB.getLocalPoint(anchorB);
+      // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
       (joint as any).m_localAnchorA = localA;
+      // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
       (joint as any).m_localAnchorB = localB;
       world.createJoint(joint);
     },
@@ -305,7 +308,9 @@ export function serializeScene(game: Game): SceneData {
 
     const bA = j.getBodyA();
     const bB = j.getBodyB();
+    // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
     const anchorA = bA.getWorldPoint((j as any).m_localAnchorA);
+    // biome-ignore lint/suspicious/noExplicitAny: accessing internal Planck.js property
     const anchorB = bB.getWorldPoint((j as any).m_localAnchorB);
 
     // chainBodies has links-1 interior bodies; total links = chainBodies.length + 1
@@ -322,7 +327,7 @@ export function serializeScene(game: Game): SceneData {
       links,
       _bodyA: ropeBodies.has(bA) ? null : bA,
       _bodyB: ropeBodies.has(bB) ? null : bB,
-    } as any);
+    } as SerializedRope & { _bodyA?: planck.Body | null; _bodyB?: planck.Body | null });
   }
 
   // ── Serialize non-rope bodies ──
@@ -390,7 +395,7 @@ export function serializeScene(game: Game): SceneData {
 
   // Resolve rope body references to IDs
   for (const r of ropes) {
-    const raw = r as any;
+    const raw = r as SerializedRope & { _bodyA?: planck.Body | null; _bodyB?: planck.Body | null };
     r.bodyAId = raw._bodyA ? (bodyMap.get(raw._bodyA) ?? null) : null;
     r.bodyBId = raw._bodyB ? (bodyMap.get(raw._bodyB) ?? null) : null;
     delete raw._bodyA;

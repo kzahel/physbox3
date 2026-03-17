@@ -64,14 +64,14 @@ describe("markDestroyed", () => {
     const body = world.createBody({ type: "dynamic", position: planck.Vec2(0, 0) });
     body.setUserData({ label: "test" });
     markDestroyed(body);
-    expect((body.getUserData() as any).destroyed).toBe(true);
+    expect((body.getUserData() as Record<string, unknown>).destroyed).toBe(true);
   });
 
   it("creates userData if none exists", () => {
     const world = new planck.World();
     const body = world.createBody({ type: "dynamic", position: planck.Vec2(0, 0) });
     markDestroyed(body);
-    expect((body.getUserData() as any).destroyed).toBe(true);
+    expect((body.getUserData() as Record<string, unknown>).destroyed).toBe(true);
   });
 });
 

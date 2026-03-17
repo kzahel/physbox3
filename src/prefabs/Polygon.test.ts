@@ -48,7 +48,7 @@ describe("createPolygon", () => {
     ]);
     expect(body).not.toBeNull();
     expect(body!.isDynamic()).toBe(true);
-    const ud = body!.getUserData() as any;
+    const ud = body!.getUserData() as Record<string, unknown>;
     expect(ud.label).toBe("polygon");
   });
 
