@@ -165,10 +165,31 @@ export function queryBodiesInRadius(pw: PhysWorld, wx: number, wy: number, radiu
     if (body === exclude) return;
     if (distance(body.GetPosition(), center) < radius) {
       bodies.push(body);
+      return;
+    }
+    // Terrain bodies sit at origin — check if the point is near the surface
+    const ud = pw.getUserData(body);
+    if (ud?.label === "terrain" && "terrainPoints" in ud) {
+      const pts = ud.terrainPoints as { x: number; y: number }[];
+      for (let i = 0; i < pts.length - 1; i++) {
+        if (distToSegment(center, pts[i], pts[i + 1]) < radius) {
+          bodies.push(body);
+          return;
+        }
+      }
     }
   });
 
   return bodies;
+}
+
+function distToSegment(p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return distance(p, a);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+  return distance(p, { x: a.x + t * dx, y: a.y + t * dy });
 }
 
 /** Find the closest body to a world point, preferring exact testPoint hits.
