@@ -7,6 +7,7 @@ import { GRAB_RADIUS_PX } from "../interaction/tools/GrabTool";
 import { getBodyUserData } from "./BodyUserData";
 import type { Camera } from "./Camera";
 import { convexHull } from "./ConvexHull";
+import { type Interpolation, lerpBody, NO_INTERP } from "./Interpolation";
 import type { IParticleSystem } from "./IRenderer";
 import { drawBalloonStrings, drawConveyorAnimation, drawDynamiteEffects } from "./PrefabOverlays";
 
@@ -66,17 +67,17 @@ export class OverlayRenderer {
   }
 
   /** Draw all 2D overlays. Call after the main scene is rendered. */
-  drawOverlays(world: planck.World, camera: Camera) {
-    drawConveyorAnimation(this.ctx, this.canvas, world, camera);
-    drawBalloonStrings(this.ctx, this.canvas, world, camera);
-    drawDynamiteEffects(this.ctx, this.canvas, world, camera, this.particles);
-    this.drawToolOverlays(camera);
-    this.drawSelectionUI(camera);
+  drawOverlays(world: planck.World, camera: Camera, interp: Interpolation = NO_INTERP) {
+    drawConveyorAnimation(this.ctx, this.canvas, world, camera, interp);
+    drawBalloonStrings(this.ctx, this.canvas, world, camera, interp);
+    drawDynamiteEffects(this.ctx, this.canvas, world, camera, this.particles, interp);
+    this.drawToolOverlays(camera, interp);
+    this.drawSelectionUI(camera, interp);
   }
 
   // ── Tool overlays ──
 
-  private drawToolOverlays(camera: Camera) {
+  private drawToolOverlays(camera: Camera, interp: Interpolation) {
     if (this.toolInfo?.toolCursor) {
       const tool = this.toolInfo.tool;
       const pos = this.toolInfo.toolCursor;
@@ -99,23 +100,27 @@ export class OverlayRenderer {
 
     if (this.toolInfo?.ropePending) {
       const rp = this.toolInfo.ropePending;
-      const sp = rp.body
-        ? camera.toScreen(rp.body.getPosition().x, rp.body.getPosition().y, this.canvas)
-        : camera.toScreen(rp.x, rp.y, this.canvas);
+      let sp: { x: number; y: number };
+      if (rp.body) {
+        const { x, y } = lerpBody(rp.body, interp);
+        sp = camera.toScreen(x, y, this.canvas);
+      } else {
+        sp = camera.toScreen(rp.x, rp.y, this.canvas);
+      }
       this.drawToolCursor(sp, 16, "rgba(180, 160, 120, 0.9)", "rgba(180, 160, 120, 0.15)");
     }
 
     if (this.toolInfo?.attachPending) {
       const body = this.toolInfo.attachPending.body;
-      const bpos = body.getPosition();
-      const sp = camera.toScreen(bpos.x, bpos.y, this.canvas);
+      const { x, y } = lerpBody(body, interp);
+      const sp = camera.toScreen(x, y, this.canvas);
       this.drawToolCursor(sp, 16, "rgba(255, 200, 50, 0.9)", "rgba(255, 200, 50, 0.15)");
     }
 
     if (this.toolInfo?.scaleDrag) {
       const sd = this.toolInfo.scaleDrag;
-      const bpos = sd.body.getPosition();
-      const sp = camera.toScreen(bpos.x, bpos.y, this.canvas);
+      const { x, y } = lerpBody(sd.body, interp);
+      const sp = camera.toScreen(x, y, this.canvas);
       const ringSize = 20 * sd.currentScale;
       this.drawToolCursor(sp, ringSize, "rgba(180, 120, 255, 0.8)", "rgba(180, 120, 255, 0.1)");
       this.ctx.fillStyle = "#fff";
@@ -172,11 +177,11 @@ export class OverlayRenderer {
 
   // ── Selection UI ──
 
-  private drawSelectionUI(camera: Camera) {
+  private drawSelectionUI(camera: Camera, interp: Interpolation) {
     if (!this.toolInfo?.selectedBody) return;
     const body = this.toolInfo.selectedBody;
-    const bpos = body.getPosition();
-    const sp = camera.toScreen(bpos.x, bpos.y, this.canvas);
+    const { x, y } = lerpBody(body, interp);
+    const sp = camera.toScreen(x, y, this.canvas);
     this.drawToolCursor(sp, 20, "rgba(100, 200, 255, 0.8)", "rgba(100, 200, 255, 0.08)");
     for (const btn of getSelectionButtons(body)) {
       switch (btn.id) {

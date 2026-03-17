@@ -5,6 +5,7 @@ import type { FixtureStyle } from "./BodyUserData";
 import { getBodyUserData } from "./BodyUserData";
 import type { Camera } from "./Camera";
 import { KILL_Y, KILL_Y_TOP } from "./Game";
+import { type Interpolation, lerpBody, lerpWorldPoint, NO_INTERP } from "./Interpolation";
 import type { IRenderer } from "./IRenderer";
 import { bodyColor, OverlayRenderer } from "./OverlayRenderer";
 import { type Particle, ParticleSystem } from "./ParticleSystem";
@@ -323,7 +324,8 @@ export class ThreeJSRenderer implements IRenderer {
     this.overlay.setToolInfo(input);
   }
 
-  drawWorld(world: planck.World, camera: Camera, _water?: unknown) {
+  drawWorld(world: planck.World, camera: Camera, _water?: unknown, interp?: Interpolation) {
+    const i = interp ?? NO_INTERP;
     const cw = this.glCanvas.clientWidth;
     const ch = this.glCanvas.clientHeight;
 
@@ -351,10 +353,10 @@ export class ThreeJSRenderer implements IRenderer {
     this.skyMesh.visible = skyH > 0;
 
     // Reconcile bodies
-    this.syncBodies(world);
+    this.syncBodies(world, i);
 
     // Reconcile joints
-    this.syncJoints(world);
+    this.syncJoints(world, i);
 
     // Update particles
     this.particles.tick();
@@ -368,23 +370,22 @@ export class ThreeJSRenderer implements IRenderer {
 
     // Clear and render 2D overlay
     this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-    this.overlay.drawOverlays(world, camera);
+    this.overlay.drawOverlays(world, camera, i);
   }
 
   // ── Body sync ──
 
-  private syncBodies(world: planck.World) {
+  private syncBodies(world: planck.World, interp: Interpolation) {
     const seen = new Set<planck.Body>();
 
     forEachBody(world, (body) => {
       seen.add(body);
-      const pos = body.getPosition();
-      const angle = body.getAngle();
+      const { x, y, angle } = lerpBody(body, interp);
       const key = fixtureKey(body);
 
       const existing = this.bodyMeshes.get(body);
       if (existing && existing.key === key) {
-        existing.group.position.set(pos.x, pos.y, 0);
+        existing.group.position.set(x, y, 0);
         existing.group.rotation.set(0, 0, angle);
       } else {
         if (existing) {
@@ -397,7 +398,7 @@ export class ThreeJSRenderer implements IRenderer {
           });
         }
         const group = this.createBodyMeshes(body);
-        group.position.set(pos.x, pos.y, 0);
+        group.position.set(x, y, 0);
         group.rotation.set(0, 0, angle);
         this.scene.add(group);
         this.bodyMeshes.set(body, { group, key });
@@ -489,7 +490,7 @@ export class ThreeJSRenderer implements IRenderer {
 
   // ── Joint sync ──
 
-  private syncJoints(world: planck.World) {
+  private syncJoints(world: planck.World, interp: Interpolation) {
     const seen = new Set<planck.Joint>();
 
     for (let joint = world.getJointList(); joint; joint = joint.getNext()) {
@@ -498,8 +499,10 @@ export class ThreeJSRenderer implements IRenderer {
         const ud = joint.getUserData() as { ropeStabilizer?: boolean } | null;
         if (!ud?.ropeStabilizer) continue;
       }
-      const a = joint.getAnchorA();
-      const b = joint.getAnchorB();
+      const rawA = joint.getAnchorA();
+      const rawB = joint.getAnchorB();
+      const a = lerpWorldPoint(joint.getBodyA(), rawA, interp);
+      const b = lerpWorldPoint(joint.getBodyB(), rawB, interp);
 
       const existing = this.jointLines.get(joint);
       if (existing) {

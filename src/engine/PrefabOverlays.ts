@@ -1,6 +1,7 @@
 import type * as planck from "planck";
 import { getBodyUserData, isBalloon, isConveyor, isDynamite } from "./BodyUserData";
 import type { Camera } from "./Camera";
+import { type Interpolation, lerpBody, NO_INTERP } from "./Interpolation";
 import type { IParticleSystem } from "./IRenderer";
 import { forEachBody } from "./Physics";
 
@@ -25,6 +26,7 @@ export function drawConveyorAnimation(
   canvas: HTMLCanvasElement,
   world: planck.World,
   camera: Camera,
+  interp: Interpolation = NO_INTERP,
 ) {
   const time = performance.now() / 1000;
 
@@ -33,15 +35,14 @@ export function drawConveyorAnimation(
     if (!isConveyor(ud)) return;
 
     const speed = ud.speed;
-    const pos = body.getPosition();
-    const angle = body.getAngle();
+    const { x, y, angle } = lerpBody(body, interp);
     const fixture = body.getFixtureList();
     if (!fixture) return;
     const shape = fixture.getShape() as planck.PolygonShape;
     const hw = Math.abs(shape.m_vertices[0].x);
 
     ctx.save();
-    const screen = camera.toScreen(pos.x, pos.y, canvas);
+    const screen = camera.toScreen(x, y, canvas);
     ctx.translate(screen.x, screen.y);
     ctx.rotate(-angle);
 
@@ -74,20 +75,20 @@ export function drawBalloonStrings(
   canvas: HTMLCanvasElement,
   world: planck.World,
   camera: Camera,
+  interp: Interpolation = NO_INTERP,
 ) {
   forEachBody(world, (body) => {
     const ud = getBodyUserData(body);
     if (!isBalloon(ud)) return;
 
-    const pos = body.getPosition();
-    const angle = body.getAngle();
+    const { x: posX, y: posY, angle } = lerpBody(body, interp);
     const fixture = body.getFixtureList();
     if (!fixture) return;
     const shape = fixture.getShape() as planck.CircleShape;
     const radius = shape.getRadius();
 
-    const bottomX = pos.x - Math.sin(angle) * radius;
-    const bottomY = pos.y - Math.cos(angle) * radius;
+    const bottomX = posX - Math.sin(angle) * radius;
+    const bottomY = posY - Math.cos(angle) * radius;
     const stringLen = radius * BALLOON_STRING_LENGTH_FACTOR;
     const sp = camera.toScreen(bottomX, bottomY, canvas);
 
@@ -104,7 +105,7 @@ export function drawBalloonStrings(
     ctx.stroke();
 
     // Highlight / shine on the balloon
-    const center = camera.toScreen(pos.x, pos.y, canvas);
+    const center = camera.toScreen(posX, posY, canvas);
     const shineR = radius * camera.zoom * BALLOON_SHINE_SCALE;
     ctx.beginPath();
     ctx.arc(center.x - shineR, center.y - shineR, shineR, 0, Math.PI * 2);
@@ -120,6 +121,7 @@ export function drawDynamiteEffects(
   world: planck.World,
   camera: Camera,
   particles: IParticleSystem,
+  interp: Interpolation = NO_INTERP,
 ) {
   forEachBody(world, (body) => {
     const ud = getBodyUserData(body);
@@ -127,11 +129,10 @@ export function drawDynamiteEffects(
 
     const remaining = Math.max(0, ud.fuseRemaining / ud.fuseDuration);
 
-    const pos = body.getPosition();
-    const angle = body.getAngle();
+    const { x: posX, y: posY, angle } = lerpBody(body, interp);
 
-    const wickBaseX = pos.x + Math.sin(-angle) * WICK_BASE_OFFSET;
-    const wickBaseY = pos.y + Math.cos(-angle) * WICK_BASE_OFFSET;
+    const wickBaseX = posX + Math.sin(-angle) * WICK_BASE_OFFSET;
+    const wickBaseY = posY + Math.cos(-angle) * WICK_BASE_OFFSET;
     const wickLen = WICK_MAX_LENGTH * remaining;
     const wickEndX = wickBaseX + Math.sin(-angle) * wickLen;
     const wickEndY = wickBaseY + Math.cos(-angle) * wickLen;

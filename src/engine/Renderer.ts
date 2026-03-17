@@ -3,6 +3,7 @@ import type { ToolRenderInfo } from "../interaction/ToolHandler";
 import type { FixtureStyle } from "./BodyUserData";
 import type { Camera } from "./Camera";
 import { KILL_Y, KILL_Y_TOP } from "./Game";
+import { type Interpolation, lerpBody, lerpWorldPoint, NO_INTERP } from "./Interpolation";
 import type { IRenderer } from "./IRenderer";
 import { bodyColor, OverlayRenderer } from "./OverlayRenderer";
 import { ParticleSystem } from "./ParticleSystem";
@@ -54,28 +55,28 @@ export class Renderer implements IRenderer {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
-  drawWorld(world: planck.World, camera: Camera, water?: WaterSystem) {
+  drawWorld(world: planck.World, camera: Camera, water?: WaterSystem, interp?: Interpolation) {
+    const i = interp ?? NO_INTERP;
     this.clear();
     this.drawOcean(camera);
     this.drawSky(camera);
-    this.drawBodies(world, camera);
-    this.drawJoints(world, camera);
+    this.drawBodies(world, camera, i);
+    this.drawJoints(world, camera, i);
     if (water) this.drawWater(water, camera);
     this.particles.tick();
     this.drawParticles(camera);
-    this.overlay.drawOverlays(world, camera);
+    this.overlay.drawOverlays(world, camera, i);
   }
 
   setInputManager(input: ToolRenderInfo) {
     this.overlay.setToolInfo(input);
   }
 
-  private drawBodies(world: planck.World, camera: Camera) {
+  private drawBodies(world: planck.World, camera: Camera, interp: Interpolation) {
     const ctx = this.ctx;
 
     forEachBody(world, (body) => {
-      const pos = body.getPosition();
-      const angle = body.getAngle();
+      const { x, y, angle } = lerpBody(body, interp);
 
       for (let fixture = body.getFixtureList(); fixture; fixture = fixture.getNext()) {
         const shape = fixture.getShape();
@@ -84,7 +85,7 @@ export class Renderer implements IRenderer {
 
         ctx.save();
 
-        const screen = camera.toScreen(pos.x, pos.y, this.canvas);
+        const screen = camera.toScreen(x, y, this.canvas);
         ctx.translate(screen.x, screen.y);
         ctx.rotate(-angle);
         ctx.scale(camera.zoom, -camera.zoom);
@@ -140,12 +141,14 @@ export class Renderer implements IRenderer {
     });
   }
 
-  private drawJoints(world: planck.World, camera: Camera) {
+  private drawJoints(world: planck.World, camera: Camera, interp: Interpolation) {
     const ctx = this.ctx;
 
     for (let joint = world.getJointList(); joint; joint = joint.getNext()) {
-      const a = joint.getAnchorA();
-      const b = joint.getAnchorB();
+      const rawA = joint.getAnchorA();
+      const rawB = joint.getAnchorB();
+      const a = lerpWorldPoint(joint.getBodyA(), rawA, interp);
+      const b = lerpWorldPoint(joint.getBodyB(), rawB, interp);
       const sa = camera.toScreen(a.x, a.y, this.canvas);
       const sb = camera.toScreen(b.x, b.y, this.canvas);
 

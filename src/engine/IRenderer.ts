@@ -1,6 +1,7 @@
 import type * as planck from "planck";
 import type { ToolRenderInfo } from "../interaction/ToolHandler";
 import type { Camera } from "./Camera";
+import type { Interpolation } from "./Interpolation";
 import type { WaterSystem } from "./WaterSystem";
 
 export interface IParticleSystem {
@@ -14,7 +15,7 @@ export interface IParticleSystem {
 export interface IRenderer {
   readonly particles: IParticleSystem;
   resize(): void;
-  drawWorld(world: planck.World, camera: Camera, water?: WaterSystem): void;
+  drawWorld(world: planck.World, camera: Camera, water?: WaterSystem, interp?: Interpolation): void;
   setInputManager(input: ToolRenderInfo): void;
   /** Clean up resources (WebGL context, DOM elements, etc.) */
   dispose(): void;

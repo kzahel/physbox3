@@ -14,6 +14,7 @@ export class SettingsPane {
       <label>Speed <input type="range" id="s-speed" min="0" max="3" step="0.1" value="${game.timeScale}"></label>
       <label>Bounce <input type="range" id="s-bounce" min="0" max="1" step="0.05" value="${game.bounciness}"></label>
       <label>Solver Iters <input type="range" id="s-iters" min="1" max="20" step="1" value="${game.positionIterations}"></label>
+      <label>Physics Hz <input type="range" id="s-physics-hz" min="15" max="120" step="5" value="${game.physicsHz}"></label>
 
       <div class="section-title">Actions</div>
       <label><button id="s-clear">Clear Dynamic</button></label>
@@ -47,6 +48,13 @@ export class SettingsPane {
       (v) => {
         game.positionIterations = v;
         game.velocityIterations = Math.max(v * 2, 4);
+      },
+      (s) => parseInt(s, 10),
+    );
+    bindSlider(
+      "#s-physics-hz",
+      (v) => {
+        game.physicsHz = v;
       },
       (s) => parseInt(s, 10),
     );

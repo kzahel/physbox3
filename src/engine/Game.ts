@@ -19,6 +19,8 @@ import { createTrain } from "../prefabs/Train";
 import { playBounce, playWoodHit, unlockAudio } from "./Audio";
 import { getBodyUserData } from "./BodyUserData";
 import { Camera } from "./Camera";
+import type { Interpolation } from "./Interpolation";
+import { snapshotBodies } from "./Interpolation";
 import type { IRenderer } from "./IRenderer";
 import { clamp, clearDynamic, destroyBodyAt, explodeAt, forEachBody, markDestroyed, scaleBody } from "./Physics";
 import { Renderer } from "./Renderer";
@@ -26,7 +28,7 @@ import { WaterSystem } from "./WaterSystem";
 
 export const KILL_Y = -100;
 export const KILL_Y_TOP = 200;
-const TIMESTEP = 1 / 60;
+const DEFAULT_PHYSICS_HZ = 60;
 const COLLISION_MIN_IMPULSE = 2;
 const COLLISION_MAX_IMPULSE = 15;
 
@@ -50,6 +52,7 @@ export class Game {
   timeScale = 1;
   velocityIterations = 8;
   positionIterations = 3;
+  physicsHz = DEFAULT_PHYSICS_HZ;
   inputManager: InputManager | null = null;
   water = new WaterSystem();
   ragdolls: RagdollData[] = [];
@@ -74,6 +77,8 @@ export class Game {
   private accumulator = 0;
   private frameCount = 0;
   private fpsTimer = 0;
+  private prevStates = new WeakMap<planck.Body, { x: number; y: number; angle: number }>();
+  private interpAlpha = 1;
 
   private resizeHandler = () => this.renderer.resize();
 
@@ -346,7 +351,8 @@ export class Game {
 
     this.removeOutOfBoundsBodies();
     this.updateCameraFollow();
-    this.renderer.drawWorld(this.world, this.camera, this.water);
+    const interp: Interpolation = { alpha: this.interpAlpha, prev: this.prevStates };
+    this.renderer.drawWorld(this.world, this.camera, this.water, interp);
   }
 
   private updateFPS(dt: number) {
@@ -360,22 +366,25 @@ export class Game {
   }
 
   private stepPhysics(dt: number) {
+    const timestep = 1 / this.physicsHz;
     const scaledDt = dt * this.timeScale;
     tickDynamite(this.world, scaledDt, (wx, wy, r, f) => this.explodeAt(wx, wy, r, f));
     tickCannons(this.world, this.renderer, (wx, wy, r, f) => this.explodeAt(wx, wy, r, f), scaledDt);
     this.accumulator += scaledDt;
-    while (this.accumulator >= TIMESTEP) {
+    while (this.accumulator >= timestep) {
+      snapshotBodies(this.world, this.prevStates);
       this.inputManager?.update();
-      applyRocketThrust(this.world, TIMESTEP);
+      applyRocketThrust(this.world, timestep);
       applyBalloonLift(this.world);
       applyFanForce(this.world);
       applyMotorTorque(this.world);
       applyRopeStabilization(this.world);
       this.water.tick(this.world);
       this.water.applyBuoyancy(this.world, this.gravity);
-      this.world.step(TIMESTEP, this.velocityIterations, this.positionIterations);
-      this.accumulator -= TIMESTEP;
+      this.world.step(timestep, this.velocityIterations, this.positionIterations);
+      this.accumulator -= timestep;
     }
+    this.interpAlpha = this.accumulator / timestep;
     spawnRocketParticles(this.world, this.renderer);
     spawnFanParticles(this.world, this.renderer);
   }
