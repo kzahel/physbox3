@@ -19,7 +19,7 @@ export class GrabTool implements ToolHandler {
 
   onMove(_wx: number, _wy: number, dx: number, dy: number, screenX: number, screenY: number) {
     if (this.mouseJoint) {
-      const world = this.ctx.game.camera.toWorld(screenX, screenY, this.ctx.game.canvas);
+      const world = this.ctx.game.camera.toWorld(screenX, screenY, this.ctx.game.container);
       this.mouseJoint.setTarget(planck.Vec2(world.x, world.y));
     } else if (this.grabbedStatic) {
       const wdx = dx / this.ctx.game.camera.zoom;

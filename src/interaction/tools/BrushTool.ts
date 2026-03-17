@@ -30,7 +30,7 @@ export abstract class BrushTool implements ToolHandler {
 
   private brush(sx: number, sy: number) {
     const r = this.radiusPx / this.ctx.game.camera.zoom;
-    const world = this.ctx.game.camera.toWorld(sx, sy, this.ctx.game.canvas);
+    const world = this.ctx.game.camera.toWorld(sx, sy, this.ctx.game.container);
     const bodies = queryBodiesInRadius(this.ctx.game.world, world.x, world.y, r, this.ctx.groundBody);
     this.brushAction(bodies, world.x, world.y);
   }

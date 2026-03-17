@@ -20,7 +20,7 @@ export class SelectTool implements ToolHandler {
   onDown(wx: number, wy: number, sx: number, sy: number) {
     if (this.selectedBody) {
       const pos = this.selectedBody.getPosition();
-      const sp = this.ctx.game.camera.toScreen(pos.x, pos.y, this.ctx.game.canvas);
+      const sp = this.ctx.game.camera.toScreen(pos.x, pos.y, this.ctx.game.container);
 
       // Fixed/Free button
       const btnY = sp.y - BTN_TOGGLE_OFFSET_Y;
