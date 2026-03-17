@@ -176,8 +176,13 @@ export class Renderer implements IRenderer {
       // Check for rope stabilizer via joint userData
       const jd = pw.getJointData(joint);
       if (jd?.ropeStabilizer) {
-        ctx.strokeStyle = "rgba(200,180,120,0.3)";
-        ctx.lineWidth = 0.5;
+        const ddx = worldB.x - worldA.x;
+        const ddy = worldB.y - worldA.y;
+        const currentLen = Math.hypot(ddx, ddy);
+        const restLen = (jd as { restLength?: number }).restLength ?? 0;
+        const active = currentLen > restLen;
+        ctx.strokeStyle = active ? "rgba(255,80,80,0.5)" : "rgba(80,200,80,0.3)";
+        ctx.lineWidth = active ? 1.5 : 0.5;
         ctx.beginPath();
         ctx.moveTo(sa.x, sa.y);
         ctx.lineTo(sb.x, sb.y);

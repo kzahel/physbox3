@@ -362,6 +362,7 @@ export function createDistanceJoint(
     hertz?: number;
     dampingRatio?: number;
     enableLimit?: boolean;
+    minLength?: number;
     maxLength?: number;
   },
 ): JointHandle {
@@ -392,6 +393,7 @@ export function createDistanceJoint(
   }
   if (opts?.enableLimit) {
     def.enableLimit = true;
+    if (opts.minLength != null) def.minLength = opts.minLength;
     if (opts.maxLength != null) def.maxLength = opts.maxLength;
   }
 

@@ -520,6 +520,14 @@ export class ThreeJSRenderer implements IRenderer {
       positions.setXYZ(0, a.x, a.y, 0.5);
       positions.setXYZ(1, b.x, b.y, 0.5);
       positions.needsUpdate = true;
+      if (isStabilizer) {
+        const restLen = (jd as { restLength?: number })?.restLength ?? 0;
+        const currentLen = Math.hypot(b.x - a.x, b.y - a.y);
+        const active = currentLen > restLen;
+        const mat = line.material as THREE.LineBasicMaterial;
+        mat.color.set(active ? 0xff5050 : 0x50c850);
+        mat.opacity = active ? 0.5 : 0.3;
+      }
     }
     if (group.children.length < 3) return; // stabilizer joints have no dots
     const dotA = group.children[1] as THREE.Mesh;
