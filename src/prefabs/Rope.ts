@@ -61,11 +61,13 @@ export function createRopeBetween(
   const angle = Math.atan2(dy, dx) - Math.PI / 2;
 
   let prev: planck.Body;
+  let anchorA: planck.Body | null = null;
   if (bodyA) {
     prev = bodyA;
   } else {
-    prev = world.createBody({ type: "static", position: planck.Vec2(x1, y1) });
-    prev.createFixture({ shape: planck.Circle(ANCHOR_RADIUS) });
+    anchorA = world.createBody({ type: "static", position: planck.Vec2(x1, y1) });
+    anchorA.createFixture({ shape: planck.Circle(ANCHOR_RADIUS) });
+    prev = anchorA;
   }
 
   const chainLinks: planck.Body[] = [];
@@ -106,7 +108,7 @@ export function createRopeBetween(
   world.createJoint(planck.RevoluteJoint({ collideConnected: true }, prev, end, planck.Vec2(jx, jy)));
 
   // Add a RopeJoint between endpoints to enforce max distance as a single efficient constraint
-  const first = bodyA ?? world.getBodyList()!;
+  const first = bodyA ?? anchorA!;
   const last = bodyB ?? end;
   if (first !== last && (first.isDynamic() || last.isDynamic())) {
     const localA = first.getLocalPoint(planck.Vec2(x1, y1));
@@ -127,7 +129,8 @@ export function createRopeBetween(
     // These constrain sub-spans of the rope so the middle can't stretch freely.
     // The slack factor allows natural catenary sag before the spring engages.
     const SLACK = STABILIZER_SLACK;
-    const interiorPoints = chainLinks.length >= 8 ? [0.25, 0.5, 0.75] : [0.5];
+    if (chainLinks.length < 8) return; // short ropes don't need interior stabilizers
+    const interiorPoints = chainLinks.length >= 16 ? [0.25, 0.5, 0.75] : [0.5];
     for (const frac of interiorPoints) {
       const idx = Math.floor((chainLinks.length - 1) * frac);
       const mid = chainLinks[idx];
