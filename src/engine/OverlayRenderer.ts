@@ -101,6 +101,13 @@ export class OverlayRenderer {
       }
     }
 
+    if (this.toolInfo?.tool === "terrain") {
+      const pts = this.toolInfo.terrainPoints;
+      if (pts.length >= 1) {
+        this.drawTerrainPreview(pts, camera);
+      }
+    }
+
     if (this.toolInfo?.ropePending) {
       const rp = this.toolInfo.ropePending;
       let sp: { x: number; y: number };
@@ -247,6 +254,48 @@ export class OverlayRenderer {
         ctx.stroke();
         ctx.setLineDash([]);
       }
+    }
+
+    ctx.restore();
+  }
+
+  private drawTerrainPreview(pts: readonly { x: number; y: number }[], camera: Camera) {
+    const ctx = this.ctx;
+    const screenPts = pts.map((p) => camera.toScreen(p.x, p.y, this.canvas));
+
+    ctx.save();
+
+    // Start dot
+    ctx.fillStyle = "rgba(80, 100, 60, 0.9)";
+    ctx.beginPath();
+    ctx.arc(screenPts[0].x, screenPts[0].y, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (screenPts.length >= 2) {
+      // Filled area below the line
+      const bottomY = this.canvas.height;
+      ctx.beginPath();
+      ctx.moveTo(screenPts[0].x, screenPts[0].y);
+      for (let i = 1; i < screenPts.length; i++) {
+        ctx.lineTo(screenPts[i].x, screenPts[i].y);
+      }
+      ctx.lineTo(screenPts[screenPts.length - 1].x, bottomY);
+      ctx.lineTo(screenPts[0].x, bottomY);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(80, 100, 60, 0.15)";
+      ctx.fill();
+
+      // Surface line
+      ctx.beginPath();
+      ctx.moveTo(screenPts[0].x, screenPts[0].y);
+      for (let i = 1; i < screenPts.length; i++) {
+        ctx.lineTo(screenPts[i].x, screenPts[i].y);
+      }
+      ctx.strokeStyle = "rgba(120, 140, 80, 0.8)";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.stroke();
     }
 
     ctx.restore();

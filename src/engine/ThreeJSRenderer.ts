@@ -1,7 +1,7 @@
 import type { Body, b2ShapeId } from "box2d3";
 import * as THREE from "three";
 import type { ToolRenderInfo } from "../interaction/ToolHandler";
-import { getBodyUserData, isSand } from "./BodyUserData";
+import { getBodyUserData, isSand, isTerrain } from "./BodyUserData";
 import { b2 } from "./Box2D";
 import type { Camera } from "./Camera";
 import { colorOpacity, parseColor } from "./ColorUtils";
@@ -324,6 +324,34 @@ export class ThreeJSRenderer implements IRenderer {
     const opacity = colorOpacity(fillColor);
     const isStatic = body.GetType().value === B2.b2BodyType.b2_staticBody.value;
 
+    // Terrain bodies: build mesh from stored points instead of iterating shapes
+    if (isTerrain(ud)) {
+      const pts = ud.terrainPoints;
+      if (pts.length >= 2) {
+        const terrainDepth = 50;
+        const shape = new THREE.Shape();
+        shape.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i].x, pts[i].y);
+        shape.lineTo(pts[pts.length - 1].x, pts[0].y - terrainDepth);
+        shape.lineTo(pts[0].x, pts[0].y - terrainDepth);
+        shape.closePath();
+        const geo = new THREE.ExtrudeGeometry(shape, { depth: EXTRUDE_DEPTH, bevelEnabled: false });
+        geo.translate(0, 0, -EXTRUDE_DEPTH / 2);
+        const mat = new THREE.MeshStandardMaterial({
+          color: threeColor,
+          transparent: opacity < 1,
+          opacity,
+          roughness: 0.9,
+          metalness: 0.05,
+          flatShading: true,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.receiveShadow = true;
+        group.add(mesh);
+      }
+      return group;
+    }
+
     const shapeIds: b2ShapeId[] = body.GetShapes() ?? [];
     for (const shapeId of shapeIds) {
       const shapeType = B2.b2Shape_GetType(shapeId);
@@ -345,9 +373,7 @@ export class ThreeJSRenderer implements IRenderer {
         const sand = isSand(ud);
 
         // Sand grains use a simple box for minimal poly count
-        const geo = sand
-          ? new THREE.BoxGeometry(r * 1.6, r * 1.6, r * 1.6)
-          : new THREE.SphereGeometry(r, 8, 6);
+        const geo = sand ? new THREE.BoxGeometry(r * 1.6, r * 1.6, r * 1.6) : new THREE.SphereGeometry(r, 8, 6);
         geo.translate(center.x, center.y, 0);
         const mesh = new THREE.Mesh(geo, mat);
         mesh.castShadow = !sand;

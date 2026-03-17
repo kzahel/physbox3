@@ -17,6 +17,7 @@ import { RopeTool, SpringTool } from "./tools/RopeTool";
 import { SandTool } from "./tools/SandTool";
 import { ScaleTool } from "./tools/ScaleTool";
 import { SelectTool } from "./tools/SelectTool";
+import { TerrainTool } from "./tools/TerrainTool";
 import { WaterTool } from "./tools/WaterTool";
 
 // Re-export Tool type that other modules need
@@ -87,6 +88,7 @@ export class InputManager implements ToolRenderInfo {
   readonly ropeTool: RopeTool;
   readonly springTool: SpringTool;
   readonly drawTool: DrawTool;
+  readonly terrainTool: TerrainTool;
   readonly platformTools: Map<Tool, PlatformDrawTool>;
 
   onToolChange?: (tool: Tool) => void;
@@ -114,6 +116,7 @@ export class InputManager implements ToolRenderInfo {
     this.selectTool = new SelectTool(ctx);
     this.scaleTool = new ScaleTool(ctx);
     this.drawTool = new DrawTool(ctx);
+    this.terrainTool = new TerrainTool(ctx);
 
     // Platform-draw family
     this.platformTools = new Map<Tool, PlatformDrawTool>(
@@ -134,6 +137,7 @@ export class InputManager implements ToolRenderInfo {
       select: this.selectTool,
       scale: this.scaleTool,
       draw: this.drawTool,
+      terrain: this.terrainTool,
       water: new WaterTool(ctx),
       sand: new SandTool(ctx),
     };
@@ -184,6 +188,10 @@ export class InputManager implements ToolRenderInfo {
 
   get drawPoints(): readonly { x: number; y: number }[] {
     return this.drawTool.drawPoints;
+  }
+
+  get terrainPoints(): readonly { x: number; y: number }[] {
+    return this.terrainTool.terrainPoints;
   }
 
   // ── Public methods ──

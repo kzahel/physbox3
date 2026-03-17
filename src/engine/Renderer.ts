@@ -1,5 +1,6 @@
 import type { b2ShapeId } from "box2d3";
 import type { ToolRenderInfo } from "../interaction/ToolHandler";
+import { isTerrain } from "./BodyUserData";
 import { b2 } from "./Box2D";
 import type { Camera } from "./Camera";
 import { KILL_Y, KILL_Y_TOP } from "./Game";
@@ -61,6 +62,7 @@ export class Renderer implements IRenderer {
     this.clear();
     this.drawOcean(camera);
     this.drawSky(camera);
+    this.drawTerrain(pw, camera);
     this.drawBodies(pw, camera, i);
     this.drawJoints(pw, camera, i);
     if (water) this.drawWater(water, camera);
@@ -73,6 +75,55 @@ export class Renderer implements IRenderer {
     this.overlay.setToolInfo(input);
   }
 
+  private drawTerrain(pw: PhysWorld, camera: Camera) {
+    const ctx = this.ctx;
+    const TERRAIN_FILL_DEPTH = 50;
+
+    forEachBody(pw, (body) => {
+      const ud = pw.getUserData(body);
+      if (!isTerrain(ud)) return;
+
+      const pts = ud.terrainPoints;
+      if (pts.length < 2) return;
+
+      ctx.save();
+
+      // Surface line
+      ctx.beginPath();
+      const s0 = camera.toScreen(pts[0].x, pts[0].y, this.canvas);
+      ctx.moveTo(s0.x, s0.y);
+      for (let i = 1; i < pts.length; i++) {
+        const s = camera.toScreen(pts[i].x, pts[i].y, this.canvas);
+        ctx.lineTo(s.x, s.y);
+      }
+
+      // Fill below: extend down from last point, across bottom, up to first point
+      const bottomY = camera.toScreen(0, pts[0].y - TERRAIN_FILL_DEPTH, this.canvas).y;
+      const sLast = camera.toScreen(pts[pts.length - 1].x, pts[pts.length - 1].y, this.canvas);
+      ctx.lineTo(sLast.x, bottomY);
+      ctx.lineTo(s0.x, bottomY);
+      ctx.closePath();
+
+      ctx.fillStyle = ud.fill ?? "rgba(80,100,60,0.9)";
+      ctx.fill();
+
+      // Draw surface stroke
+      ctx.beginPath();
+      ctx.moveTo(s0.x, s0.y);
+      for (let i = 1; i < pts.length; i++) {
+        const s = camera.toScreen(pts[i].x, pts[i].y, this.canvas);
+        ctx.lineTo(s.x, s.y);
+      }
+      ctx.strokeStyle = "rgba(120,140,80,0.9)";
+      ctx.lineWidth = Math.max(2, 0.08 * camera.zoom);
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.stroke();
+
+      ctx.restore();
+    });
+  }
+
   private drawBodies(pw: PhysWorld, camera: Camera, interp: Interpolation) {
     const ctx = this.ctx;
     const B2 = b2();
@@ -80,6 +131,7 @@ export class Renderer implements IRenderer {
     forEachBody(pw, (body) => {
       const { x, y, angle } = lerpBody(body, interp);
       const ud = pw.getUserData(body);
+      if (isTerrain(ud)) return; // rendered in drawTerrain
       const fillColor = ud?.fill ?? bodyColor(pw, body);
       const strokeColor = ud?.stroke ?? "rgba(255,255,255,0.3)";
 

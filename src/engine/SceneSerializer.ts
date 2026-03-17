@@ -1,9 +1,17 @@
 import type { Body, b2ShapeId } from "box2d3";
+import { isTerrain } from "./BodyUserData";
 import { b2 } from "./Box2D";
 import type { Game } from "./Game";
 import { bodyAngle } from "./Physics";
 import type { JointHandle, PhysWorld } from "./PhysWorld";
-import type { SceneData, SerializedBody, SerializedJoint, SerializedRope, SerializedShape } from "./SceneStore";
+import type {
+  SceneData,
+  SerializedBody,
+  SerializedJoint,
+  SerializedRope,
+  SerializedShape,
+  SerializedTerrain,
+} from "./SceneStore";
 
 // ── Joint type name mapping ──
 
@@ -161,8 +169,21 @@ export function serializeScene(game: Game): SceneData {
   const bodies: SerializedBody[] = [];
   let nextId = 0;
 
+  // ── Serialize terrain bodies ──
+  const terrains: SerializedTerrain[] = [];
+  const terrainBodies = new Set<Body>();
+
   pw.forEachBody((b) => {
-    if (ropeBodies.has(b)) return;
+    const ud = pw.getUserData(b);
+    if (isTerrain(ud)) {
+      terrainBodies.add(b);
+      terrains.push({ points: ud.terrainPoints.map((p) => ({ x: p.x, y: p.y })) });
+    }
+  });
+
+  // ── Serialize non-rope, non-terrain bodies ──
+  pw.forEachBody((b) => {
+    if (ropeBodies.has(b) || terrainBodies.has(b)) return;
 
     const id = nextId++;
     bodyMap.set(b, id);
@@ -270,5 +291,11 @@ export function serializeScene(game: Game): SceneData {
     joints.push(sj);
   });
 
-  return { bodies, joints, ropes: ropes.length > 0 ? ropes : undefined, gravity: game.gravity };
+  return {
+    bodies,
+    joints,
+    ropes: ropes.length > 0 ? ropes : undefined,
+    terrains: terrains.length > 0 ? terrains : undefined,
+    gravity: game.gravity,
+  };
 }

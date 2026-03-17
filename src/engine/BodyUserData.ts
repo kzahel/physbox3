@@ -59,6 +59,11 @@ export interface SandData extends BodyDataBase {
   label: "sand";
 }
 
+export interface TerrainData extends BodyDataBase {
+  label: "terrain";
+  terrainPoints: { x: number; y: number }[];
+}
+
 /** Bodies with a generic or no label (ground, wall, rope links, etc.) */
 export interface GenericBodyData extends BodyDataBase {
   label?: string;
@@ -73,6 +78,7 @@ export type BodyUserData =
   | CannonballData
   | ConveyorData
   | SandData
+  | TerrainData
   | GenericBodyData;
 
 /** Type-safe accessor for body userData via PhysWorld */
@@ -112,6 +118,10 @@ export function isConveyor(ud: BodyUserData | null): ud is ConveyorData {
 
 export function isSand(ud: BodyUserData | null): ud is SandData {
   return ud?.label === "sand";
+}
+
+export function isTerrain(ud: BodyUserData | null): ud is TerrainData {
+  return ud?.label === "terrain";
 }
 
 /** Fixture-level style data */

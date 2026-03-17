@@ -49,6 +49,7 @@ export interface ToolRenderInfo {
   readonly scaleDrag: { body: Body; startScreenY: number; currentScale: number } | null;
   readonly platformDraw: { start: { x: number; y: number }; end: { x: number; y: number } } | null;
   readonly drawPoints: readonly { x: number; y: number }[];
+  readonly terrainPoints: readonly { x: number; y: number }[];
 }
 
 export type Tool =
@@ -79,5 +80,6 @@ export type Tool =
   | "unglue"
   | "train"
   | "draw"
+  | "terrain"
   | "water"
   | "sand";

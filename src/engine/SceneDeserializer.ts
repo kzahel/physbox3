@@ -1,5 +1,6 @@
 import type { Body } from "box2d3";
 import { createRopeBetween } from "../prefabs/Rope";
+import { createTerrain } from "../prefabs/Terrain";
 import type { BodyUserData } from "./BodyUserData";
 import { b2 } from "./Box2D";
 import type { Game } from "./Game";
@@ -187,6 +188,13 @@ export function deserializeScene(game: Game, data: SceneData) {
       const bodyA = r.bodyAId !== null ? (idToBody.get(r.bodyAId) ?? null) : null;
       const bodyB = r.bodyBId !== null ? (idToBody.get(r.bodyBId) ?? null) : null;
       createRopeBetween(pw, r.x1, r.y1, r.x2, r.y2, bodyA, bodyB, r.links);
+    }
+  }
+
+  // Recreate terrain
+  if (data.terrains) {
+    for (const t of data.terrains) {
+      createTerrain(pw, t.points);
     }
   }
 

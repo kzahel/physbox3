@@ -65,10 +65,15 @@ export interface SerializedRope {
   links: number;
 }
 
+export interface SerializedTerrain {
+  points: { x: number; y: number }[];
+}
+
 export interface SceneData {
   bodies: SerializedBody[];
   joints: SerializedJoint[];
   ropes?: SerializedRope[];
+  terrains?: SerializedTerrain[];
   gravity: number;
 }
 
