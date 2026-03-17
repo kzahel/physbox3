@@ -51,6 +51,9 @@ interface SerializedJoint {
   lowerTranslation?: number;
   upperTranslation?: number;
   maxMotorForce?: number;
+  // RopeJoint
+  maxLength?: number;
+  userData?: unknown;
 }
 
 interface SceneData {
@@ -173,6 +176,10 @@ export function serializeScene(game: Game): SceneData {
         sj.axisX = axis.x;
         sj.axisY = axis.y;
       }
+    } else if (jType === "rope-joint") {
+      const rj = j as planck.RopeJoint;
+      sj.maxLength = rj.getMaxLength();
+      sj.userData = j.getUserData();
     } else if (jType === "prismatic-joint") {
       const pj = j as planck.PrismaticJoint;
       sj.enableLimit = pj.isLimitEnabled();
@@ -321,6 +328,22 @@ export function deserializeScene(game: Game, data: SceneData) {
           ),
         );
         break;
+      case "rope-joint": {
+        const localA = bodyA.getLocalPoint(anchorA);
+        const localB = bodyB.getLocalPoint(anchorB);
+        game.world.createJoint(
+          new planck.RopeJoint({
+            bodyA,
+            bodyB,
+            localAnchorA: localA,
+            localAnchorB: localB,
+            maxLength: sj.maxLength ?? 0,
+            collideConnected: sj.collideConnected,
+            userData: sj.userData,
+          } as planck.RopeJointDef),
+        );
+        break;
+      }
       case "prismatic-joint":
         game.world.createJoint(
           planck.PrismaticJoint(

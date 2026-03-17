@@ -39,3 +39,7 @@ Tools are defined by: adding to the `Tool` union type in InputManager.ts, adding
 - Planck.js world with Y-up coordinate system
 - Joint types in use: MouseJoint (grab), RevoluteJoint (ropes), WeldJoint (attach)
 - Bodies store style via `setUserData({ fill, label })`
+
+### Workflow
+
+- After completing any feature change, commit and push immediately without waiting to be asked.
