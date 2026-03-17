@@ -20,6 +20,7 @@ export class RagdollController {
     const left = this.keys.has("ArrowLeft");
     const right = this.keys.has("ArrowRight");
     const jump = this.keys.has("ArrowUp");
+    const down = this.keys.has("ArrowDown");
 
     for (const rd of this.game.ragdolls) {
       const torso = rd.torso;
@@ -37,6 +38,9 @@ export class RagdollController {
       if (jump && vel.y < MAX_FLY_SPEED) {
         const impulse = grounded ? JUMP_IMPULSE : JUMP_IMPULSE * 0.5;
         torso.ApplyLinearImpulse(new B2.b2Vec2(0, impulse * torso.GetMass()), torso.GetPosition(), true);
+      }
+      if (down && vel.y > -MAX_FLY_SPEED) {
+        torso.ApplyLinearImpulse(new B2.b2Vec2(0, -JUMP_IMPULSE * 0.5 * torso.GetMass()), torso.GetPosition(), true);
       }
     }
   }
