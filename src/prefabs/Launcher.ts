@@ -60,14 +60,15 @@ export function createLauncher(pw: PhysWorld, x: number, y: number): Body {
 
   const frameB = new B2.b2Transform();
   frameB.p = rod.GetLocalPoint(anchorVec);
-  frameB.q = B2.b2Rot_identity;
+  const localAxisB = rod.GetLocalVector(new B2.b2Vec2(0, 1));
+  frameB.q = B2.b2MakeRot(Math.atan2(localAxisB.y, localAxisB.x));
   prisDef.base.localFrameB = frameB;
 
   prisDef.enableLimit = true;
   prisDef.lowerTranslation = 0;
   prisDef.upperTranslation = 3;
   prisDef.enableMotor = true;
-  prisDef.maxMotorForce = 200;
+  prisDef.maxMotorForce = 500;
   prisDef.motorSpeed = 5;
 
   const pistonId = B2.b2CreatePrismaticJoint(pw.worldId, prisDef);
