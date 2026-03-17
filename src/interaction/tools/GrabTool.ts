@@ -1,4 +1,5 @@
 import type { Body } from "box2d3";
+import { isTerrain } from "../../engine/BodyUserData";
 import { b2 } from "../../engine/Box2D";
 import { findClosestBody, isDynamic } from "../../engine/Physics";
 import type { JointHandle } from "../../engine/PhysWorld";
@@ -43,6 +44,15 @@ export class GrabTool implements ToolHandler {
       const pos = this.grabbedStatic.GetPosition();
       const rot = this.grabbedStatic.GetRotation();
       this.grabbedStatic.SetTransform(new B2.b2Vec2(pos.x + wdx, pos.y + wdy), rot);
+
+      // Keep terrain userData points in sync with body movement
+      const ud = this.ctx.game.pw.getUserData(this.grabbedStatic);
+      if (isTerrain(ud)) {
+        for (const p of ud.terrainPoints) {
+          p.x += wdx;
+          p.y += wdy;
+        }
+      }
     }
   }
 

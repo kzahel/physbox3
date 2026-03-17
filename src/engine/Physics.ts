@@ -220,6 +220,20 @@ export function findClosestBody(pw: PhysWorld, wx: number, wy: number, radius: n
     if (d < bestDist && d < radius) {
       bestDist = d;
       target = body;
+      return;
+    }
+
+    // Terrain bodies sit at origin — check surface segments
+    const ud = pw.getUserData(body);
+    if (ud?.label === "terrain" && "terrainPoints" in ud) {
+      const pts = ud.terrainPoints as { x: number; y: number }[];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const sd = distToSegment({ x: wx, y: wy }, pts[i], pts[i + 1]);
+        if (sd < bestDist && sd < radius) {
+          bestDist = sd;
+          target = body;
+        }
+      }
     }
   });
 
