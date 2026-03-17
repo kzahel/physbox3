@@ -20,6 +20,7 @@ export class SettingsPane {
       <label><button id="s-reset">Reset Scene</button></label>
       <label><button id="s-pause">${game.paused ? "Play" : "Pause"}</button></label>
       <label><button id="s-fullscreen">Fullscreen</button></label>
+      <label><button id="s-debug-bounds">Debug Bounds</button></label>
 
       <div class="section-title">Scenes</div>
       <div class="scene-save-row">
@@ -72,6 +73,15 @@ export class SettingsPane {
     });
     document.addEventListener("fullscreenchange", () => {
       fsBtn.textContent = document.fullscreenElement ? "Exit Fullscreen" : "Fullscreen";
+    });
+
+    const debugBtn = container.querySelector<HTMLButtonElement>("#s-debug-bounds")!;
+    debugBtn.addEventListener("click", () => {
+      const r = game.renderer as { debug?: boolean };
+      if ("debug" in r) {
+        r.debug = !r.debug;
+        debugBtn.textContent = r.debug ? "Debug Bounds: ON" : "Debug Bounds";
+      }
     });
 
     // Scene save/load
