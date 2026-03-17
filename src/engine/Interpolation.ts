@@ -30,10 +30,13 @@ export function lerpBody(body: Body, interp: Interpolation): { x: number; y: num
     return { x: cur.x, y: cur.y, angle: curAngle };
   }
   const a = interp.alpha;
+  // Shortest-arc interpolation: normalize angle delta to [-π, π]
+  let da = curAngle - prev.angle;
+  da -= Math.round(da / (2 * Math.PI)) * 2 * Math.PI;
   return {
     x: prev.x + (cur.x - prev.x) * a,
     y: prev.y + (cur.y - prev.y) * a,
-    angle: prev.angle + (curAngle - prev.angle) * a,
+    angle: prev.angle + da * a,
   };
 }
 
