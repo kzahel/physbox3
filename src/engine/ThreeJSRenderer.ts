@@ -8,6 +8,7 @@ import { KILL_Y, KILL_Y_TOP } from "./Game";
 import type { IRenderer } from "./IRenderer";
 import { bodyColor, OverlayRenderer } from "./OverlayRenderer";
 import { type Particle, ParticleSystem } from "./ParticleSystem";
+import { forEachBody } from "./Physics";
 
 // ── Color parsing ──
 
@@ -375,7 +376,7 @@ export class ThreeJSRenderer implements IRenderer {
   private syncBodies(world: planck.World) {
     const seen = new Set<planck.Body>();
 
-    for (let body = world.getBodyList(); body; body = body.getNext()) {
+    forEachBody(world, (body) => {
       seen.add(body);
       const pos = body.getPosition();
       const angle = body.getAngle();
@@ -401,7 +402,7 @@ export class ThreeJSRenderer implements IRenderer {
         this.scene.add(group);
         this.bodyMeshes.set(body, { group, key });
       }
-    }
+    });
 
     for (const [body, entry] of this.bodyMeshes) {
       if (!seen.has(body)) {

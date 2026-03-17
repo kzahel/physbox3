@@ -2,6 +2,11 @@ import * as planck from "planck";
 import { playExplosion } from "./Audio";
 import type { IRenderer } from "./IRenderer";
 
+/** Iterate all bodies in the world (hides Planck's linked-list API). */
+export function forEachBody(world: planck.World, cb: (body: planck.Body) => void): void {
+  for (let b = world.getBodyList(); b; b = b.getNext()) cb(b);
+}
+
 /** Mark a body as destroyed in its userData so timer-based prefabs (cannons, dynamite) stop. */
 export function markDestroyed(body: planck.Body): void {
   const ud = (body.getUserData() ?? {}) as Record<string, unknown>;
@@ -208,9 +213,9 @@ export function bodyRadius(body: planck.Body): number {
 
 export function clearDynamic(world: planck.World): void {
   const toRemove: planck.Body[] = [];
-  for (let b = world.getBodyList(); b; b = b.getNext()) {
+  forEachBody(world, (b) => {
     if (b.isDynamic()) toRemove.push(b);
-  }
+  });
   for (const b of toRemove) {
     markDestroyed(b);
     world.destroyBody(b);

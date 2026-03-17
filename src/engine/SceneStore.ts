@@ -1,6 +1,6 @@
 import * as planck from "planck";
 import type { Game } from "./Game";
-import { markDestroyed } from "./Physics";
+import { forEachBody, markDestroyed } from "./Physics";
 
 // ── Serialization types ──
 
@@ -250,7 +250,7 @@ export function serializeScene(game: Game): SceneData {
   const bodies: SerializedBody[] = [];
   let nextId = 0;
 
-  for (let b = game.world.getBodyList(); b; b = b.getNext()) {
+  forEachBody(game.world, (b) => {
     const id = nextId++;
     bodyMap.set(b, id);
 
@@ -304,7 +304,7 @@ export function serializeScene(game: Game): SceneData {
       fixtures,
       userData: b.getUserData(),
     });
-  }
+  });
 
   const joints: SerializedJoint[] = [];
   for (let j = game.world.getJointList(); j; j = j.getNext()) {
@@ -336,9 +336,7 @@ export function serializeScene(game: Game): SceneData {
 export function deserializeScene(game: Game, data: SceneData) {
   // Clear everything
   const bodiesToRemove: planck.Body[] = [];
-  for (let b = game.world.getBodyList(); b; b = b.getNext()) {
-    bodiesToRemove.push(b);
-  }
+  forEachBody(game.world, (b) => bodiesToRemove.push(b));
   for (const b of bodiesToRemove) {
     markDestroyed(b);
     game.world.destroyBody(b);

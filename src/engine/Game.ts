@@ -20,19 +20,20 @@ import { playBounce, playWoodHit, unlockAudio } from "./Audio";
 import { getBodyUserData } from "./BodyUserData";
 import { Camera } from "./Camera";
 import type { IRenderer } from "./IRenderer";
-import { clearDynamic, destroyBodyAt, explodeAt, markDestroyed, scaleBody } from "./Physics";
+import { clearDynamic, destroyBodyAt, explodeAt, forEachBody, markDestroyed, scaleBody } from "./Physics";
 import { Renderer } from "./Renderer";
 
 export const KILL_Y = -100;
 export const KILL_Y_TOP = 200;
 const TIMESTEP = 1 / 60;
+const COLLISION_MIN_IMPULSE = 2;
+const COLLISION_MAX_IMPULSE = 15;
 
 function applyMotorTorque(world: planck.World) {
-  for (let b = world.getBodyList(); b; b = b.getNext()) {
+  forEachBody(world, (b) => {
     const ud = getBodyUserData(b);
-    if (ud?.motorSpeed == null) continue;
-    b.setAngularVelocity(ud.motorSpeed);
-  }
+    if (ud?.motorSpeed != null) b.setAngularVelocity(ud.motorSpeed);
+  });
 }
 
 export class Game {
@@ -107,18 +108,15 @@ export class Game {
   }
 
   private bindCollisionSounds() {
-    const MIN_IMPULSE = 2;
-    const MAX_IMPULSE = 15;
-
     this.world.on("post-solve", (contact, impulse) => {
       const ni = impulse.normalImpulses[0];
-      if (ni < MIN_IMPULSE) return;
+      if (ni < COLLISION_MIN_IMPULSE) return;
 
       const fA = contact.getFixtureA();
       const fB = contact.getFixtureB();
       const tA = fA.getShape().getType();
       const tB = fB.getShape().getType();
-      const intensity = Math.min(1, (ni - MIN_IMPULSE) / (MAX_IMPULSE - MIN_IMPULSE));
+      const intensity = Math.min(1, (ni - COLLISION_MIN_IMPULSE) / (COLLISION_MAX_IMPULSE - COLLISION_MIN_IMPULSE));
 
       if (tA === "circle" || tB === "circle") {
         playBounce(intensity);
@@ -349,7 +347,7 @@ export class Game {
   private removeOutOfBoundsBodies() {
     const toRemove: planck.Body[] = [];
     let count = 0;
-    for (let b = this.world.getBodyList(); b; b = b.getNext()) {
+    forEachBody(this.world, (b) => {
       if (b.isDynamic()) {
         if (b.getPosition().y < KILL_Y || b.getPosition().y > KILL_Y_TOP) {
           toRemove.push(b);
@@ -357,7 +355,7 @@ export class Game {
           count++;
         }
       }
-    }
+    });
     for (const b of toRemove) {
       markDestroyed(b);
       this.world.destroyBody(b);

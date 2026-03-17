@@ -8,14 +8,22 @@ import { bodyColor, OverlayRenderer } from "./OverlayRenderer";
 import { ParticleSystem } from "./ParticleSystem";
 import { forEachBody } from "./Physics";
 
+// Ocean wave parameters (frequency, amplitude pairs)
+const OCEAN_WAVE_A = { freq: 0.8, amp: 2 };
+const OCEAN_WAVE_B = { freq: 1.5, amp: 1 };
+
+// Sky wisp parameters (frequency, amplitude pairs)
+const SKY_WISP_A = { freq: 0.5, amp: 3 };
+const SKY_WISP_B = { freq: 1.2, amp: 1.5 };
+
 /** Ocean surface wave displacement in world units */
 function oceanWave(wx: number): number {
-  return Math.sin(wx * 0.8) * 2 + Math.sin(wx * 1.5) * 1;
+  return Math.sin(wx * OCEAN_WAVE_A.freq) * OCEAN_WAVE_A.amp + Math.sin(wx * OCEAN_WAVE_B.freq) * OCEAN_WAVE_B.amp;
 }
 
 /** Sky boundary wisp displacement in world units */
 function cloudWisp(wx: number): number {
-  return Math.sin(wx * 0.5) * 3 + Math.sin(wx * 1.2) * 1.5;
+  return Math.sin(wx * SKY_WISP_A.freq) * SKY_WISP_A.amp + Math.sin(wx * SKY_WISP_B.freq) * SKY_WISP_B.amp;
 }
 
 export class Renderer implements IRenderer {

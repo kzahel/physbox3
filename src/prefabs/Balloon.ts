@@ -1,5 +1,6 @@
 import * as planck from "planck";
-import { getBodyUserData } from "../engine/BodyUserData";
+import { type BalloonData, getBodyUserData, isBalloon } from "../engine/BodyUserData";
+import { forEachBody } from "../engine/Physics";
 
 export function createBalloon(world: planck.World, x: number, y: number): planck.Body {
   const r = Math.random;
@@ -21,15 +22,15 @@ export function createBalloon(world: planck.World, x: number, y: number): planck
   });
 
   const lift = 25 + r() * 10;
-  body.setUserData({ fill: color, label: "balloon", lift });
+  body.setUserData({ fill: color, label: "balloon", lift } satisfies BalloonData);
   return body;
 }
 
 export function applyBalloonLift(world: planck.World): void {
-  for (let b = world.getBodyList(); b; b = b.getNext()) {
-    if (!b.isDynamic()) continue;
+  forEachBody(world, (b) => {
+    if (!b.isDynamic()) return;
     const ud = getBodyUserData(b);
-    if (ud?.label !== "balloon" || !ud.lift) continue;
+    if (!isBalloon(ud)) return;
     b.applyForceToCenter(planck.Vec2(0, ud.lift * b.getMass()), true);
-  }
+  });
 }

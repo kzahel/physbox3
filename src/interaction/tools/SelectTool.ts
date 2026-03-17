@@ -1,5 +1,5 @@
 import type * as planck from "planck";
-import { getBodyUserData } from "../../engine/BodyUserData";
+import { getBodyUserData, isConveyor, isRocket } from "../../engine/BodyUserData";
 import {
   BTN_DIRECTION_OFFSET_Y,
   BTN_HALF_HEIGHT,
@@ -86,10 +86,10 @@ function reverseDirection(body: import("planck").Body, world: import("planck").W
     }
   } else if (label === "conveyor") {
     const ud = getBodyUserData(body);
-    if (ud && ud.speed != null) ud.speed = -ud.speed;
+    if (isConveyor(ud)) ud.speed = -ud.speed;
   } else if (label === "rocket") {
     const ud = getBodyUserData(body);
-    if (ud && ud.thrust != null) ud.thrust = -ud.thrust;
+    if (isRocket(ud)) ud.thrust = -ud.thrust;
   }
   const mud = getBodyUserData(body);
   if (mud && mud.motorSpeed != null) mud.motorSpeed = -mud.motorSpeed;

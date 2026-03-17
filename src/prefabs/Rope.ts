@@ -1,21 +1,42 @@
 import * as planck from "planck";
 
+// Rope link physics
+const MAX_ROPE_LINKS = 30;
+const LINK_HALF_WIDTH = 0.08;
+const LINK_DENSITY = 2;
+const LINK_FRICTION = 0.4;
+const LINK_LINEAR_DAMPING = 0.5;
+const LINK_ANGULAR_DAMPING = 2;
+const LINK_COLOR = "rgba(180,160,120,0.7)";
+const ANCHOR_RADIUS = 0.15;
+
+// Stabilizer spring parameters
+const STABILIZER_SLACK = 1.15;
+const STABILIZER_SPRING_K = 50;
+const STABILIZER_DAMPING = 5;
+
 export function createChainRope(world: planck.World, x: number, y: number, links: number, linkLen = 0.4): planck.Body {
   const anchor = world.createBody({ type: "static", position: planck.Vec2(x, y) });
-  anchor.createFixture({ shape: planck.Circle(0.15) });
+  anchor.createFixture({ shape: planck.Circle(ANCHOR_RADIUS) });
 
   let prev: planck.Body = anchor;
   for (let i = 0; i < links; i++) {
     const link = world.createBody({
       type: "dynamic",
       position: planck.Vec2(x, y - (i + 1) * linkLen),
-      linearDamping: 0.5,
-      angularDamping: 2,
+      linearDamping: LINK_LINEAR_DAMPING,
+      angularDamping: LINK_ANGULAR_DAMPING,
     });
-    link.createFixture({ shape: planck.Box(0.08, linkLen / 2), density: 2, friction: 0.4 });
-    link.setUserData({ fill: "rgba(180,160,120,0.7)" });
+    link.createFixture({
+      shape: planck.Box(LINK_HALF_WIDTH, linkLen / 2),
+      density: LINK_DENSITY,
+      friction: LINK_FRICTION,
+    });
+    link.setUserData({ fill: LINK_COLOR });
 
-    world.createJoint(planck.RevoluteJoint({ collideConnected: true }, prev, link, planck.Vec2(x, y - i * linkLen - linkLen / 2)));
+    world.createJoint(
+      planck.RevoluteJoint({ collideConnected: true }, prev, link, planck.Vec2(x, y - i * linkLen - linkLen / 2)),
+    );
     prev = link;
   }
   return prev;
@@ -33,8 +54,7 @@ export function createRopeBetween(
   const dx = x2 - x1;
   const dy = y2 - y1;
   const dist = Math.hypot(dx, dy);
-  const MAX_LINKS = 30;
-  const links = Math.max(2, Math.min(MAX_LINKS, Math.round(dist / 0.4)));
+  const links = Math.max(2, Math.min(MAX_ROPE_LINKS, Math.round(dist / 0.4)));
   const linkLen = dist / links;
   const stepX = dx / links;
   const stepY = dy / links;
@@ -45,7 +65,7 @@ export function createRopeBetween(
     prev = bodyA;
   } else {
     prev = world.createBody({ type: "static", position: planck.Vec2(x1, y1) });
-    prev.createFixture({ shape: planck.Circle(0.15) });
+    prev.createFixture({ shape: planck.Circle(ANCHOR_RADIUS) });
   }
 
   const chainLinks: planck.Body[] = [];
@@ -56,11 +76,15 @@ export function createRopeBetween(
       type: "dynamic",
       position: planck.Vec2(lx, ly),
       angle,
-      linearDamping: 0.5,
-      angularDamping: 2,
+      linearDamping: LINK_LINEAR_DAMPING,
+      angularDamping: LINK_ANGULAR_DAMPING,
     });
-    link.createFixture({ shape: planck.Box(0.08, linkLen / 2), density: 2, friction: 0.4 });
-    link.setUserData({ fill: "rgba(180,160,120,0.7)" });
+    link.createFixture({
+      shape: planck.Box(LINK_HALF_WIDTH, linkLen / 2),
+      density: LINK_DENSITY,
+      friction: LINK_FRICTION,
+    });
+    link.setUserData({ fill: LINK_COLOR });
 
     const jx = x1 + stepX * (i - 0.5);
     const jy = y1 + stepY * (i - 0.5);
@@ -74,7 +98,7 @@ export function createRopeBetween(
     end = bodyB;
   } else {
     end = world.createBody({ type: "static", position: planck.Vec2(x2, y2) });
-    end.createFixture({ shape: planck.Circle(0.15) });
+    end.createFixture({ shape: planck.Circle(ANCHOR_RADIUS) });
   }
 
   const jx = x1 + stepX * (links - 0.5);
@@ -102,7 +126,7 @@ export function createRopeBetween(
     // Add midpoint (and quarter-point for longer ropes) stabilizer joints.
     // These constrain sub-spans of the rope so the middle can't stretch freely.
     // The slack factor allows natural catenary sag before the spring engages.
-    const SLACK = 1.15; // 15% slack before spring force kicks in
+    const SLACK = STABILIZER_SLACK;
     const interiorPoints = chainLinks.length >= 8 ? [0.25, 0.5, 0.75] : [0.5];
     for (const frac of interiorPoints) {
       const idx = Math.floor((chainLinks.length - 1) * frac);
@@ -151,8 +175,8 @@ export function createRopeBetween(
  * This supplements the constraint solver by providing a smooth restoring force gradient.
  */
 export function applyRopeStabilization(world: planck.World) {
-  const SPRING_K = 50; // spring stiffness
-  const DAMPING = 5; // velocity damping along rope axis
+  const SPRING_K = STABILIZER_SPRING_K;
+  const DAMPING = STABILIZER_DAMPING;
   const toDestroy: planck.Joint[] = [];
 
   for (let j = world.getJointList(); j; j = j.getNext()) {

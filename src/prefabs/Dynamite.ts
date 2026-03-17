@@ -1,6 +1,9 @@
 import * as planck from "planck";
-import { getBodyUserData } from "../engine/BodyUserData";
-import { markDestroyed } from "../engine/Physics";
+import { type DynamiteData, getBodyUserData, isDynamite } from "../engine/BodyUserData";
+import { forEachBody, markDestroyed } from "../engine/Physics";
+
+const DYNAMITE_EXPLOSION_RADIUS = 8;
+const DYNAMITE_EXPLOSION_FORCE = 30;
 
 export function createDynamite(world: planck.World, x: number, y: number, fuseTime = 3): planck.Body {
   const body = world.createBody({ type: "dynamic", position: planck.Vec2(x, y) });
@@ -10,7 +13,7 @@ export function createDynamite(world: planck.World, x: number, y: number, fuseTi
     label: "dynamite",
     fuseRemaining: fuseTime,
     fuseDuration: fuseTime,
-  });
+  } satisfies DynamiteData);
   return body;
 }
 
@@ -21,17 +24,17 @@ export function tickDynamite(
   explodeAt: (wx: number, wy: number, radius: number, force: number) => void,
 ) {
   const toExplode: planck.Body[] = [];
-  for (let b = world.getBodyList(); b; b = b.getNext()) {
+  forEachBody(world, (b) => {
     const ud = getBodyUserData(b);
-    if (ud?.label !== "dynamite" || ud.fuseRemaining == null) continue;
+    if (!isDynamite(ud)) return;
     ud.fuseRemaining -= dt;
     if (ud.fuseRemaining <= 0) toExplode.push(b);
-  }
+  });
   for (const b of toExplode) {
     const ud = getBodyUserData(b);
     if (ud?.destroyed) continue;
     const pos = b.getPosition();
-    explodeAt(pos.x, pos.y, 8, 30);
+    explodeAt(pos.x, pos.y, DYNAMITE_EXPLOSION_RADIUS, DYNAMITE_EXPLOSION_FORCE);
     markDestroyed(b);
     world.destroyBody(b);
   }

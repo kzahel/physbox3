@@ -4,9 +4,10 @@ import { ERASE_RADIUS_PX } from "../interaction/tools/EraseTool";
 import { GLUE_RADIUS_PX } from "../interaction/tools/GlueTool";
 import { GRAB_RADIUS_PX } from "../interaction/tools/GrabTool";
 import { hasMotor, isDirectional } from "../interaction/tools/SelectTool";
-import { getBodyUserData } from "./BodyUserData";
+import { getBodyUserData, isBalloon, isConveyor, isDynamite } from "./BodyUserData";
 import type { Camera } from "./Camera";
 import type { IParticleSystem } from "./IRenderer";
+import { forEachBody } from "./Physics";
 
 /** Button dimensions shared with SelectTool for hit detection */
 export const BTN_HALF_WIDTH = 38;
@@ -44,6 +45,12 @@ const BALLOON_STRING_LENGTH_FACTOR = 3;
 const BALLOON_STRING_SEGMENTS = 3;
 const BALLOON_STRING_WOBBLE = 4;
 const BALLOON_SHINE_SCALE = 0.3;
+
+// Dynamite wick rendering
+const WICK_BASE_OFFSET = 0.4;
+const WICK_MAX_LENGTH = 0.5;
+const WICK_GLOW_MIN_RADIUS = 4;
+const WICK_GLOW_RADIUS_JITTER = 3;
 
 const PLATFORM_PREVIEW_COLORS: Partial<Record<Tool, string>> = {
   fan: "rgba(120, 180, 220, 0.9)",
@@ -208,15 +215,15 @@ export class OverlayRenderer {
     const ctx = this.ctx;
     const time = performance.now() / 1000;
 
-    for (let body = world.getBodyList(); body; body = body.getNext()) {
+    forEachBody(world, (body) => {
       const ud = getBodyUserData(body);
-      if (ud?.label !== "conveyor") continue;
+      if (!isConveyor(ud)) return;
 
-      const speed = ud.speed ?? 3;
+      const speed = ud.speed;
       const pos = body.getPosition();
       const angle = body.getAngle();
       const fixture = body.getFixtureList();
-      if (!fixture) continue;
+      if (!fixture) return;
       const shape = fixture.getShape() as planck.PolygonShape;
       const hw = Math.abs(shape.m_vertices[0].x);
 
@@ -246,19 +253,19 @@ export class OverlayRenderer {
       }
 
       ctx.restore();
-    }
+    });
   }
 
   private drawBalloonStrings(world: planck.World, camera: Camera) {
     const ctx = this.ctx;
-    for (let body = world.getBodyList(); body; body = body.getNext()) {
+    forEachBody(world, (body) => {
       const ud = getBodyUserData(body);
-      if (ud?.label !== "balloon") continue;
+      if (!isBalloon(ud)) return;
 
       const pos = body.getPosition();
       const angle = body.getAngle();
       const fixture = body.getFixtureList();
-      if (!fixture) continue;
+      if (!fixture) return;
       const shape = fixture.getShape() as planck.CircleShape;
       const radius = shape.getRadius();
 
@@ -287,13 +294,13 @@ export class OverlayRenderer {
       ctx.fillStyle = "rgba(255,255,255,0.25)";
       ctx.fill();
       ctx.restore();
-    }
+    });
   }
 
   private drawDynamiteEffects(world: planck.World, camera: Camera) {
-    for (let body = world.getBodyList(); body; body = body.getNext()) {
+    forEachBody(world, (body) => {
       const ud = getBodyUserData(body);
-      if (ud?.label !== "dynamite" || ud.fuseRemaining == null || !ud.fuseDuration) continue;
+      if (!isDynamite(ud)) return;
 
       const remaining = Math.max(0, ud.fuseRemaining / ud.fuseDuration);
 
@@ -301,9 +308,9 @@ export class OverlayRenderer {
       const angle = body.getAngle();
       const ctx = this.ctx;
 
-      const wickBaseX = pos.x + Math.sin(-angle) * 0.4;
-      const wickBaseY = pos.y + Math.cos(-angle) * 0.4;
-      const wickLen = 0.5 * remaining;
+      const wickBaseX = pos.x + Math.sin(-angle) * WICK_BASE_OFFSET;
+      const wickBaseY = pos.y + Math.cos(-angle) * WICK_BASE_OFFSET;
+      const wickLen = WICK_MAX_LENGTH * remaining;
       const wickEndX = wickBaseX + Math.sin(-angle) * wickLen;
       const wickEndY = wickBaseY + Math.cos(-angle) * wickLen;
 
@@ -320,11 +327,11 @@ export class OverlayRenderer {
       if (remaining > 0) {
         this.particles.spawnSpark(wickEndX, wickEndY);
         ctx.beginPath();
-        ctx.arc(weSp.x, weSp.y, 4 + Math.random() * 3, 0, Math.PI * 2);
+        ctx.arc(weSp.x, weSp.y, WICK_GLOW_MIN_RADIUS + Math.random() * WICK_GLOW_RADIUS_JITTER, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(255,${150 + Math.floor(Math.random() * 100)},50,${0.5 + Math.random() * 0.3})`;
         ctx.fill();
       }
-    }
+    });
   }
 
   // ── Draw tool preview ──

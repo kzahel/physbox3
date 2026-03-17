@@ -1,6 +1,7 @@
 import * as planck from "planck";
-import { getBodyUserData } from "../engine/BodyUserData";
+import { type FanData, getBodyUserData, isFan } from "../engine/BodyUserData";
 import type { IRenderer } from "../engine/IRenderer";
+import { forEachBody } from "../engine/Physics";
 
 export function createFan(
   world: planck.World,
@@ -12,19 +13,30 @@ export function createFan(
 ): planck.Body {
   const body = world.createBody({ type: "static", position: planck.Vec2(x, y), angle });
   body.createFixture({ shape: planck.Box(0.4, 0.25), friction: 0.5 });
-  body.setUserData({ fill: "rgba(120,180,220,0.85)", label: "fan", force, range });
+  body.setUserData({ fill: "rgba(120,180,220,0.85)", label: "fan", force, range } satisfies FanData);
   return body;
 }
 
 /** Helper to iterate fans and compute direction/range. */
-function forEachFan(world: planck.World, cb: (fan: planck.Body, pos: planck.Vec2, angle: number, force: number, range: number, dirX: number, dirY: number) => void) {
-  for (let fan = world.getBodyList(); fan; fan = fan.getNext()) {
+function forEachFan(
+  world: planck.World,
+  cb: (
+    fan: planck.Body,
+    pos: planck.Vec2,
+    angle: number,
+    force: number,
+    range: number,
+    dirX: number,
+    dirY: number,
+  ) => void,
+) {
+  forEachBody(world, (fan) => {
     const ud = getBodyUserData(fan);
-    if (ud?.label !== "fan") continue;
+    if (!isFan(ud)) return;
     const pos = fan.getPosition();
     const angle = fan.getAngle();
-    cb(fan, pos, angle, ud.force ?? 15, ud.range ?? 10, Math.cos(angle), Math.sin(angle));
-  }
+    cb(fan, pos, angle, ud.force, ud.range, Math.cos(angle), Math.sin(angle));
+  });
 }
 
 /** Apply fan forces to nearby bodies. Must be called inside the fixed timestep loop. */

@@ -1,7 +1,13 @@
 import * as planck from "planck";
-import { getBodyUserData } from "../engine/BodyUserData";
+import { type CannonballData, type CannonData, getBodyUserData, isCannon, isCannonball } from "../engine/BodyUserData";
 import type { IRenderer } from "../engine/IRenderer";
-import { markDestroyed } from "../engine/Physics";
+import { forEachBody, markDestroyed } from "../engine/Physics";
+
+const CANNON_FIRE_INTERVAL = 1; // seconds between shots
+const CANNONBALL_SPEED = 20;
+const CANNONBALL_LIFETIME = 5; // seconds before auto-despawn
+const CANNONBALL_EXPLOSION_RADIUS = 5;
+const CANNONBALL_EXPLOSION_FORCE = 20;
 
 export function createCannon(world: planck.World, x: number, y: number, angle: number): planck.Body {
   const body = world.createBody({ type: "static", position: planck.Vec2(x, y), angle });
@@ -14,7 +20,7 @@ export function createCannon(world: planck.World, x: number, y: number, angle: n
       planck.Vec2(0.4, 0.35),
     ]),
   });
-  body.setUserData({ fill: "rgba(80,80,90,0.9)", label: "cannon", cannonCooldown: 0.5 });
+  body.setUserData({ fill: "rgba(80,80,90,0.9)", label: "cannon", cannonCooldown: 0.5 } satisfies CannonData);
   return body;
 }
 
@@ -29,11 +35,15 @@ function fireCannon(world: planck.World, cannon: planck.Body, renderer: IRendere
   const spawnY = pos.y + dirY * 1.0;
   const ball = world.createBody({ type: "dynamic", position: planck.Vec2(spawnX, spawnY) });
   ball.createFixture({ shape: planck.Circle(0.2), density: 5, friction: 0.3, restitution: 0.1 });
-  ball.setUserData({ fill: "rgba(100,100,110,0.9)", label: "cannonball", lifetime: 5, parentCannon: cannon });
+  ball.setUserData({
+    fill: "rgba(100,100,110,0.9)",
+    label: "cannonball",
+    lifetime: CANNONBALL_LIFETIME,
+    parentCannon: cannon,
+  } satisfies CannonballData);
   ball.setBullet(true);
 
-  const speed = 20;
-  ball.setLinearVelocity(planck.Vec2(dirX * speed, dirY * speed));
+  ball.setLinearVelocity(planck.Vec2(dirX * CANNONBALL_SPEED, dirY * CANNONBALL_SPEED));
   renderer.particles.spawnMuzzleFlash(spawnX, spawnY);
 }
 
@@ -60,22 +70,27 @@ export function tickCannons(
       let other: planck.Body | null = null;
       const udA = getBodyUserData(fA);
       const udB = getBodyUserData(fB);
-      if (udA?.label === "cannonball" && !udA.exploded) {
+      if (isCannonball(udA) && !udA.exploded) {
         ball = fA;
         other = fB;
-      } else if (udB?.label === "cannonball" && !udB.exploded) {
+      } else if (isCannonball(udB) && !udB.exploded) {
         ball = fB;
         other = fA;
       }
       if (!ball || !other) return;
-      const bud = getBodyUserData(ball)!;
+      const bud = getBodyUserData(ball)! as CannonballData;
       // Don't explode on the cannon that fired this ball
       if (other === bud.parentCannon) return;
       bud.exploded = true;
       // Defer destruction to after physics step
       setTimeout(() => {
         if (bud.destroyed) return;
-        explodeAt(ball!.getPosition().x, ball!.getPosition().y, 5, 20);
+        explodeAt(
+          ball!.getPosition().x,
+          ball!.getPosition().y,
+          CANNONBALL_EXPLOSION_RADIUS,
+          CANNONBALL_EXPLOSION_FORCE,
+        );
         markDestroyed(ball!);
         world.destroyBody(ball!);
       }, 0);
@@ -83,27 +98,27 @@ export function tickCannons(
   }
 
   // Tick cannon cooldowns and fire
-  for (let b = world.getBodyList(); b; b = b.getNext()) {
+  forEachBody(world, (b) => {
     const ud = getBodyUserData(b);
-    if (ud?.label !== "cannon" || ud.cannonCooldown == null) continue;
+    if (!isCannon(ud)) return;
     ud.cannonCooldown -= dt;
     if (ud.cannonCooldown <= 0) {
       if (!ud.destroyed) fireCannon(world, b, renderer);
-      ud.cannonCooldown = 1; // fire every 1s
+      ud.cannonCooldown = CANNON_FIRE_INTERVAL;
     }
-  }
+  });
 
   // Tick cannonball lifetimes
   const toDestroy: planck.Body[] = [];
-  for (let b = world.getBodyList(); b; b = b.getNext()) {
+  forEachBody(world, (b) => {
     const ud = getBodyUserData(b);
-    if (ud?.label !== "cannonball" || ud.lifetime == null) continue;
+    if (!isCannonball(ud)) return;
     ud.lifetime -= dt;
     if (ud.lifetime <= 0 && !ud.exploded && !ud.destroyed) {
       markDestroyed(b);
       toDestroy.push(b);
     }
-  }
+  });
   for (const b of toDestroy) {
     world.destroyBody(b);
   }

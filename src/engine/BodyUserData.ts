@@ -1,39 +1,104 @@
 /**
  * Centralized type for body.getUserData() across the codebase.
- * All fields are optional since different prefabs set different subsets.
+ * Uses a discriminated union on `label` for type-safe access per prefab type.
  */
-export interface BodyUserData {
+
+/** Shared fields present on all body user data. */
+interface BodyDataBase {
   fill?: string;
-  label?: string;
   stroke?: string;
-  // Motor (any body with spinning motor)
+  destroyed?: boolean;
   motorSpeed?: number;
-  // Conveyor belt
-  speed?: number;
-  // Rocket
-  thrust?: number;
-  fuel?: number;
-  // Fan
-  force?: number;
-  range?: number;
-  // Balloon
-  lift?: number;
-  // Dynamite
-  fuseRemaining?: number;
-  fuseDuration?: number;
-  // Cannon
-  cannonCooldown?: number;
-  // Cannonball
-  lifetime?: number;
+}
+
+export interface RocketData extends BodyDataBase {
+  label: "rocket";
+  thrust: number;
+  fuel: number;
+}
+
+export interface FanData extends BodyDataBase {
+  label: "fan";
+  force: number;
+  range: number;
+}
+
+export interface BalloonData extends BodyDataBase {
+  label: "balloon";
+  lift: number;
+}
+
+export interface DynamiteData extends BodyDataBase {
+  label: "dynamite";
+  fuseRemaining: number;
+  fuseDuration: number;
+}
+
+export interface CannonData extends BodyDataBase {
+  label: "cannon";
+  cannonCooldown: number;
+}
+
+export interface CannonballData extends BodyDataBase {
+  label: "cannonball";
+  lifetime: number;
   exploded?: boolean;
   parentCannon?: import("planck").Body;
-  // Destruction flag (cannon balls, dynamite, etc.)
-  destroyed?: boolean;
 }
+
+export interface ConveyorData extends BodyDataBase {
+  label: "conveyor";
+  speed: number;
+}
+
+/** Bodies with a generic or no label (ground, wall, rope links, etc.) */
+export interface GenericBodyData extends BodyDataBase {
+  label?: string;
+}
+
+export type BodyUserData =
+  | RocketData
+  | FanData
+  | BalloonData
+  | DynamiteData
+  | CannonData
+  | CannonballData
+  | ConveyorData
+  | GenericBodyData;
 
 /** Type-safe accessor for body userData */
 export function getBodyUserData(body: import("planck").Body): BodyUserData | null {
   return body.getUserData() as BodyUserData | null;
+}
+
+// ── Type guards for narrowing after getBodyUserData() ──
+
+export function isRocket(ud: BodyUserData | null): ud is RocketData {
+  return ud?.label === "rocket";
+}
+
+export function isFan(ud: BodyUserData | null): ud is FanData {
+  return ud?.label === "fan";
+}
+
+export function isBalloon(ud: BodyUserData | null): ud is BalloonData {
+  return ud?.label === "balloon";
+}
+
+export function isDynamite(ud: BodyUserData | null): ud is DynamiteData {
+  return ud?.label === "dynamite";
+}
+
+export function isCannon(ud: BodyUserData | null): ud is CannonData {
+  return ud?.label === "cannon";
+}
+
+export function isCannonball(ud: BodyUserData | null): ud is CannonballData {
+  return ud?.label === "cannonball";
+}
+
+export function isConveyor(ud: BodyUserData | null): ud is ConveyorData {
+  return ud?.label === "conveyor";
 }
 
 /** Fixture-level style data */
