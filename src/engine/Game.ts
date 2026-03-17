@@ -17,6 +17,7 @@ import { createSeesaw } from "../prefabs/Seesaw";
 import { createSpringBall } from "../prefabs/SpringBall";
 import { playBounce, playWoodHit, unlockAudio } from "./Audio";
 import { Camera } from "./Camera";
+import type { IRenderer } from "./IRenderer";
 import { clearDynamic, destroyBodyAt, explodeAt, markDestroyed, scaleBody } from "./Physics";
 import { Renderer } from "./Renderer";
 
@@ -35,8 +36,10 @@ function applyMotorTorque(world: planck.World) {
 export class Game {
   world: planck.World;
   camera: Camera;
-  renderer: Renderer;
+  renderer: IRenderer;
   canvas: HTMLCanvasElement;
+  /** Container element for canvases — used for event binding and sizing */
+  container: HTMLElement;
 
   gravity = -10;
   bounciness = 0.5;
@@ -67,19 +70,32 @@ export class Game {
   private frameCount = 0;
   private fpsTimer = 0;
 
+  private resizeHandler = () => this.renderer.resize();
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
+    this.container = canvas.parentElement!;
     this.world = new planck.World({ gravity: planck.Vec2(0, this.gravity) });
     this.camera = new Camera();
     this.renderer = new Renderer(canvas);
 
     this.renderer.resize();
-    window.addEventListener("resize", () => this.renderer.resize());
+    window.addEventListener("resize", this.resizeHandler);
     unlockAudio();
 
     this.buildDefaultScene();
     this.bindCollisionSounds();
     this.bindBounciness();
+  }
+
+  /** Swap the active renderer at runtime. */
+  setRenderer(newRenderer: IRenderer) {
+    this.renderer.dispose();
+    this.renderer = newRenderer;
+    if (this.inputManager) {
+      this.renderer.setInputManager(this.inputManager);
+    }
+    this.renderer.resize();
   }
 
   private bindBounciness() {

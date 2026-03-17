@@ -10,6 +10,7 @@ import {
 } from "../interaction/InputManager";
 import type { Camera } from "./Camera";
 import { KILL_Y, KILL_Y_TOP } from "./Game";
+import type { IRenderer } from "./IRenderer";
 import { ParticleSystem } from "./ParticleSystem";
 
 /** Button dimensions shared with SelectTool for hit detection */
@@ -38,7 +39,7 @@ const TOOL_CURSORS: Partial<Record<Tool, CursorStyle>> = {
   scale: { radius: 14, stroke: "rgba(180, 120, 255, 0.6)", fill: "rgba(180, 120, 255, 0.05)" },
 };
 
-export class Renderer {
+export class Renderer implements IRenderer {
   private ctx: CanvasRenderingContext2D;
   private canvas: HTMLCanvasElement;
   readonly particles = new ParticleSystem();
@@ -46,6 +47,10 @@ export class Renderer {
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
+  }
+
+  dispose() {
+    // Nothing to clean up for Canvas 2D
   }
 
   resize() {
@@ -151,7 +156,8 @@ export class Renderer {
     this.drawDynamiteEffects(world, camera);
 
     // Particles
-    this.particles.tick(this.ctx, camera, this.canvas);
+    this.particles.tick();
+    this.drawParticles(camera);
 
     // Draw tool cursor overlay
     if (this.inputManager?.toolCursor) {
@@ -280,6 +286,19 @@ export class Renderer {
   }
 
   private inputManager: InputManager | null = null;
+
+  private drawParticles(camera: Camera) {
+    const ctx = this.ctx;
+    for (const p of this.particles.getParticles()) {
+      const sp = camera.toScreen(p.x, p.y, this.canvas);
+      const alpha = p.life / p.maxLife;
+      const r = p.size * camera.zoom;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, Math.max(1, r), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha.toFixed(2)})`;
+      ctx.fill();
+    }
+  }
 
   private drawToolCursor(pos: { x: number; y: number }, radius: number, stroke: string, fill: string) {
     this.inScreenSpace(() => {

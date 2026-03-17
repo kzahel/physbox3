@@ -1,9 +1,9 @@
 import * as planck from "planck";
-import type { Renderer } from "../engine/Renderer";
+import type { IRenderer } from "../engine/IRenderer";
 
 export function createCannon(
   world: planck.World,
-  renderer: Renderer,
+  renderer: IRenderer,
   explodeAt: (wx: number, wy: number, radius: number, force: number) => void,
   x: number,
   y: number,

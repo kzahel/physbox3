@@ -1,5 +1,5 @@
 import * as planck from "planck";
-import type { Renderer } from "../engine/Renderer";
+import type { IRenderer } from "../engine/IRenderer";
 
 export function createFan(
   world: planck.World,
@@ -15,7 +15,7 @@ export function createFan(
   return body;
 }
 
-export function applyFanForce(world: planck.World, renderer: Renderer): void {
+export function applyFanForce(world: planck.World, renderer: IRenderer): void {
   for (let fan = world.getBodyList(); fan; fan = fan.getNext()) {
     const ud = fan.getUserData() as { label?: string; force?: number; range?: number } | null;
     if (ud?.label !== "fan") continue;

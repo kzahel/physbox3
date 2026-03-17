@@ -1,5 +1,5 @@
 import * as planck from "planck";
-import type { Renderer } from "../engine/Renderer";
+import type { IRenderer } from "../engine/IRenderer";
 
 export function createRocket(world: planck.World, x: number, y: number, angle = 0): planck.Body {
   const body = world.createBody({ type: "dynamic", position: planck.Vec2(x, y), angle });
@@ -20,7 +20,7 @@ export function createRocket(world: planck.World, x: number, y: number, angle = 
   return body;
 }
 
-export function applyRocketThrust(world: planck.World, renderer: Renderer, dt: number): void {
+export function applyRocketThrust(world: planck.World, renderer: IRenderer, dt: number): void {
   for (let b = world.getBodyList(); b; b = b.getNext()) {
     if (!b.isDynamic()) continue;
     const ud = b.getUserData() as { label?: string; thrust?: number; fuel?: number } | null;

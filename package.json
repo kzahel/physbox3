@@ -16,11 +16,13 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.7",
+    "@types/three": "^0.183.1",
     "typescript": "~5.9.3",
     "vite": "^7.2.2",
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "planck": "^1.0.6"
+    "planck": "^1.0.6",
+    "three": "^0.183.2"
   }
 }

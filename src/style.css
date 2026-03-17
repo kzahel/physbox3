@@ -11,10 +11,17 @@ body {
   color: #e0e0e0;
 }
 
-#canvas {
-  display: block;
+#canvas-container {
+  position: relative;
   width: 100vw;
   height: 100vh;
+  touch-action: none;
+}
+
+#canvas-container canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
   cursor: crosshair;
   touch-action: none;
 }

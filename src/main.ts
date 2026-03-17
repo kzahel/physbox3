@@ -65,6 +65,29 @@ if (TiltGravity.isSupported()) {
   bottomTools.appendChild(tiltBtn);
 }
 
+// 3D renderer toggle
+let is3D = false;
+const renderBtn = document.createElement("button");
+renderBtn.textContent = "3D";
+renderBtn.addEventListener("click", async () => {
+  if (!is3D) {
+    const { ThreeJSRenderer } = await import("./engine/ThreeJSRenderer");
+    const renderer3d = new ThreeJSRenderer(canvas);
+    game.setRenderer(renderer3d);
+    is3D = true;
+    renderBtn.classList.add("active");
+    renderBtn.textContent = "3D: ON";
+  } else {
+    const { Renderer } = await import("./engine/Renderer");
+    const renderer2d = new Renderer(canvas);
+    game.setRenderer(renderer2d);
+    is3D = false;
+    renderBtn.classList.remove("active");
+    renderBtn.textContent = "3D";
+  }
+});
+bottomTools.appendChild(renderBtn);
+
 // Light/Dark mode toggle
 const DARK_BG = "#1a1a2e";
 const LIGHT_BG = "#d8d8e0";

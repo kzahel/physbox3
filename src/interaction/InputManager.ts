@@ -238,18 +238,18 @@ export class InputManager {
   // ── Event binding ──
 
   private bind() {
-    const canvas = this.game.canvas;
+    const el = this.game.container;
 
-    canvas.addEventListener("mousedown", (e) => this.onMouseDown(e));
-    canvas.addEventListener("mousemove", (e) => this.onMouseMove(e));
-    canvas.addEventListener("mouseup", (e) => this.onMouseUp(e));
-    canvas.addEventListener("wheel", (e) => this.onWheel(e), { passive: false });
-    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    el.addEventListener("mousedown", (e) => this.onMouseDown(e));
+    el.addEventListener("mousemove", (e) => this.onMouseMove(e));
+    el.addEventListener("mouseup", (e) => this.onMouseUp(e));
+    el.addEventListener("wheel", (e) => this.onWheel(e as WheelEvent), { passive: false });
+    el.addEventListener("contextmenu", (e) => e.preventDefault());
 
-    canvas.addEventListener("touchstart", (e) => this.onTouchStart(e), { passive: false });
-    canvas.addEventListener("touchmove", (e) => this.onTouchMove(e), { passive: false });
-    canvas.addEventListener("touchend", (e) => this.onTouchEnd(e));
-    canvas.addEventListener("touchcancel", (e) => this.onTouchEnd(e));
+    el.addEventListener("touchstart", (e) => this.onTouchStart(e as TouchEvent), { passive: false });
+    el.addEventListener("touchmove", (e) => this.onTouchMove(e as TouchEvent), { passive: false });
+    el.addEventListener("touchend", (e) => this.onTouchEnd(e as TouchEvent));
+    el.addEventListener("touchcancel", (e) => this.onTouchEnd(e as TouchEvent));
 
     window.addEventListener("keydown", (e) => {
       this.keys.add(e.key);

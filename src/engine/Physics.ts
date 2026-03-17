@@ -1,6 +1,6 @@
 import * as planck from "planck";
 import { playExplosion } from "./Audio";
-import type { Renderer } from "./Renderer";
+import type { IRenderer } from "./IRenderer";
 
 /** Mark a body as destroyed in its userData so timer-based prefabs (cannons, dynamite) stop. */
 export function markDestroyed(body: planck.Body): void {
@@ -12,7 +12,7 @@ export function markDestroyed(body: planck.Body): void {
 /** Reusable explosion: particles, sound, radial impulse */
 export function explodeAt(
   world: planck.World,
-  renderer: Renderer,
+  renderer: IRenderer,
   wx: number,
   wy: number,
   radius: number,

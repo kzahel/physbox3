@@ -1,6 +1,6 @@
-import type { Camera } from "./Camera";
+import type { IParticleSystem } from "./IRenderer";
 
-interface Particle {
+export interface Particle {
   x: number;
   y: number;
   vx: number;
@@ -13,24 +13,29 @@ interface Particle {
   b: number;
 }
 
-export class ParticleSystem {
-  private particles: Particle[] = [];
+export class ParticleSystem implements IParticleSystem {
+  private _particles: Particle[] = [];
   private lastTime = 0;
 
-  tick(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
+  /** Advance simulation. Call once per frame. */
+  tick() {
     const now = performance.now();
     const dt = Math.min((now - this.lastTime) / 1000, 0.1);
     this.lastTime = now;
     this.update(dt);
-    this.draw(ctx, camera, canvas);
+  }
+
+  /** Read-only access to live particles for renderer-specific drawing. */
+  getParticles(): readonly Particle[] {
+    return this._particles;
   }
 
   private update(dt: number) {
-    for (let i = this.particles.length - 1; i >= 0; i--) {
-      const p = this.particles[i];
+    for (let i = this._particles.length - 1; i >= 0; i--) {
+      const p = this._particles[i];
       p.life -= dt;
       if (p.life <= 0) {
-        this.particles.splice(i, 1);
+        this._particles.splice(i, 1);
         continue;
       }
       p.x += p.vx * dt;
@@ -40,21 +45,9 @@ export class ParticleSystem {
     }
   }
 
-  private draw(ctx: CanvasRenderingContext2D, camera: Camera, canvas: HTMLCanvasElement) {
-    for (const p of this.particles) {
-      const sp = camera.toScreen(p.x, p.y, canvas);
-      const alpha = p.life / p.maxLife;
-      const r = p.size * camera.zoom;
-      ctx.beginPath();
-      ctx.arc(sp.x, sp.y, Math.max(1, r), 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha.toFixed(2)})`;
-      ctx.fill();
-    }
-  }
-
   private emit(x: number, y: number, count: number, gen: () => Omit<Particle, "x" | "y">) {
     for (let i = 0; i < count; i++) {
-      this.particles.push({ x, y, ...gen() });
+      this._particles.push({ x, y, ...gen() });
     }
   }
 
@@ -68,7 +61,7 @@ export class ParticleSystem {
       const perpY = dirX * spread;
       const speed = 3 + Math.random() * 4;
       const life = (range / speed) * (0.4 + Math.random() * 0.4);
-      this.particles.push({
+      this._particles.push({
         x: wx + dirX * 0.5 + perpX,
         y: wy + dirY * 0.5 + perpY,
         vx: dirX * speed + (Math.random() - 0.5) * 0.5,
@@ -128,7 +121,7 @@ export class ParticleSystem {
       const speed = 3 + Math.random() * 4;
       const life = 0.15 + Math.random() * 0.25;
       const isSmoke = Math.random() < 0.2;
-      this.particles.push({
+      this._particles.push({
         x: wx + (Math.random() - 0.5) * 0.2,
         y: wy + (Math.random() - 0.5) * 0.2,
         vx: exDirX * speed + spread,
