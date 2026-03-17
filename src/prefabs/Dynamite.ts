@@ -1,4 +1,5 @@
 import type { Body } from "box2d3";
+import { makeBody, makeShapeDef } from "../engine/BodyFactory";
 import { type DynamiteData, getBodyUserData, isDynamite } from "../engine/BodyUserData";
 import { b2 } from "../engine/Box2D";
 import { forEachBodyByLabel, markDestroyed } from "../engine/Physics";
@@ -8,17 +9,10 @@ const DYNAMITE_EXPLOSION_RADIUS = 15;
 const DYNAMITE_EXPLOSION_FORCE = 6;
 
 export function createDynamite(pw: PhysWorld, x: number, y: number, fuseTime = 3): Body {
-  const B2 = b2();
-  const bodyDef = B2.b2DefaultBodyDef();
-  bodyDef.type = B2.b2BodyType.b2_dynamicBody;
-  bodyDef.position = new B2.b2Vec2(x, y);
-  const body = pw.createBody(bodyDef);
+  const body = makeBody(pw, x, y);
 
-  const shapeDef = B2.b2DefaultShapeDef();
-  shapeDef.density = 2;
-  shapeDef.material.friction = 0.5;
-  shapeDef.enableHitEvents = true;
-  body.CreatePolygonShape(shapeDef, B2.b2MakeBox(0.25, 0.4));
+  const shapeDef = makeShapeDef({ density: 2, friction: 0.5 });
+  body.CreatePolygonShape(shapeDef, b2().b2MakeBox(0.25, 0.4));
 
   pw.setUserData(body, {
     fill: "rgba(255,50,30,0.9)",

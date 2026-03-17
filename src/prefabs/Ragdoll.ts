@@ -1,4 +1,5 @@
 import type { Body } from "box2d3";
+import { makeBody, makeCircle, makeShapeDef } from "../engine/BodyFactory";
 import { b2 } from "../engine/Box2D";
 import { createRevoluteJoint } from "../engine/Physics";
 import type { PhysWorld } from "../engine/PhysWorld";
@@ -42,7 +43,6 @@ export function updateRagdollFootContacts(pw: PhysWorld, ragdoll: RagdollData): 
 }
 
 export function createRagdoll(pw: PhysWorld, x: number, y: number, ragdolls: RagdollData[]): Body {
-  const B2 = b2();
   const hue = Math.floor(Math.random() * 360);
   const skinColor = `hsla(${(hue + 30) % 360},40%,70%,0.85)`;
   const shirtColor = `hsla(${hue},60%,45%,0.85)`;
@@ -51,77 +51,55 @@ export function createRagdoll(pw: PhysWorld, x: number, y: number, ragdolls: Rag
   const limbOpts = { enableLimit: true, lowerAngle: -Math.PI / 3, upperAngle: Math.PI / 3 };
   const neckOpts = { enableLimit: true, lowerAngle: -Math.PI / 6, upperAngle: Math.PI / 6 };
 
-  function makeBody(bx: number, by: number, isDynamic: boolean, fixedRotation = false): Body {
-    const def = B2.b2DefaultBodyDef();
-    def.type = isDynamic ? B2.b2BodyType.b2_dynamicBody : B2.b2BodyType.b2_staticBody;
-    def.position = new B2.b2Vec2(bx, by);
-    if (fixedRotation) {
-      def.motionLocks = new B2.b2MotionLocks();
-      def.motionLocks.angularZ = true;
-    }
-    return pw.createBody(def);
-  }
-
   function addCircle(body: Body, radius: number, density: number, friction: number) {
-    const shapeDef = B2.b2DefaultShapeDef();
-    shapeDef.density = density;
-    shapeDef.material.friction = friction;
-    shapeDef.enableHitEvents = true;
-    const circle = new B2.b2Circle();
-    circle.center = new B2.b2Vec2(0, 0);
-    circle.radius = radius;
-    body.CreateCircleShape(shapeDef, circle);
+    body.CreateCircleShape(makeShapeDef({ density, friction }), makeCircle(radius));
   }
 
   function addBox(body: Body, hw: number, hh: number, density: number, friction: number) {
-    const shapeDef = B2.b2DefaultShapeDef();
-    shapeDef.density = density;
-    shapeDef.material.friction = friction;
-    shapeDef.enableHitEvents = true;
-    body.CreatePolygonShape(shapeDef, B2.b2MakeBox(hw, hh));
+    body.CreatePolygonShape(makeShapeDef({ density, friction }), b2().b2MakeBox(hw, hh));
   }
 
   // Head
-  const head = makeBody(x, y + 2.1, true);
+  const head = makeBody(pw, x, y + 2.1);
   addCircle(head, 0.25, 1, 0.3);
   pw.setUserData(head, { fill: skinColor, label: "ragdoll" });
 
   // Torso (fixed rotation)
-  const torso = makeBody(x, y + 1.2, true, true);
+  const torso = makeBody(pw, x, y + 1.2, { fixedRotation: true });
   addBox(torso, 0.25, 0.55, 2, 0.3);
   pw.setUserData(torso, { fill: shirtColor, label: "ragdoll-torso" });
 
   createRevoluteJoint(pw, torso, head, { x, y: y + 1.85 }, neckOpts);
 
   // Arms
-  const lArm = makeBody(x - 0.55, y + 1.4, true);
+  const lArm = makeBody(pw, x - 0.55, y + 1.4);
   addBox(lArm, 0.08, 0.35, 0.5, 0.3);
   pw.setUserData(lArm, { fill: skinColor, label: "ragdoll" });
   createRevoluteJoint(pw, torso, lArm, { x: x - 0.3, y: y + 1.7 }, limbOpts);
 
-  const rArm = makeBody(x + 0.55, y + 1.4, true);
+  const rArm = makeBody(pw, x + 0.55, y + 1.4);
   addBox(rArm, 0.08, 0.35, 0.5, 0.3);
   pw.setUserData(rArm, { fill: skinColor, label: "ragdoll" });
   createRevoluteJoint(pw, torso, rArm, { x: x + 0.3, y: y + 1.7 }, limbOpts);
 
   // Upper legs
-  const lULeg = makeBody(x - 0.15, y + 0.4, true);
+  const lULeg = makeBody(pw, x - 0.15, y + 0.4);
   addBox(lULeg, 0.1, 0.3, 1, 0.3);
   pw.setUserData(lULeg, { fill: pantsColor, label: "ragdoll" });
   createRevoluteJoint(pw, torso, lULeg, { x: x - 0.15, y: y + 0.65 }, limbOpts);
 
-  const rULeg = makeBody(x + 0.15, y + 0.4, true);
+  const rULeg = makeBody(pw, x + 0.15, y + 0.4);
   addBox(rULeg, 0.1, 0.3, 1, 0.3);
   pw.setUserData(rULeg, { fill: pantsColor, label: "ragdoll" });
   createRevoluteJoint(pw, torso, rULeg, { x: x + 0.15, y: y + 0.65 }, limbOpts);
 
   // Feet
-  const lFoot = makeBody(x - 0.15, y - 0.15, true);
+  const lFoot = makeBody(pw, x - 0.15, y - 0.15);
   addBox(lFoot, 0.1, 0.25, 1, 0.8);
   pw.setUserData(lFoot, { fill: pantsColor, label: "ragdoll-foot" });
   createRevoluteJoint(pw, lULeg, lFoot, { x: x - 0.15, y: y + 0.1 }, limbOpts);
 
-  const rFoot = makeBody(x + 0.15, y - 0.15, true);
+  const rFoot = makeBody(pw, x + 0.15, y - 0.15);
   addBox(rFoot, 0.1, 0.25, 1, 0.8);
   pw.setUserData(rFoot, { fill: pantsColor, label: "ragdoll-foot" });
   createRevoluteJoint(pw, rULeg, rFoot, { x: x + 0.15, y: y + 0.1 }, limbOpts);

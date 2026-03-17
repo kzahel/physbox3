@@ -1,4 +1,5 @@
 import type { Body } from "box2d3";
+import { makeBody, makeShapeDef } from "../engine/BodyFactory";
 import { type FanData, isFan } from "../engine/BodyUserData";
 import { b2 } from "../engine/Box2D";
 import type { IRenderer } from "../engine/IRenderer";
@@ -6,16 +7,10 @@ import { bodyAngle, distance, forEachBodyByLabel, isDynamic } from "../engine/Ph
 import type { PhysWorld } from "../engine/PhysWorld";
 
 export function createFan(pw: PhysWorld, x: number, y: number, angle: number, force = 15, range = 10): Body {
-  const B2 = b2();
-  const bodyDef = B2.b2DefaultBodyDef();
-  bodyDef.type = B2.b2BodyType.b2_staticBody;
-  bodyDef.position = new B2.b2Vec2(x, y);
-  bodyDef.rotation = B2.b2MakeRot(angle);
-  const body = pw.createBody(bodyDef);
+  const body = makeBody(pw, x, y, { type: "static", rotation: angle });
 
-  const shapeDef = B2.b2DefaultShapeDef();
-  shapeDef.material.friction = 0.5;
-  body.CreatePolygonShape(shapeDef, B2.b2MakeBox(0.4, 0.25));
+  const shapeDef = makeShapeDef({ friction: 0.5, hitEvents: false });
+  body.CreatePolygonShape(shapeDef, b2().b2MakeBox(0.4, 0.25));
 
   pw.setUserData(body, { fill: "rgba(120,180,220,0.85)", label: "fan", force, range } satisfies FanData);
   return body;

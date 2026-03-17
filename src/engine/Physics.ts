@@ -21,6 +21,20 @@ export function isDynamic(body: Body): boolean {
   return body.GetType().value === B2.b2BodyType.b2_dynamicBody.value;
 }
 
+/** Shape type predicates — compare .value enums from b2Shape_GetType(). */
+export function isCircleShape(shapeType: { value: number }): boolean {
+  return shapeType.value === b2().b2ShapeType.b2_circleShape.value;
+}
+export function isPolygonShape(shapeType: { value: number }): boolean {
+  return shapeType.value === b2().b2ShapeType.b2_polygonShape.value;
+}
+export function isSegmentShape(shapeType: { value: number }): boolean {
+  return shapeType.value === b2().b2ShapeType.b2_segmentShape.value;
+}
+export function isCapsuleShape(shapeType: { value: number }): boolean {
+  return shapeType.value === b2().b2ShapeType.b2_capsuleShape.value;
+}
+
 /** Get the angle of a body in radians. */
 export function bodyAngle(body: Body): number {
   return b2().b2Rot_GetAngle(body.GetRotation());
@@ -109,12 +123,12 @@ export function scaleBody(_pw: PhysWorld, body: Body, scale: number): Body {
       isSensor: B2.b2Shape_IsSensor(shapeId),
     };
 
-    if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
+    if (isCircleShape(shapeType)) {
       const circle = B2.b2Shape_GetCircle(shapeId);
       entry.radius = circle.radius * scale;
       entry.centerX = circle.center.x * scale;
       entry.centerY = circle.center.y * scale;
-    } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
+    } else if (isPolygonShape(shapeType)) {
       const poly = B2.b2Shape_GetPolygon(shapeId);
       entry.verts = [];
       for (let j = 0; j < poly.count; j++) {
@@ -140,12 +154,12 @@ export function scaleBody(_pw: PhysWorld, body: Body, scale: number): Body {
     shapeDef.material.restitution = sd.restitution;
     shapeDef.isSensor = sd.isSensor;
 
-    if (sd.type === B2.b2ShapeType.b2_circleShape.value) {
+    if (sd.type === b2().b2ShapeType.b2_circleShape.value) {
       const circle = new B2.b2Circle();
       circle.center = new B2.b2Vec2(sd.centerX!, sd.centerY!);
       circle.radius = sd.radius!;
       body.CreateCircleShape(shapeDef, circle);
-    } else if (sd.type === B2.b2ShapeType.b2_polygonShape.value && sd.verts) {
+    } else if (sd.type === b2().b2ShapeType.b2_polygonShape.value && sd.verts) {
       const hull = B2.b2ComputeHull(sd.verts.map((v) => new B2.b2Vec2(v.x, v.y)));
       const poly = B2.b2MakePolygon(hull, 0);
       body.CreatePolygonShape(shapeDef, poly);
@@ -318,10 +332,10 @@ export function bodyRadius(body: Body): number {
   for (const shapeId of shapeIds) {
     const shapeType = B2.b2Shape_GetType(shapeId);
 
-    if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
+    if (isCircleShape(shapeType)) {
       const circle = B2.b2Shape_GetCircle(shapeId);
       maxR = Math.max(maxR, circle.radius);
-    } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
+    } else if (isPolygonShape(shapeType)) {
       const aabb = B2.b2Shape_GetAABB(shapeId);
       const ext = B2.b2Sub(aabb.upperBound, aabb.lowerBound);
       maxR = Math.max(maxR, B2.b2Length(ext) / 2);

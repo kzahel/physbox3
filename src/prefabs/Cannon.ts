@@ -1,4 +1,5 @@
 import type { Body } from "box2d3";
+import { makeBody, makeCircle, makeShapeDef } from "../engine/BodyFactory";
 import { type CannonballData, type CannonData, isCannon, isCannonball } from "../engine/BodyUserData";
 import { b2 } from "../engine/Box2D";
 import type { IRenderer } from "../engine/IRenderer";
@@ -13,14 +14,9 @@ const CANNONBALL_EXPLOSION_FORCE = 5;
 
 export function createCannon(pw: PhysWorld, x: number, y: number, angle: number): Body {
   const B2 = b2();
-  const bodyDef = B2.b2DefaultBodyDef();
-  bodyDef.type = B2.b2BodyType.b2_staticBody;
-  bodyDef.position = new B2.b2Vec2(x, y);
-  bodyDef.rotation = B2.b2MakeRot(angle);
-  const body = pw.createBody(bodyDef);
+  const body = makeBody(pw, x, y, { type: "static", rotation: angle });
 
-  const shapeDef = B2.b2DefaultShapeDef();
-  shapeDef.material.friction = 0.5;
+  const shapeDef = makeShapeDef({ friction: 0.5, hitEvents: false });
   body.CreatePolygonShape(shapeDef, B2.b2MakeBox(0.6, 0.3));
 
   // Barrel
@@ -37,7 +33,6 @@ export function createCannon(pw: PhysWorld, x: number, y: number, angle: number)
 }
 
 function fireCannon(pw: PhysWorld, cannon: Body, renderer: IRenderer) {
-  const B2 = b2();
   const pos = cannon.GetPosition();
   const a = bodyAngle(cannon);
   const dirX = Math.cos(a);
@@ -46,23 +41,13 @@ function fireCannon(pw: PhysWorld, cannon: Body, renderer: IRenderer) {
   const spawnX = pos.x + dirX * 1.0;
   const spawnY = pos.y + dirY * 1.0;
 
-  const ballDef = B2.b2DefaultBodyDef();
-  ballDef.type = B2.b2BodyType.b2_dynamicBody;
-  ballDef.position = new B2.b2Vec2(spawnX, spawnY);
-  ballDef.isBullet = true;
-  ballDef.linearVelocity = new B2.b2Vec2(dirX * CANNONBALL_SPEED, dirY * CANNONBALL_SPEED);
-  const ball = pw.createBody(ballDef);
+  const ball = makeBody(pw, spawnX, spawnY, {
+    isBullet: true,
+    linearVelocity: { x: dirX * CANNONBALL_SPEED, y: dirY * CANNONBALL_SPEED },
+  });
 
-  const shapeDef = B2.b2DefaultShapeDef();
-  shapeDef.density = 5;
-  shapeDef.material.friction = 0.3;
-  shapeDef.material.restitution = 0.1;
-  shapeDef.enableHitEvents = true;
-  shapeDef.enableContactEvents = true;
-  const circle = new B2.b2Circle();
-  circle.center = new B2.b2Vec2(0, 0);
-  circle.radius = 0.2;
-  ball.CreateCircleShape(shapeDef, circle);
+  const shapeDef = makeShapeDef({ density: 5, friction: 0.3, restitution: 0.1, contactEvents: true });
+  ball.CreateCircleShape(shapeDef, makeCircle(0.2));
 
   pw.setUserData(ball, {
     fill: "rgba(100,100,110,0.9)",

@@ -1,4 +1,5 @@
 import type { Body } from "box2d3";
+import { makeBody, makeCircle, makeShapeDef } from "../engine/BodyFactory";
 import { b2 } from "../engine/Box2D";
 import { createRevoluteJoint, createWheelJoint } from "../engine/Physics";
 import type { PhysWorld } from "../engine/PhysWorld";
@@ -8,33 +9,20 @@ export function createTrain(pw: PhysWorld, x: number, y: number): Body {
   const r = Math.random;
 
   const wheelRadius = 0.35;
-  const wheelDensity = 1.2;
-  const wheelFriction = 0.9;
   const suspAxis = { x: 0, y: 1 };
   const wheelColor = "rgba(40,40,35,0.9)";
   const carSpacing = 0.3;
 
   function makeWheel(wx: number, wy: number): Body {
-    const def = B2.b2DefaultBodyDef();
-    def.type = B2.b2BodyType.b2_dynamicBody;
-    def.position = new B2.b2Vec2(wx, wy);
-    const wheel = pw.createBody(def);
-    const shapeDef = B2.b2DefaultShapeDef();
-    shapeDef.density = wheelDensity;
-    shapeDef.material.friction = wheelFriction;
-    shapeDef.enableHitEvents = true;
-    const circle = new B2.b2Circle();
-    circle.center = new B2.b2Vec2(0, 0);
-    circle.radius = wheelRadius;
-    wheel.CreateCircleShape(shapeDef, circle);
+    const wheel = makeBody(pw, wx, wy);
+    const shapeDef = makeShapeDef({ density: 1.2, friction: 0.9 });
+    wheel.CreateCircleShape(shapeDef, makeCircle(wheelRadius));
     pw.setUserData(wheel, { fill: wheelColor });
     return wheel;
   }
 
   function makePolygonShape(body: Body, verts: { x: number; y: number }[], density: number) {
-    const shapeDef = B2.b2DefaultShapeDef();
-    shapeDef.density = density;
-    shapeDef.enableHitEvents = true;
+    const shapeDef = makeShapeDef({ density });
     const hull = B2.b2ComputeHull(verts.map((v) => new B2.b2Vec2(v.x, v.y)));
     body.CreatePolygonShape(shapeDef, B2.b2MakePolygon(hull, 0));
   }
@@ -45,15 +33,8 @@ export function createTrain(pw: PhysWorld, x: number, y: number): Body {
   const engHue = 200 + Math.floor(r() * 40);
   const engColor = `hsla(${engHue},50%,35%,0.9)`;
 
-  const engineDef = B2.b2DefaultBodyDef();
-  engineDef.type = B2.b2BodyType.b2_dynamicBody;
-  engineDef.position = new B2.b2Vec2(x, y);
-  const engine = pw.createBody(engineDef);
-
-  const engShape = B2.b2DefaultShapeDef();
-  engShape.density = 1.5;
-  engShape.material.friction = 0.3;
-  engShape.enableHitEvents = true;
+  const engine = makeBody(pw, x, y);
+  const engShape = makeShapeDef({ density: 1.5, friction: 0.3 });
   engine.CreatePolygonShape(engShape, B2.b2MakeBox(engHW, engHH));
 
   // Cab
@@ -116,16 +97,10 @@ export function createTrain(pw: PhysWorld, x: number, y: number): Body {
     const carHue = 30 + Math.floor(r() * 30);
     const carColor = `hsla(${carHue},40%,45%,0.85)`;
 
-    const carDef = B2.b2DefaultBodyDef();
-    carDef.type = B2.b2BodyType.b2_dynamicBody;
-    carDef.position = new B2.b2Vec2(cx, y);
-    const car = pw.createBody(carDef);
+    const car = makeBody(pw, cx, y);
 
     // Floor
-    const floorShape = B2.b2DefaultShapeDef();
-    floorShape.density = 0.6;
-    floorShape.material.friction = 0.3;
-    floorShape.enableHitEvents = true;
+    const floorShape = makeShapeDef({ density: 0.6, friction: 0.3 });
     car.CreatePolygonShape(floorShape, B2.b2MakeBox(carHW, carHH));
 
     // Left wall

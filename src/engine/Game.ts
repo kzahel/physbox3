@@ -17,13 +17,24 @@ import { createSeesaw } from "../prefabs/Seesaw";
 import { createSpringBall } from "../prefabs/SpringBall";
 import { createTrain } from "../prefabs/Train";
 import { playBounce, playWoodHit, unlockAudio } from "./Audio";
+import { makeBody, makeShapeDef } from "./BodyFactory";
 import { getBodyUserData } from "./BodyUserData";
 import { b2 } from "./Box2D";
 import { Camera } from "./Camera";
 import type { Interpolation } from "./Interpolation";
 import { snapshotBodies } from "./Interpolation";
 import type { IRenderer } from "./IRenderer";
-import { clamp, clearDynamic, destroyBodyAt, explodeAt, isDynamic, markDestroyed, scaleBody } from "./Physics";
+import {
+  clamp,
+  clearDynamic,
+  destroyBodyAt,
+  explodeAt,
+  isCircleShape,
+  isDynamic,
+  isPolygonShape,
+  markDestroyed,
+  scaleBody,
+} from "./Physics";
 import { type PhysProfile, PhysWorld } from "./PhysWorld";
 import { Renderer } from "./Renderer";
 import { WaterSystem } from "./WaterSystem";
@@ -165,12 +176,9 @@ export class Game {
         (approachSpeed - COLLISION_MIN_IMPULSE) / (COLLISION_MAX_IMPULSE - COLLISION_MIN_IMPULSE),
       );
 
-      if (tA.value === B2.b2ShapeType.b2_circleShape.value || tB.value === B2.b2ShapeType.b2_circleShape.value) {
+      if (isCircleShape(tA) || isCircleShape(tB)) {
         playBounce(intensity, vol);
-      } else if (
-        tA.value === B2.b2ShapeType.b2_polygonShape.value ||
-        tB.value === B2.b2ShapeType.b2_polygonShape.value
-      ) {
+      } else if (isPolygonShape(tA) || isPolygonShape(tB)) {
         playWoodHit(intensity, vol);
       }
     });
@@ -178,17 +186,10 @@ export class Game {
 
   /** Create a static body with a box shape. */
   private createStaticBox(x: number, y: number, halfW: number, halfH: number, fill: string, label: string): Body {
-    const B2 = b2();
-    const bodyDef = B2.b2DefaultBodyDef();
-    bodyDef.type = B2.b2BodyType.b2_staticBody;
-    bodyDef.position = new B2.b2Vec2(x, y);
-    const body = this.pw.createBody(bodyDef);
+    const body = makeBody(this.pw, x, y, { type: "static" });
 
-    const shapeDef = B2.b2DefaultShapeDef();
-    shapeDef.enableHitEvents = true;
-    shapeDef.material.restitution = this.bounciness;
-    const box = B2.b2MakeBox(halfW, halfH);
-    body.CreatePolygonShape(shapeDef, box);
+    const shapeDef = makeShapeDef({ restitution: this.bounciness });
+    body.CreatePolygonShape(shapeDef, b2().b2MakeBox(halfW, halfH));
 
     this.pw.setUserData(body, { fill, label });
     return body;

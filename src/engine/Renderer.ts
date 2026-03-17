@@ -8,8 +8,10 @@ import { type Interpolation, lerpBody, lerpWorldPoint, NO_INTERP } from "./Inter
 import type { IRenderer } from "./IRenderer";
 import { bodyColor, OverlayRenderer } from "./OverlayRenderer";
 import { ParticleSystem } from "./ParticleSystem";
-import { forEachBody } from "./Physics";
+import { forEachBody, isCapsuleShape, isCircleShape, isPolygonShape, isSegmentShape } from "./Physics";
 import type { PhysWorld } from "./PhysWorld";
+import { computeSpringCoilPath } from "./SpringGeometry";
+import { computeTerrainFillPath } from "./TerrainGeometry";
 import type { WaterSystem } from "./WaterSystem";
 
 // Ocean wave parameters (frequency, amplitude pairs)
@@ -82,35 +84,28 @@ export class Renderer implements IRenderer {
       const ud = pw.getUserData(body);
       if (!isTerrain(ud)) return;
 
+      const fillPath = computeTerrainFillPath(ud.terrainPoints);
+      if (!fillPath) return;
+
       const pts = ud.terrainPoints;
-      if (pts.length < 2) return;
-
-      // Find the lowest point to use as the fill bottom
-      let minY = Infinity;
-      for (const p of pts) minY = Math.min(minY, p.y);
-
       ctx.save();
 
-      // Trace surface, then close along the bottom at minY
+      // Draw filled polygon (surface + bottom closure)
       ctx.beginPath();
-      const s0 = camera.toScreen(pts[0].x, pts[0].y, this.canvas);
+      const s0 = camera.toScreen(fillPath[0].x, fillPath[0].y, this.canvas);
       ctx.moveTo(s0.x, s0.y);
-      for (let i = 1; i < pts.length; i++) {
-        const s = camera.toScreen(pts[i].x, pts[i].y, this.canvas);
+      for (let i = 1; i < fillPath.length; i++) {
+        const s = camera.toScreen(fillPath[i].x, fillPath[i].y, this.canvas);
         ctx.lineTo(s.x, s.y);
       }
-      const sLast = camera.toScreen(pts[pts.length - 1].x, minY, this.canvas);
-      const sFirst = camera.toScreen(pts[0].x, minY, this.canvas);
-      ctx.lineTo(sLast.x, sLast.y);
-      ctx.lineTo(sFirst.x, sFirst.y);
       ctx.closePath();
-
       ctx.fillStyle = ud.fill ?? "rgba(80,100,60,0.9)";
       ctx.fill();
 
       // Draw surface stroke
       ctx.beginPath();
-      ctx.moveTo(s0.x, s0.y);
+      const ss0 = camera.toScreen(pts[0].x, pts[0].y, this.canvas);
+      ctx.moveTo(ss0.x, ss0.y);
       for (let i = 1; i < pts.length; i++) {
         const s = camera.toScreen(pts[i].x, pts[i].y, this.canvas);
         ctx.lineTo(s.x, s.y);
@@ -152,7 +147,7 @@ export class Renderer implements IRenderer {
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 1 / camera.zoom;
 
-        if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
+        if (isCircleShape(shapeType)) {
           const circle = B2.b2Shape_GetCircle(shapeId);
           const r = circle.radius;
           const center = circle.center;
@@ -164,7 +159,7 @@ export class Renderer implements IRenderer {
           ctx.moveTo(center.x, center.y);
           ctx.lineTo(center.x + r, center.y);
           ctx.stroke();
-        } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
+        } else if (isPolygonShape(shapeType)) {
           const poly = B2.b2Shape_GetPolygon(shapeId);
           ctx.beginPath();
           const v0 = poly.GetVertex(0);
@@ -176,13 +171,13 @@ export class Renderer implements IRenderer {
           ctx.closePath();
           ctx.fill();
           ctx.stroke();
-        } else if (shapeType.value === B2.b2ShapeType.b2_segmentShape.value) {
+        } else if (isSegmentShape(shapeType)) {
           const seg = B2.b2Shape_GetSegment(shapeId);
           ctx.beginPath();
           ctx.moveTo(seg.point1.x, seg.point1.y);
           ctx.lineTo(seg.point2.x, seg.point2.y);
           ctx.stroke();
-        } else if (shapeType.value === B2.b2ShapeType.b2_capsuleShape.value) {
+        } else if (isCapsuleShape(shapeType)) {
           const capsule = B2.b2Shape_GetCapsule(shapeId);
           const p1 = capsule.center1;
           const p2 = capsule.center2;
@@ -266,33 +261,18 @@ export class Renderer implements IRenderer {
   }
 
   private drawSpringCoil(sa: { x: number; y: number }, sb: { x: number; y: number }, zoom: number) {
-    const ctx = this.ctx;
-    const dx = sb.x - sa.x;
-    const dy = sb.y - sa.y;
-    const len = Math.hypot(dx, dy);
+    const len = Math.hypot(sb.x - sa.x, sb.y - sa.y);
     if (len < 1) return;
 
-    const coils = 12;
-    const amplitude = Math.max(4, 0.15 * zoom);
-    const nx = -dy / len;
-    const ny = dx / len;
-
+    const points = computeSpringCoilPath(sa, sb, 12, Math.max(4, 0.15 * zoom));
+    const ctx = this.ctx;
     ctx.strokeStyle = "rgba(200,220,255,0.7)";
     ctx.lineWidth = Math.max(1, 0.05 * zoom);
     ctx.beginPath();
-    ctx.moveTo(sa.x, sa.y);
-
-    for (let i = 1; i <= coils * 2; i++) {
-      const t = i / (coils * 2 + 1);
-      const x = sa.x + dx * t;
-      const y = sa.y + dy * t;
-      const side = i % 2 === 1 ? 1 : -1;
-      ctx.lineTo(x + nx * amplitude * side, y + ny * amplitude * side);
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y);
     }
-
-    const tEnd = (coils * 2 + 1) / (coils * 2 + 1);
-    ctx.lineTo(sa.x + dx * tEnd, sa.y + dy * tEnd);
-    ctx.lineTo(sb.x, sb.y);
     ctx.stroke();
   }
 

@@ -1,27 +1,16 @@
 import type { Body } from "box2d3";
-import { b2 } from "../engine/Box2D";
+import { makeBody, makeCircle, makeShapeDef } from "../engine/BodyFactory";
 import { createDistanceJoint, distance } from "../engine/Physics";
 import type { PhysWorld } from "../engine/PhysWorld";
 
 export function createSpringBall(pw: PhysWorld, x: number, y: number): Body {
-  const B2 = b2();
   const sides = 5;
   const radius = 1.5;
 
   // Hub
-  const hubDef = B2.b2DefaultBodyDef();
-  hubDef.type = B2.b2BodyType.b2_dynamicBody;
-  hubDef.position = new B2.b2Vec2(x, y);
-  const hub = pw.createBody(hubDef);
-
-  const hubShape = B2.b2DefaultShapeDef();
-  hubShape.density = 2;
-  hubShape.material.friction = 0.4;
-  hubShape.enableHitEvents = true;
-  const hubCircle = new B2.b2Circle();
-  hubCircle.center = new B2.b2Vec2(0, 0);
-  hubCircle.radius = 0.3;
-  hub.CreateCircleShape(hubShape, hubCircle);
+  const hub = makeBody(pw, x, y);
+  const hubShape = makeShapeDef({ density: 2, friction: 0.4 });
+  hub.CreateCircleShape(hubShape, makeCircle(0.3));
   pw.setUserData(hub, { fill: "rgba(255,220,50,0.9)" });
 
   // Pods
@@ -31,20 +20,9 @@ export function createSpringBall(pw: PhysWorld, x: number, y: number): Body {
     const px = x + Math.cos(angle) * radius;
     const py = y + Math.sin(angle) * radius;
 
-    const podDef = B2.b2DefaultBodyDef();
-    podDef.type = B2.b2BodyType.b2_dynamicBody;
-    podDef.position = new B2.b2Vec2(px, py);
-    const pod = pw.createBody(podDef);
-
-    const podShape = B2.b2DefaultShapeDef();
-    podShape.density = 1;
-    podShape.material.friction = 0.6;
-    podShape.material.restitution = 0.5;
-    podShape.enableHitEvents = true;
-    const podCircle = new B2.b2Circle();
-    podCircle.center = new B2.b2Vec2(0, 0);
-    podCircle.radius = 0.25;
-    pod.CreateCircleShape(podShape, podCircle);
+    const pod = makeBody(pw, px, py);
+    const podShape = makeShapeDef({ density: 1, friction: 0.6, restitution: 0.5 });
+    pod.CreateCircleShape(podShape, makeCircle(0.25));
     pw.setUserData(pod, { fill: "rgba(255,100,180,0.8)" });
 
     // Spring from hub to pod

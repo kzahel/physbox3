@@ -2,7 +2,7 @@ import type { Body, b2ShapeId } from "box2d3";
 import { isTerrain } from "./BodyUserData";
 import { b2 } from "./Box2D";
 import type { Game } from "./Game";
-import { bodyAngle } from "./Physics";
+import { bodyAngle, isCircleShape, isPolygonShape, isSegmentShape } from "./Physics";
 import type { JointHandle, PhysWorld } from "./PhysWorld";
 import type {
   SceneData,
@@ -200,11 +200,11 @@ export function serializeScene(game: Game): SceneData {
         restitution: B2.b2Shape_GetRestitution(shapeId),
       };
 
-      if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
+      if (isCircleShape(shapeType)) {
         const circle = B2.b2Shape_GetCircle(shapeId);
         sd.type = "circle";
         sd.params = [circle.radius];
-      } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
+      } else if (isPolygonShape(shapeType)) {
         const poly = B2.b2Shape_GetPolygon(shapeId);
         // Detect axis-aligned box (4 verts, symmetric about origin)
         if (poly.count === 4) {
@@ -226,7 +226,7 @@ export function serializeScene(game: Game): SceneData {
           }
           sd.params = verts;
         }
-      } else if (shapeType.value === B2.b2ShapeType.b2_segmentShape.value) {
+      } else if (isSegmentShape(shapeType)) {
         const seg = B2.b2Shape_GetSegment(shapeId);
         sd.type = "segment";
         sd.params = [seg.point1.x, seg.point1.y, seg.point2.x, seg.point2.y];

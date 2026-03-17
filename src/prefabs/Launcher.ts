@@ -1,4 +1,5 @@
 import type { Body } from "box2d3";
+import { makeBody, makeShapeDef } from "../engine/BodyFactory";
 import { b2 } from "../engine/Box2D";
 import { createWeldJoint } from "../engine/Physics";
 import type { PhysWorld } from "../engine/PhysWorld";
@@ -7,36 +8,20 @@ export function createLauncher(pw: PhysWorld, x: number, y: number): Body {
   const B2 = b2();
 
   // Static base
-  const baseDef = B2.b2DefaultBodyDef();
-  baseDef.type = B2.b2BodyType.b2_staticBody;
-  baseDef.position = new B2.b2Vec2(x, y);
-  const base = pw.createBody(baseDef);
-  const baseShape = B2.b2DefaultShapeDef();
-  baseShape.material.friction = 0.5;
+  const base = makeBody(pw, x, y, { type: "static" });
+  const baseShape = makeShapeDef({ friction: 0.5, hitEvents: false });
   base.CreatePolygonShape(baseShape, B2.b2MakeBox(1.5, 0.3));
   pw.setUserData(base, { fill: "rgba(100,100,120,0.9)" });
 
   // Dynamic rod
-  const rodDef = B2.b2DefaultBodyDef();
-  rodDef.type = B2.b2BodyType.b2_dynamicBody;
-  rodDef.position = new B2.b2Vec2(x, y + 1.5);
-  const rod = pw.createBody(rodDef);
-  const rodShape = B2.b2DefaultShapeDef();
-  rodShape.density = 0.5;
-  rodShape.material.friction = 0.2;
-  rodShape.enableHitEvents = true;
+  const rod = makeBody(pw, x, y + 1.5);
+  const rodShape = makeShapeDef({ density: 0.5, friction: 0.2 });
   rod.CreatePolygonShape(rodShape, B2.b2MakeBox(0.15, 1));
   pw.setUserData(rod, { fill: "rgba(160,160,180,0.8)" });
 
   // Dynamic platform
-  const platDef = B2.b2DefaultBodyDef();
-  platDef.type = B2.b2BodyType.b2_dynamicBody;
-  platDef.position = new B2.b2Vec2(x, y + 2.8);
-  const plat = pw.createBody(platDef);
-  const platShape = B2.b2DefaultShapeDef();
-  platShape.density = 1;
-  platShape.material.friction = 0.7;
-  platShape.enableHitEvents = true;
+  const plat = makeBody(pw, x, y + 2.8);
+  const platShape = makeShapeDef({ density: 1, friction: 0.7 });
   plat.CreatePolygonShape(platShape, B2.b2MakeBox(2, 0.2));
   pw.setUserData(plat, { fill: "rgba(80,180,80,0.8)" });
 

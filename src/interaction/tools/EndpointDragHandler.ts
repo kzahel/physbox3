@@ -1,7 +1,7 @@
 import type { Body, b2ShapeId } from "box2d3";
 import { getBodyUserData } from "../../engine/BodyUserData";
 import { b2 } from "../../engine/Box2D";
-import { distance } from "../../engine/Physics";
+import { distance, isPolygonShape } from "../../engine/Physics";
 import type { ToolContext } from "../ToolHandler";
 
 const ENDPOINT_SNAP_PX = 24;
@@ -92,7 +92,7 @@ export class EndpointDragHandler {
 
     const shapeId = shapeIds[0];
     const shapeType = B2.b2Shape_GetType(shapeId);
-    if (shapeType.value !== B2.b2ShapeType.b2_polygonShape.value) return null;
+    if (!isPolygonShape(shapeType)) return null;
 
     const poly = B2.b2Shape_GetPolygon(shapeId);
     // For a box shape, vertices are at corners. Extract half-extents from AABB-like analysis.

@@ -4,7 +4,7 @@ import { b2 } from "./Box2D";
 import type { Camera } from "./Camera";
 import { type Interpolation, lerpBody, NO_INTERP } from "./Interpolation";
 import type { IParticleSystem } from "./IRenderer";
-import { forEachBody } from "./Physics";
+import { forEachBody, isCircleShape, isPolygonShape } from "./Physics";
 import type { PhysWorld } from "./PhysWorld";
 
 // Conveyor animation
@@ -44,7 +44,7 @@ export function drawConveyorAnimation(
     const shapeIds: b2ShapeId[] = body.GetShapes() ?? [];
     if (shapeIds.length === 0) return;
     const shapeType = B2.b2Shape_GetType(shapeIds[0]);
-    if (shapeType.value !== B2.b2ShapeType.b2_polygonShape.value) return;
+    if (!isPolygonShape(shapeType)) return;
     const poly = B2.b2Shape_GetPolygon(shapeIds[0]);
     const v0 = poly.GetVertex(0);
     const hw = Math.abs(v0.x);
@@ -97,7 +97,7 @@ export function drawBalloonStrings(
     const shapeIds: b2ShapeId[] = body.GetShapes() ?? [];
     if (shapeIds.length === 0) return;
     const shapeType = B2.b2Shape_GetType(shapeIds[0]);
-    if (shapeType.value !== B2.b2ShapeType.b2_circleShape.value) return;
+    if (!isCircleShape(shapeType)) return;
     const circle = B2.b2Shape_GetCircle(shapeIds[0]);
     const radius = circle.radius;
 

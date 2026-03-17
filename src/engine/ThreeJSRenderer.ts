@@ -10,8 +10,10 @@ import { type Interpolation, lerpBody, lerpWorldPoint, NO_INTERP } from "./Inter
 import type { IRenderer } from "./IRenderer";
 import { bodyColor, OverlayRenderer } from "./OverlayRenderer";
 import { type Particle, ParticleSystem } from "./ParticleSystem";
-import { forEachBody } from "./Physics";
+import { forEachBody, isCapsuleShape, isCircleShape, isPolygonShape, isSegmentShape } from "./Physics";
 import type { JointHandle, PhysWorld } from "./PhysWorld";
+import { computeSpringCoilPath } from "./SpringGeometry";
+import { computeTerrainFillPath } from "./TerrainGeometry";
 import { createPolygonGeometry, EXTRUDE_DEPTH } from "./ThreeGeometryUtils";
 
 function rgbaToThreeColor(color: string): THREE.Color {
@@ -28,10 +30,10 @@ function shapeKey(body: Body): string {
   for (const shapeId of shapeIds) {
     const shapeType = B2.b2Shape_GetType(shapeId);
     key += `${shapeType.value};`;
-    if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
+    if (isCircleShape(shapeType)) {
       const c = B2.b2Shape_GetCircle(shapeId);
       key += `${c.radius.toFixed(4)},`;
-    } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
+    } else if (isPolygonShape(shapeType)) {
       const p = B2.b2Shape_GetPolygon(shapeId);
       for (let i = 0; i < p.count; i++) {
         const v = p.GetVertex(i);
@@ -326,15 +328,11 @@ export class ThreeJSRenderer implements IRenderer {
 
     // Terrain bodies: build mesh from stored points instead of iterating shapes
     if (isTerrain(ud)) {
-      const pts = ud.terrainPoints;
-      if (pts.length >= 2) {
-        let minY = Infinity;
-        for (const p of pts) minY = Math.min(minY, p.y);
+      const fillPath = computeTerrainFillPath(ud.terrainPoints);
+      if (fillPath) {
         const shape = new THREE.Shape();
-        shape.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i].x, pts[i].y);
-        shape.lineTo(pts[pts.length - 1].x, minY);
-        shape.lineTo(pts[0].x, minY);
+        shape.moveTo(fillPath[0].x, fillPath[0].y);
+        for (let i = 1; i < fillPath.length; i++) shape.lineTo(fillPath[i].x, fillPath[i].y);
         shape.closePath();
         const geo = new THREE.ExtrudeGeometry(shape, { depth: EXTRUDE_DEPTH, bevelEnabled: false });
         geo.translate(0, 0, -EXTRUDE_DEPTH / 2);
@@ -367,7 +365,7 @@ export class ThreeJSRenderer implements IRenderer {
         flatShading: true,
       });
 
-      if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
+      if (isCircleShape(shapeType)) {
         const circle = B2.b2Shape_GetCircle(shapeId);
         const r = circle.radius;
         const center = circle.center;
@@ -389,7 +387,7 @@ export class ThreeJSRenderer implements IRenderer {
           const spokeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
           group.add(new THREE.Line(spokeGeo, spokeMat));
         }
-      } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
+      } else if (isPolygonShape(shapeType)) {
         const poly = B2.b2Shape_GetPolygon(shapeId);
         const verts: { x: number; y: number }[] = [];
         for (let j = 0; j < poly.count; j++) {
@@ -402,7 +400,7 @@ export class ThreeJSRenderer implements IRenderer {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         group.add(mesh);
-      } else if (shapeType.value === B2.b2ShapeType.b2_segmentShape.value) {
+      } else if (isSegmentShape(shapeType)) {
         const seg = B2.b2Shape_GetSegment(shapeId);
         const lineGeo = new THREE.BufferGeometry().setFromPoints([
           new THREE.Vector3(seg.point1.x, seg.point1.y, 0),
@@ -410,7 +408,7 @@ export class ThreeJSRenderer implements IRenderer {
         ]);
         const lineMat = new THREE.LineBasicMaterial({ color: threeColor, transparent: true, opacity });
         group.add(new THREE.Line(lineGeo, lineMat));
-      } else if (shapeType.value === B2.b2ShapeType.b2_capsuleShape.value) {
+      } else if (isCapsuleShape(shapeType)) {
         // Approximate capsule as a cylinder + hemispheres
         const capsule = B2.b2Shape_GetCapsule(shapeId);
         const p1 = capsule.center1;
@@ -564,24 +562,8 @@ export class ThreeJSRenderer implements IRenderer {
   }
 
   private computeSpringCoilPoints(a: { x: number; y: number }, b: { x: number; y: number }): THREE.Vector3[] {
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const len = Math.hypot(dx, dy);
-    if (len < 0.01) return [new THREE.Vector3(a.x, a.y, 0.5), new THREE.Vector3(b.x, b.y, 0.5)];
-
-    const coils = 12;
-    const amplitude = 0.15;
-    const nx = -dy / len;
-    const ny = dx / len;
-
-    const points: THREE.Vector3[] = [new THREE.Vector3(a.x, a.y, 0.5)];
-    for (let i = 1; i <= coils * 2; i++) {
-      const t = i / (coils * 2 + 1);
-      const side = i % 2 === 1 ? 1 : -1;
-      points.push(new THREE.Vector3(a.x + dx * t + nx * amplitude * side, a.y + dy * t + ny * amplitude * side, 0.5));
-    }
-    points.push(new THREE.Vector3(b.x, b.y, 0.5));
-    return points;
+    const path = computeSpringCoilPath(a, b, 12, 0.15);
+    return path.map((p) => new THREE.Vector3(p.x, p.y, 0.5));
   }
 
   // ── Particles ──

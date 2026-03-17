@@ -1,4 +1,5 @@
 import type { Body } from "box2d3";
+import { makeBody, makeShapeDef } from "../engine/BodyFactory";
 import { isRocket, type RocketData } from "../engine/BodyUserData";
 import { b2 } from "../engine/Box2D";
 import type { IRenderer } from "../engine/IRenderer";
@@ -7,14 +8,9 @@ import type { PhysWorld } from "../engine/PhysWorld";
 
 export function createRocket(pw: PhysWorld, x: number, y: number, angle = 0): Body {
   const B2 = b2();
-  const bodyDef = B2.b2DefaultBodyDef();
-  bodyDef.type = B2.b2BodyType.b2_dynamicBody;
-  bodyDef.position = new B2.b2Vec2(x, y);
-  bodyDef.rotation = B2.b2MakeRot(angle);
-  const body = pw.createBody(bodyDef);
+  const body = makeBody(pw, x, y, { rotation: angle });
 
-  const shapeDef = B2.b2DefaultShapeDef();
-  shapeDef.enableHitEvents = true;
+  const shapeDef = makeShapeDef();
 
   // Main body
   shapeDef.density = 1.5;

@@ -1,4 +1,5 @@
 import type { Body } from "box2d3";
+import { makeBody, makeCircle, makeShapeDef } from "../engine/BodyFactory";
 import { b2 } from "../engine/Box2D";
 import { clamp, createDistanceJoint, createRevoluteJoint, isDynamic } from "../engine/Physics";
 import type { JointHandle, PhysWorld } from "../engine/PhysWorld";
@@ -18,35 +19,32 @@ const ENABLE_ROPE_STABILIZER = false;
 const STABILIZER_SPRING_K = 50;
 const STABILIZER_DAMPING = 5;
 
-export function createChainRope(pw: PhysWorld, x: number, y: number, links: number, linkLen = 0.4): Body {
-  const B2 = b2();
+function createRopeAnchor(pw: PhysWorld, x: number, y: number, label?: string): Body {
+  const anchor = makeBody(pw, x, y, { type: "static" });
+  const shape = makeShapeDef({ hitEvents: false });
+  anchor.CreateCircleShape(shape, makeCircle(ANCHOR_RADIUS));
+  if (label) pw.setUserData(anchor, { label });
+  return anchor;
+}
 
-  const anchorDef = B2.b2DefaultBodyDef();
-  anchorDef.type = B2.b2BodyType.b2_staticBody;
-  anchorDef.position = new B2.b2Vec2(x, y);
-  const anchor = pw.createBody(anchorDef);
-  const anchorShape = B2.b2DefaultShapeDef();
-  const anchorCircle = new B2.b2Circle();
-  anchorCircle.center = new B2.b2Vec2(0, 0);
-  anchorCircle.radius = ANCHOR_RADIUS;
-  anchor.CreateCircleShape(anchorShape, anchorCircle);
+function createRopeLink(pw: PhysWorld, x: number, y: number, linkLen: number, rotation?: number): Body {
+  const link = makeBody(pw, x, y, {
+    linearDamping: LINK_LINEAR_DAMPING,
+    angularDamping: LINK_ANGULAR_DAMPING,
+    rotation,
+  });
+  const linkShape = makeShapeDef({ density: LINK_DENSITY, friction: LINK_FRICTION });
+  link.CreatePolygonShape(linkShape, b2().b2MakeBox(LINK_HALF_WIDTH, linkLen / 2));
+  pw.setUserData(link, { fill: LINK_COLOR, label: "ropeLink" });
+  return link;
+}
+
+export function createChainRope(pw: PhysWorld, x: number, y: number, links: number, linkLen = 0.4): Body {
+  const anchor = createRopeAnchor(pw, x, y);
 
   let prev: Body = anchor;
   for (let i = 0; i < links; i++) {
-    const linkDef = B2.b2DefaultBodyDef();
-    linkDef.type = B2.b2BodyType.b2_dynamicBody;
-    linkDef.position = new B2.b2Vec2(x, y - (i + 1) * linkLen);
-    linkDef.linearDamping = LINK_LINEAR_DAMPING;
-    linkDef.angularDamping = LINK_ANGULAR_DAMPING;
-    const link = pw.createBody(linkDef);
-
-    const linkShape = B2.b2DefaultShapeDef();
-    linkShape.density = LINK_DENSITY;
-    linkShape.material.friction = LINK_FRICTION;
-    linkShape.enableHitEvents = true;
-    link.CreatePolygonShape(linkShape, B2.b2MakeBox(LINK_HALF_WIDTH, linkLen / 2));
-    pw.setUserData(link, { fill: LINK_COLOR, label: "ropeLink" });
-
+    const link = createRopeLink(pw, x, y - (i + 1) * linkLen, linkLen);
     createRevoluteJoint(pw, prev, link, { x, y: y - i * linkLen - linkLen / 2 }, { collideConnected: true });
     prev = link;
   }
@@ -63,7 +61,6 @@ export function createRopeBetween(
   bodyB: Body | null,
   linkCount?: number,
 ): void {
-  const B2 = b2();
   const dx = x2 - x1;
   const dy = y2 - y1;
   const dist = Math.hypot(dx, dy);
@@ -78,16 +75,7 @@ export function createRopeBetween(
   if (bodyA) {
     prev = bodyA;
   } else {
-    const def = B2.b2DefaultBodyDef();
-    def.type = B2.b2BodyType.b2_staticBody;
-    def.position = new B2.b2Vec2(x1, y1);
-    anchorA = pw.createBody(def);
-    const shape = B2.b2DefaultShapeDef();
-    const circle = new B2.b2Circle();
-    circle.center = new B2.b2Vec2(0, 0);
-    circle.radius = ANCHOR_RADIUS;
-    anchorA.CreateCircleShape(shape, circle);
-    pw.setUserData(anchorA, { label: "ropeAnchor" });
+    anchorA = createRopeAnchor(pw, x1, y1, "ropeAnchor");
     prev = anchorA;
   }
 
@@ -95,20 +83,7 @@ export function createRopeBetween(
   for (let i = 1; i < links; i++) {
     const lx = x1 + stepX * i;
     const ly = y1 + stepY * i;
-    const linkDef = B2.b2DefaultBodyDef();
-    linkDef.type = B2.b2BodyType.b2_dynamicBody;
-    linkDef.position = new B2.b2Vec2(lx, ly);
-    linkDef.rotation = B2.b2MakeRot(angle);
-    linkDef.linearDamping = LINK_LINEAR_DAMPING;
-    linkDef.angularDamping = LINK_ANGULAR_DAMPING;
-    const link = pw.createBody(linkDef);
-
-    const linkShape = B2.b2DefaultShapeDef();
-    linkShape.density = LINK_DENSITY;
-    linkShape.material.friction = LINK_FRICTION;
-    linkShape.enableHitEvents = true;
-    link.CreatePolygonShape(linkShape, B2.b2MakeBox(LINK_HALF_WIDTH, linkLen / 2));
-    pw.setUserData(link, { fill: LINK_COLOR, label: "ropeLink" });
+    const link = createRopeLink(pw, lx, ly, linkLen, angle);
 
     const jx = x1 + stepX * (i - 0.5);
     const jy = y1 + stepY * (i - 0.5);
@@ -121,16 +96,7 @@ export function createRopeBetween(
   if (bodyB) {
     end = bodyB;
   } else {
-    const def = B2.b2DefaultBodyDef();
-    def.type = B2.b2BodyType.b2_staticBody;
-    def.position = new B2.b2Vec2(x2, y2);
-    end = pw.createBody(def);
-    const shape = B2.b2DefaultShapeDef();
-    const circle = new B2.b2Circle();
-    circle.center = new B2.b2Vec2(0, 0);
-    circle.radius = ANCHOR_RADIUS;
-    end.CreateCircleShape(shape, circle);
-    pw.setUserData(end, { label: "ropeAnchor" });
+    end = createRopeAnchor(pw, x2, y2, "ropeAnchor");
   }
 
   const jx = x1 + stepX * (links - 0.5);
