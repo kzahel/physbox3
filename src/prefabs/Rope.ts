@@ -13,7 +13,8 @@ const LINK_ANGULAR_DAMPING = 2;
 const LINK_COLOR = "rgba(180,160,120,0.7)";
 const ANCHOR_RADIUS = 0.15;
 
-// Stabilizer spring parameters
+// Stabilizer spring parameters (disabled — Box2D v3 solver is stable enough without it)
+const ENABLE_ROPE_STABILIZER = false;
 const STABILIZER_SPRING_K = 50;
 const STABILIZER_DAMPING = 5;
 
@@ -141,7 +142,7 @@ export function createRopeBetween(
   // the rope chain so it never pulls bodies together when the rope is merely sagging.
   const first = bodyA ?? anchorA!;
   const last = bodyB ?? end;
-  if (first !== last && (isDynamic(first) || isDynamic(last))) {
+  if (ENABLE_ROPE_STABILIZER && first !== last && (isDynamic(first) || isDynamic(last))) {
     const anchor1 = { x: x1, y: y1 };
     const anchor2 = { x: x2, y: y2 };
 
@@ -170,6 +171,7 @@ export function createRopeBetween(
  * This supplements the constraint solver by providing a smooth restoring force gradient.
  */
 export function applyRopeStabilization(pw: PhysWorld) {
+  if (!ENABLE_ROPE_STABILIZER) return;
   const B2 = b2();
   const SPRING_K = STABILIZER_SPRING_K;
   const DAMP = STABILIZER_DAMPING;
