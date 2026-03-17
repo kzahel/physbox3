@@ -43,7 +43,7 @@ export function createTrain(world: planck.World, x: number, y: number): planck.B
   engine.setUserData({ fill: engColor, label: "train" });
 
   // Engine wheels - strong motor, slow speed
-  const motorSpeed = -4;
+  const motorSpeed = 4;
   const motorTorque = 200;
   const engWheelOpts = {
     enableMotor: true,
@@ -77,11 +77,10 @@ export function createTrain(world: planck.World, x: number, y: number): planck.B
   const wallThick = 0.12;
 
   let prevBody = engine;
-  let prevHW = engHW;
   let cx = x + engHW; // right edge of engine
 
   for (let c = 0; c < 3; c++) {
-    cx += prevHW + carSpacing + carHW; // advance to center of next car
+    cx += carSpacing + carHW; // advance to center of next car
     const carHue = 30 + Math.floor(r() * 30);
     const carColor = `hsla(${carHue},40%,45%,0.85)`;
 
@@ -140,7 +139,7 @@ export function createTrain(world: planck.World, x: number, y: number): planck.B
     world.createJoint(planck.RevoluteJoint({}, prevBody, car, planck.Vec2(couplingX, y)));
 
     prevBody = car;
-    prevHW = carHW;
+    cx += carHW; // move cx to right edge of this car
   }
 
   return engine;
