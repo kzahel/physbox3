@@ -1,9 +1,9 @@
 import { b2 } from "../engine/Box2D";
 import type { Game } from "../engine/Game";
 
-const MOVE_FORCE = 8;
-const JUMP_IMPULSE = 6;
-const MAX_SPEED = 6;
+const MOVE_FORCE = 25;
+const JUMP_IMPULSE = 8;
+const MAX_SPEED = 8;
 
 export class RagdollController {
   private keys: Set<string>;

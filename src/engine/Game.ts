@@ -10,7 +10,7 @@ import { createDynamite, tickDynamite } from "../prefabs/Dynamite";
 import { applyFanForce, createFan, spawnFanParticles } from "../prefabs/Fan";
 import { createLauncher } from "../prefabs/Launcher";
 import { createPlatform } from "../prefabs/Platform";
-import { createRagdoll, type RagdollData } from "../prefabs/Ragdoll";
+import { createRagdoll, updateRagdollFootContacts, type RagdollData } from "../prefabs/Ragdoll";
 import { applyRocketThrust, createRocket, spawnRocketParticles } from "../prefabs/Rocket";
 import { applyRopeStabilization, createChainRope, createRopeBetween } from "../prefabs/Rope";
 import { createSeesaw } from "../prefabs/Seesaw";
@@ -408,6 +408,7 @@ export class Game {
     while (this.accumulator >= timestep) {
       snapshotBodies(this.pw, this.prevStates);
       this.inputManager?.update();
+      for (const rd of this.ragdolls) updateRagdollFootContacts(this.pw, rd);
       applyRocketThrust(this.pw, timestep);
       applyBalloonLift(this.pw);
       applyFanForce(this.pw);
