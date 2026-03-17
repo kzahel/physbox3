@@ -90,6 +90,17 @@ async function setRendererMode(want3D: boolean) {
 renderBtn.addEventListener("click", () => setRendererMode(!is3D));
 bottomTools.appendChild(renderBtn);
 
+// F3 toggles debug bounding sphere rendering in 3D mode
+window.addEventListener("keydown", (e) => {
+  if (e.key === "F3") {
+    e.preventDefault();
+    const r = game.renderer as { debug?: boolean };
+    if (r && "debug" in r) {
+      r.debug = !r.debug;
+    }
+  }
+});
+
 // Restore saved renderer preference
 if (localStorage.getItem("physbox-renderer") === "3d") {
   setRendererMode(true);

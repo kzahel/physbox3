@@ -101,11 +101,15 @@ function fixtureKey(body: planck.Body): string {
 
 export class ThreeJSRenderer implements IRenderer {
   readonly particles = new ParticleSystem();
+  debug = false;
 
   private scene: THREE.Scene;
   private camera3d: THREE.OrthographicCamera;
   private glRenderer: THREE.WebGLRenderer;
   private inputManager: InputManager | null = null;
+
+  // Debug bounding sphere wireframes
+  private debugMeshes: THREE.LineSegments[] = [];
 
   // Overlay canvas for 2D UI (tool cursors, buttons, text)
   private overlayCanvas: HTMLCanvasElement;
@@ -307,6 +311,9 @@ export class ThreeJSRenderer implements IRenderer {
     // Update particles
     this.particles.tick();
     this.syncParticles();
+
+    // Debug bounding spheres
+    this.syncDebug();
 
     // Render 3D scene
     this.glRenderer.render(this.scene, this.camera3d);
@@ -570,6 +577,54 @@ export class ThreeJSRenderer implements IRenderer {
     this.pointsGeometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
     this.pointsGeometry.setDrawRange(0, count);
     this.pointsGeometry.computeBoundingSphere();
+  }
+
+  // ── Debug bounding spheres ──
+
+  private syncDebug() {
+    // Clear previous debug meshes
+    for (const m of this.debugMeshes) {
+      this.scene.remove(m);
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
+    }
+    this.debugMeshes.length = 0;
+
+    if (!this.debug) return;
+
+    const wireSphereMat = new THREE.LineBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.5 });
+    const wireSphereMatParticles = new THREE.LineBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.6 });
+
+    // Body bounding spheres
+    for (const [, entry] of this.bodyMeshes) {
+      entry.group.traverse((child) => {
+        if (child instanceof THREE.Mesh && child.geometry) {
+          if (!child.geometry.boundingSphere) child.geometry.computeBoundingSphere();
+          const bs = child.geometry.boundingSphere;
+          if (!bs) return;
+          const sphere = new THREE.SphereGeometry(bs.radius, 12, 8);
+          const wireframe = new THREE.WireframeGeometry(sphere);
+          const line = new THREE.LineSegments(wireframe, wireSphereMat.clone());
+          // Position in world space: group transform + local bounding sphere center
+          const worldCenter = bs.center.clone().applyMatrix4(child.matrixWorld);
+          line.position.copy(worldCenter);
+          line.position.z = 0.5;
+          this.scene.add(line);
+          this.debugMeshes.push(line);
+        }
+      });
+    }
+
+    // Particle system bounding sphere
+    const pbs = this.pointsGeometry.boundingSphere;
+    if (pbs && pbs.radius > 0) {
+      const sphere = new THREE.SphereGeometry(pbs.radius, 16, 10);
+      const wireframe = new THREE.WireframeGeometry(sphere);
+      const line = new THREE.LineSegments(wireframe, wireSphereMatParticles);
+      line.position.set(pbs.center.x, pbs.center.y, pbs.center.z + this.pointsMesh.position.z);
+      this.scene.add(line);
+      this.debugMeshes.push(line);
+    }
   }
 
   // ── 2D Overlay (tool cursors, buttons, previews) ──
