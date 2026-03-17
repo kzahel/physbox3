@@ -6,7 +6,6 @@
  */
 import type {
   Body,
-  BodyRef,
   b2BodyDef,
   b2BodyId,
   b2ExplosionDef,
@@ -47,17 +46,17 @@ export class JointHandle {
   GetType(): b2JointType {
     return b2().b2Joint_GetType(this.id);
   }
-  /** Returns BodyRef — cast `as unknown as Body` for full API. Resolves via PhysWorld tracking. */
-  GetBodyA(): BodyRef {
+  /** Returns the Body OOP wrapper resolved via PhysWorld tracking. */
+  GetBodyA(): Body {
     const B2 = b2();
     const bodyId: b2BodyId = B2.b2Joint_GetBodyA(this.id);
-    return (this._pw.findBodyByIndex1(bodyId.index1) ?? bodyId) as unknown as BodyRef;
+    return (this._pw.findBodyByIndex1(bodyId.index1) ?? bodyId) as unknown as Body;
   }
-  /** Returns BodyRef — cast `as unknown as Body` for full API. Resolves via PhysWorld tracking. */
-  GetBodyB(): BodyRef {
+  /** Returns the Body OOP wrapper resolved via PhysWorld tracking. */
+  GetBodyB(): Body {
     const B2 = b2();
     const bodyId: b2BodyId = B2.b2Joint_GetBodyB(this.id);
-    return (this._pw.findBodyByIndex1(bodyId.index1) ?? bodyId) as unknown as BodyRef;
+    return (this._pw.findBodyByIndex1(bodyId.index1) ?? bodyId) as unknown as Body;
   }
   GetLocalFrameA(): b2Transform {
     return b2().b2Joint_GetLocalFrameA(this.id);
@@ -127,6 +126,12 @@ export class PhysWorld {
   }
 
   // --- Body management ---
+
+  static MAX_BODIES = 2000;
+
+  get isFull(): boolean {
+    return this._bodies.size >= PhysWorld.MAX_BODIES;
+  }
 
   createBody(def: b2BodyDef): Body {
     const body = this.world.CreateBody(def);

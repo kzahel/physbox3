@@ -75,11 +75,8 @@ function reverseDirection(pw: PhysWorld, body: Body) {
       const bodyA = joint.GetBodyA();
       const bodyB = joint.GetBodyB();
       if (bodyA === body || bodyB === body) {
-        // biome-ignore lint/suspicious/noExplicitAny: WheelJoint methods not fully typed
-        const wj = joint as any;
-        if (typeof wj.SetMotorSpeed === "function" && typeof wj.GetMotorSpeed === "function") {
-          wj.SetMotorSpeed(-wj.GetMotorSpeed());
-        }
+        const speed = B2.b2WheelJoint_GetMotorSpeed(joint.id);
+        B2.b2WheelJoint_SetMotorSpeed(joint.id, -speed);
       }
     });
   } else if (label === "conveyor") {

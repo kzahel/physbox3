@@ -1,5 +1,6 @@
 import type { Body, b2ShapeId } from "box2d3";
 import { createRopeBetween } from "../prefabs/Rope";
+import type { BodyUserData } from "./BodyUserData";
 import { b2 } from "./Box2D";
 import type { Game } from "./Game";
 import {
@@ -289,11 +290,8 @@ export function serializeScene(game: Game): SceneData {
       ropeJoints.add(j);
       return;
     }
-    // Resolve body references via index1 lookup
-    const bIdA = j.GetBodyA() as unknown as { index1: number };
-    const bIdB = j.GetBodyB() as unknown as { index1: number };
-    const bA = pw.findBodyByIndex1(bIdA.index1);
-    const bB = pw.findBodyByIndex1(bIdB.index1);
+    const bA = j.GetBodyA();
+    const bB = j.GetBodyB();
     if (ud?.isMainRope) {
       ropeJoints.add(j);
       if (bA && bB) {
@@ -419,8 +417,8 @@ export function serializeScene(game: Game): SceneData {
   pw.forEachJoint((j) => {
     if (ropeJoints.has(j)) return;
 
-    const bA = j.GetBodyA() as unknown as Body;
-    const bB = j.GetBodyB() as unknown as Body;
+    const bA = j.GetBodyA();
+    const bB = j.GetBodyB();
     const bodyAId = bodyMap.get(bA);
     const bodyBId = bodyMap.get(bB);
     if (bodyAId === undefined || bodyBId === undefined) return;
@@ -513,8 +511,7 @@ export function deserializeScene(game: Game, data: SceneData) {
       }
     }
 
-    // biome-ignore lint/suspicious/noExplicitAny: userData from deserialized scene data
-    if (sb.userData) pw.setUserData(body, sb.userData as any);
+    if (sb.userData) pw.setUserData(body, sb.userData as BodyUserData);
     idToBody.set(sb.id, body);
   }
 

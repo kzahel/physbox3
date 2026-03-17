@@ -182,8 +182,8 @@ export function applyRopeStabilization(pw: PhysWorld) {
       return;
     }
 
-    const bodyA = j.GetBodyA() as unknown as Body;
-    const bodyB = j.GetBodyB() as unknown as Body;
+    const bodyA = j.GetBodyA();
+    const bodyB = j.GetBodyB();
     const frameA = j.GetLocalFrameA();
     const frameB = j.GetLocalFrameB();
     const anchorA = bodyA.GetWorldPoint(frameA.p);

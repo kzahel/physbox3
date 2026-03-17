@@ -1,4 +1,4 @@
-import type { Body, b2ShapeId } from "box2d3";
+import type { b2ShapeId } from "box2d3";
 import type { ToolRenderInfo } from "../interaction/ToolHandler";
 import { b2 } from "./Box2D";
 import type { Camera } from "./Camera";
@@ -160,9 +160,8 @@ export class Renderer implements IRenderer {
     const B2 = b2();
 
     pw.forEachJoint((joint) => {
-      // joint.GetBodyA/B() returns BodyRef (empty interface) — cast to Body for full API
-      const bodyA = joint.GetBodyA() as unknown as Body;
-      const bodyB = joint.GetBodyB() as unknown as Body;
+      const bodyA = joint.GetBodyA();
+      const bodyB = joint.GetBodyB();
       const localFrameA = joint.GetLocalFrameA();
       const localFrameB = joint.GetLocalFrameB();
       const worldA = bodyA.GetWorldPoint(localFrameA.p);

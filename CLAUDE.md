@@ -63,7 +63,7 @@ See `docs/migration-plan.md` for the full plan and `docs/box2d3-wasm-reference.m
 - `body.GetJoints()` returns **`b2JointId[]`** (plain ID structs), NOT `Joint[]` OOP wrappers. Use flat API: `b2Joint_GetType(id)`, `b2Joint_GetBodyA(id)`, etc.
 - **`body.GetPointer()` / `world.GetPointer()` return ONLY `index1` (a number)**, NOT full ID structs. Do NOT use these for `bodyIdA`/`bodyIdB` on joint defs or `B2_ID_EQUALS` comparisons. Use `pw.getBodyId(body)` and `pw.worldId` instead.
 - **`JointHandle`** (in PhysWorld.ts) wraps `b2JointId` with OOP-like methods via flat API. The WASM build doesn't expose joint creation on World, so joints are created via flat API (`b2CreateWeldJoint` etc.) which returns `b2JointId`. `JointHandle` provides `GetBodyA()`, `GetBodyB()`, `GetType()`, `IsValid()`, `Destroy()`, etc. Use `pw.addJointId(id)` to create and track a JointHandle.
-- `jointHandle.GetBodyA()` / `GetBodyB()` return the actual `Body` OOP wrapper (resolved via PhysWorld tracking). Cast `as unknown as Body` for full API access.
+- `jointHandle.GetBodyA()` / `GetBodyB()` return `Body` directly (resolved via PhysWorld tracking). No cast needed.
 
 ### Established Migration Patterns
 
@@ -100,8 +100,8 @@ B2.b2Shape_GetSegment(shapeId)  // → b2Segment { point1, point2 }
 B2.b2Shape_GetCapsule(shapeId)  // → b2Capsule { center1, center2, radius }
 B2.b2Shape_IsSensor(shapeId)    // → boolean
 
-// Joint anchors (world-space) — joint.GetBodyA/B() returns BodyRef, cast to Body
-const bodyA = joint.GetBodyA() as unknown as Body;
+// Joint anchors (world-space) — joint.GetBodyA/B() returns Body directly
+const bodyA = joint.GetBodyA();
 const localFrameA = joint.GetLocalFrameA();  // → b2Transform { p, q }
 const worldAnchor = bodyA.GetWorldPoint(localFrameA.p);
 
