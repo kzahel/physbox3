@@ -114,6 +114,10 @@ export class Game {
 
       const fA = contact.getFixtureA();
       const fB = contact.getFixtureB();
+      const udA = getBodyUserData(fA.getBody());
+      const udB = getBodyUserData(fB.getBody());
+      if (udA?.label === "polygon" || udB?.label === "polygon") return;
+
       const tA = fA.getShape().getType();
       const tB = fB.getShape().getType();
       const intensity = Math.min(1, (ni - COLLISION_MIN_IMPULSE) / (COLLISION_MAX_IMPULSE - COLLISION_MIN_IMPULSE));
