@@ -237,6 +237,7 @@ export function createWeldJoint(pw: PhysWorld, a: Body, b: Body, anchor: { x: nu
 
   def.base.bodyIdA = pw.getBodyId(a);
   def.base.bodyIdB = pw.getBodyId(b);
+  def.base.collideConnected = false;
   const jointId = B2.b2CreateWeldJoint(pw.worldId, def);
   return pw.addJointId(jointId);
 }
