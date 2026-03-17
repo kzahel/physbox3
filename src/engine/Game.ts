@@ -260,7 +260,14 @@ export class Game {
     frameB.q = B2.b2Rot_identity;
     def.base.localFrameB = frameB;
 
-    B2.b2CreateDistanceJoint(this.pw.world.GetPointer(), def);
+    // Try OOP API (world.CreateDistanceJoint), fall back to flat API
+    // biome-ignore lint/suspicious/noExplicitAny: .d.ts incomplete — Create*Joint exists per reference
+    const world = this.pw.world as any;
+    if (typeof world.CreateDistanceJoint === "function") {
+      world.CreateDistanceJoint(def);
+    } else {
+      B2.b2CreateDistanceJoint(this.pw.world.GetPointer(), def);
+    }
   }
 
   addSpringBall(x: number, y: number) {

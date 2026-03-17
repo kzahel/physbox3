@@ -1,4 +1,4 @@
-import type { Body, b2ShapeId, Joint } from "box2d3";
+import type { Body, b2JointId, b2ShapeId } from "box2d3";
 import { playExplosion } from "./Audio";
 import { type BodyUserData, getBodyUserData } from "./BodyUserData";
 import { b2 } from "./Box2D";
@@ -77,7 +77,8 @@ export function explodeAt(
   pw.explode(def);
 }
 
-/** Recreate a body's shapes at a new scale. */
+/** Recreate a body's shapes at a new scale.
+ *  body.GetShapes() returns b2ShapeId[] — use flat API for geometry access. */
 export function scaleBody(_pw: PhysWorld, body: Body, scale: number): Body {
   const B2 = b2();
 
@@ -96,44 +97,39 @@ export function scaleBody(_pw: PhysWorld, body: Body, scale: number): Body {
     verts?: { x: number; y: number }[];
   }[] = [];
 
-  const shapes = body.GetShapes();
-  if (shapes) {
-    for (let i = 0; i < shapes.length; i++) {
-      const shape = shapes[i];
-      const shapeId = shape.GetPointer() as b2ShapeId;
-      const shapeType = B2.b2Shape_GetType(shapeId);
-      const entry: (typeof shapeData)[number] = {
-        type: shapeType.value,
-        density: B2.b2Shape_GetDensity(shapeId),
-        friction: B2.b2Shape_GetFriction(shapeId),
-        restitution: B2.b2Shape_GetRestitution(shapeId),
-        isSensor: B2.b2Shape_IsSensor(shapeId),
-      };
+  // body.GetShapes() returns b2ShapeId[] (plain ID objects, not OOP Shape wrappers)
+  const shapeIds: b2ShapeId[] = body.GetShapes() ?? [];
+  for (const shapeId of shapeIds) {
+    const shapeType = B2.b2Shape_GetType(shapeId);
+    const entry: (typeof shapeData)[number] = {
+      type: shapeType.value,
+      density: B2.b2Shape_GetDensity(shapeId),
+      friction: B2.b2Shape_GetFriction(shapeId),
+      restitution: B2.b2Shape_GetRestitution(shapeId),
+      isSensor: B2.b2Shape_IsSensor(shapeId),
+    };
 
-      if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
-        const circle = B2.b2Shape_GetCircle(shapeId);
-        entry.radius = circle.radius * scale;
-        entry.centerX = circle.center.x * scale;
-        entry.centerY = circle.center.y * scale;
-      } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
-        const poly = B2.b2Shape_GetPolygon(shapeId);
-        entry.verts = [];
-        for (let j = 0; j < poly.count; j++) {
-          const v = poly.GetVertex(j);
-          entry.verts.push({ x: v.x * scale, y: v.y * scale });
-        }
-      } else {
-        continue;
+    if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
+      const circle = B2.b2Shape_GetCircle(shapeId);
+      entry.radius = circle.radius * scale;
+      entry.centerX = circle.center.x * scale;
+      entry.centerY = circle.center.y * scale;
+    } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
+      const poly = B2.b2Shape_GetPolygon(shapeId);
+      entry.verts = [];
+      for (let j = 0; j < poly.count; j++) {
+        const v = poly.GetVertex(j);
+        entry.verts.push({ x: v.x * scale, y: v.y * scale });
       }
-      shapeData.push(entry);
+    } else {
+      continue;
     }
+    shapeData.push(entry);
   }
 
-  // Destroy old shapes
-  if (shapes) {
-    for (let i = 0; i < shapes.length; i++) {
-      shapes[i].Destroy(false);
-    }
+  // Destroy old shapes via flat API
+  for (const shapeId of shapeIds) {
+    B2.b2DestroyShape(shapeId, false);
   }
 
   // Create scaled shapes
@@ -175,7 +171,8 @@ export function queryBodiesInRadius(pw: PhysWorld, wx: number, wy: number, radiu
   return bodies;
 }
 
-/** Find the closest body to a world point, preferring exact testPoint hits. */
+/** Find the closest body to a world point, preferring exact testPoint hits.
+ *  body.GetShapes() returns b2ShapeId[] — use flat API b2Shape_TestPoint. */
 export function findClosestBody(pw: PhysWorld, wx: number, wy: number, radius: number): Body | null {
   const B2 = b2();
   const point = new B2.b2Vec2(wx, wy);
@@ -187,17 +184,15 @@ export function findClosestBody(pw: PhysWorld, wx: number, wy: number, radius: n
     const d = distance(pos, { x: wx, y: wy });
     if (d > radius && bestDist <= radius) return;
 
-    // Check if point is inside any shape
-    const shapes = body.GetShapes();
-    if (shapes) {
-      for (let i = 0; i < shapes.length; i++) {
-        if (shapes[i].TestPoint(point)) {
-          if (d < bestDist || bestDist > 0) {
-            target = body;
-            bestDist = 0;
-          }
-          return;
+    // Check if point is inside any shape using flat API
+    const shapeIds: b2ShapeId[] = body.GetShapes() ?? [];
+    for (const shapeId of shapeIds) {
+      if (B2.b2Shape_TestPoint(shapeId, point)) {
+        if (d < bestDist || bestDist > 0) {
+          target = body;
+          bestDist = 0;
         }
+        return;
       }
     }
 
@@ -221,12 +216,11 @@ export function destroyBodyAt(pw: PhysWorld, wx: number, wy: number, radius = 0.
 }
 
 /** Create a weld joint between two bodies at the given anchor point (world space).
- *  Returns the b2JointId for the created joint. */
+ *  Uses OOP world.CreateWeldJoint which returns a WeldJoint wrapper.
+ *  The .d.ts is incomplete — CreateWeldJoint exists at runtime per box2d3-wasm reference. */
 export function createWeldJoint(pw: PhysWorld, a: Body, b: Body, anchor: { x: number; y: number }) {
   const B2 = b2();
   const def = B2.b2DefaultWeldJointDef();
-  def.base.bodyIdA = a.GetPointer();
-  def.base.bodyIdB = b.GetPointer();
 
   // Convert world-space anchor to local frames
   const anchorVec = new B2.b2Vec2(anchor.x, anchor.y);
@@ -243,63 +237,70 @@ export function createWeldJoint(pw: PhysWorld, a: Body, b: Body, anchor: { x: nu
   frameB.q = B2.b2Rot_identity;
   def.base.localFrameB = frameB;
 
+  // Try OOP API first (world.CreateWeldJoint), fall back to flat API
+  // biome-ignore lint/suspicious/noExplicitAny: .d.ts incomplete — CreateWeldJoint exists per reference
+  const world = pw.world as any;
+  if (typeof world.CreateWeldJoint === "function") {
+    // OOP API: bodyIdA/bodyIdB set via the def; World extracts them
+    def.base.bodyIdA = a.GetPointer();
+    def.base.bodyIdB = b.GetPointer();
+    return world.CreateWeldJoint(def);
+  }
+  // Flat API fallback
+  def.base.bodyIdA = a.GetPointer();
+  def.base.bodyIdB = b.GetPointer();
   return B2.b2CreateWeldJoint(pw.world.GetPointer(), def);
 }
 
-/** Check if two bodies are connected by a weld joint. */
+/** Check if two bodies are connected by a weld joint.
+ *  body.GetJoints() returns b2JointId[] — use flat API for joint queries. */
 export function areWelded(_pw: PhysWorld, a: Body, b: Body): boolean {
   const B2 = b2();
-  const bId = b.GetPointer();
-  const joints = a.GetJoints();
-  if (!joints) return false;
-  for (let i = 0; i < joints.length; i++) {
-    const joint = joints[i];
-    if (joint.GetType().value !== B2.b2JointType.b2_weldJoint.value) continue;
-    const jId = joint.GetPointer();
-    const bodyAId = B2.b2Joint_GetBodyA(jId);
-    const bodyBId = B2.b2Joint_GetBodyB(jId);
-    if (B2.B2_ID_EQUALS(bodyAId, bId) || B2.B2_ID_EQUALS(bodyBId, bId)) {
+  const bPtr = b.GetPointer();
+  // body.GetJoints() returns b2JointId[] (plain ID objects, not OOP Joint wrappers)
+  const jointIds: b2JointId[] = a.GetJoints() ?? [];
+  for (const jointId of jointIds) {
+    if (B2.b2Joint_GetType(jointId).value !== B2.b2JointType.b2_weldJoint.value) continue;
+    const bodyAId = B2.b2Joint_GetBodyA(jointId);
+    const bodyBId = B2.b2Joint_GetBodyB(jointId);
+    if (B2.B2_ID_EQUALS(bodyAId, bPtr) || B2.B2_ID_EQUALS(bodyBId, bPtr)) {
       return true;
     }
   }
   return false;
 }
 
-/** Collect all weld joints attached to a body (as flat API joint IDs). */
-export function getWeldJoints(_pw: PhysWorld, body: Body): Joint[] {
+/** Collect all weld joint IDs attached to a body.
+ *  body.GetJoints() returns b2JointId[] — use flat API for joint queries. */
+export function getWeldJoints(_pw: PhysWorld, body: Body): b2JointId[] {
   const B2 = b2();
-  const result: Joint[] = [];
-  const joints = body.GetJoints();
-  if (!joints) return result;
-  for (let i = 0; i < joints.length; i++) {
-    const joint = joints[i];
-    if (joint.GetType().value === B2.b2JointType.b2_weldJoint.value) {
-      result.push(joint);
+  const result: b2JointId[] = [];
+  const jointIds: b2JointId[] = body.GetJoints() ?? [];
+  for (const jointId of jointIds) {
+    if (B2.b2Joint_GetType(jointId).value === B2.b2JointType.b2_weldJoint.value) {
+      result.push(jointId);
     }
   }
   return result;
 }
 
-/** Compute the bounding radius of a body from its shapes. */
+/** Compute the bounding radius of a body from its shapes.
+ *  body.GetShapes() returns b2ShapeId[] — use flat API for geometry access. */
 export function bodyRadius(body: Body): number {
   const B2 = b2();
   let maxR = 0;
 
-  const shapes = body.GetShapes();
-  if (shapes) {
-    for (let i = 0; i < shapes.length; i++) {
-      const shape = shapes[i];
-      const shapeId = shape.GetPointer() as b2ShapeId;
-      const shapeType = B2.b2Shape_GetType(shapeId);
+  const shapeIds: b2ShapeId[] = body.GetShapes() ?? [];
+  for (const shapeId of shapeIds) {
+    const shapeType = B2.b2Shape_GetType(shapeId);
 
-      if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
-        const circle = B2.b2Shape_GetCircle(shapeId);
-        maxR = Math.max(maxR, circle.radius);
-      } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
-        const aabb = B2.b2Shape_GetAABB(shapeId);
-        const ext = B2.b2Sub(aabb.upperBound, aabb.lowerBound);
-        maxR = Math.max(maxR, B2.b2Length(ext) / 2);
-      }
+    if (shapeType.value === B2.b2ShapeType.b2_circleShape.value) {
+      const circle = B2.b2Shape_GetCircle(shapeId);
+      maxR = Math.max(maxR, circle.radius);
+    } else if (shapeType.value === B2.b2ShapeType.b2_polygonShape.value) {
+      const aabb = B2.b2Shape_GetAABB(shapeId);
+      const ext = B2.b2Sub(aabb.upperBound, aabb.lowerBound);
+      maxR = Math.max(maxR, B2.b2Length(ext) / 2);
     }
   }
 
