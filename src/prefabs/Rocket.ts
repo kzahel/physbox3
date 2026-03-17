@@ -21,7 +21,8 @@ export function createRocket(world: planck.World, x: number, y: number, angle = 
   return body;
 }
 
-export function applyRocketThrust(world: planck.World, renderer: IRenderer, dt: number): void {
+/** Apply thrust forces and deplete fuel. Must be called inside the fixed timestep loop. */
+export function applyRocketThrust(world: planck.World, dt: number): void {
   for (let b = world.getBodyList(); b; b = b.getNext()) {
     if (!b.isDynamic()) continue;
     const ud = getBodyUserData(b);
@@ -34,7 +35,18 @@ export function applyRocketThrust(world: planck.World, renderer: IRenderer, dt: 
     const fx = -Math.sin(angle) * ud.thrust * b.getMass();
     const fy = Math.cos(angle) * ud.thrust * b.getMass();
     b.applyForceToCenter(planck.Vec2(fx, fy), true);
+  }
+}
 
+/** Spawn exhaust particles for active rockets. Called once per render frame. */
+export function spawnRocketParticles(world: planck.World, renderer: IRenderer): void {
+  for (let b = world.getBodyList(); b; b = b.getNext()) {
+    if (!b.isDynamic()) continue;
+    const ud = getBodyUserData(b);
+    if (ud?.label !== "rocket" || !ud.thrust) continue;
+    if (ud.fuel != null && ud.fuel <= 0) continue;
+
+    const angle = b.getAngle();
     const pos = b.getPosition();
     const exhaustX = pos.x + Math.sin(angle) * 1.0;
     const exhaustY = pos.y - Math.cos(angle) * 1.0;

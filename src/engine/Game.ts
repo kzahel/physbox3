@@ -7,11 +7,11 @@ import { createCannon, tickCannons } from "../prefabs/Cannon";
 import { createCar } from "../prefabs/Car";
 import { createConveyor } from "../prefabs/Conveyor";
 import { createDynamite, tickDynamite } from "../prefabs/Dynamite";
-import { applyFanForce, createFan } from "../prefabs/Fan";
+import { applyFanForce, createFan, spawnFanParticles } from "../prefabs/Fan";
 import { createLauncher } from "../prefabs/Launcher";
 import { createPlatform } from "../prefabs/Platform";
 import { createRagdoll, type RagdollData } from "../prefabs/Ragdoll";
-import { applyRocketThrust, createRocket } from "../prefabs/Rocket";
+import { applyRocketThrust, createRocket, spawnRocketParticles } from "../prefabs/Rocket";
 import { applyRopeStabilization, createChainRope, createRopeBetween } from "../prefabs/Rope";
 import { createSeesaw } from "../prefabs/Seesaw";
 import { createSpringBall } from "../prefabs/SpringBall";
@@ -329,19 +329,21 @@ export class Game {
 
   private stepPhysics(dt: number) {
     const scaledDt = dt * this.timeScale;
-    this.inputManager?.update();
-    applyRocketThrust(this.world, this.renderer, scaledDt);
-    applyBalloonLift(this.world);
-    applyFanForce(this.world, this.renderer);
-    applyMotorTorque(this.world);
-    applyRopeStabilization(this.world);
     tickDynamite(this.world, scaledDt, (wx, wy, r, f) => this.explodeAt(wx, wy, r, f));
     tickCannons(this.world, this.renderer, (wx, wy, r, f) => this.explodeAt(wx, wy, r, f), scaledDt);
     this.accumulator += scaledDt;
     while (this.accumulator >= TIMESTEP) {
+      this.inputManager?.update();
+      applyRocketThrust(this.world, TIMESTEP);
+      applyBalloonLift(this.world);
+      applyFanForce(this.world);
+      applyMotorTorque(this.world);
+      applyRopeStabilization(this.world);
       this.world.step(TIMESTEP, this.velocityIterations, this.positionIterations);
       this.accumulator -= TIMESTEP;
     }
+    spawnRocketParticles(this.world, this.renderer);
+    spawnFanParticles(this.world, this.renderer);
   }
 
   private removeOutOfBoundsBodies() {

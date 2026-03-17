@@ -16,18 +16,20 @@ export function createFan(
   return body;
 }
 
-export function applyFanForce(world: planck.World, renderer: IRenderer): void {
+/** Helper to iterate fans and compute direction/range. */
+function forEachFan(world: planck.World, cb: (fan: planck.Body, pos: planck.Vec2, angle: number, force: number, range: number, dirX: number, dirY: number) => void) {
   for (let fan = world.getBodyList(); fan; fan = fan.getNext()) {
     const ud = getBodyUserData(fan);
     if (ud?.label !== "fan") continue;
-
     const pos = fan.getPosition();
     const angle = fan.getAngle();
-    const force = ud.force ?? 15;
-    const range = ud.range ?? 10;
-    const dirX = Math.cos(angle);
-    const dirY = Math.sin(angle);
+    cb(fan, pos, angle, ud.force ?? 15, ud.range ?? 10, Math.cos(angle), Math.sin(angle));
+  }
+}
 
+/** Apply fan forces to nearby bodies. Must be called inside the fixed timestep loop. */
+export function applyFanForce(world: planck.World): void {
+  forEachFan(world, (fan, pos, _angle, force, range, dirX, dirY) => {
     const endX = pos.x + dirX * range;
     const endY = pos.y + dirY * range;
     const minX = Math.min(pos.x, endX) - 2;
@@ -60,7 +62,12 @@ export function applyFanForce(world: planck.World, renderer: IRenderer): void {
       const f = force * falloff * b.getMass();
       b.applyForceToCenter(planck.Vec2(dirX * f, dirY * f), true);
     }
+  });
+}
 
+/** Spawn wind particles for active fans. Called once per render frame. */
+export function spawnFanParticles(world: planck.World, renderer: IRenderer): void {
+  forEachFan(world, (_fan, pos, angle, _force, range) => {
     renderer.particles.spawnWind(pos.x, pos.y, angle, range);
-  }
+  });
 }
