@@ -137,8 +137,8 @@ export function createRopeBetween(
   createRevoluteJoint(pw, prev, end, { x: jx, y: jy }, { collideConnected: true });
 
   // Distance joint between endpoints to enforce max distance (replaces RopeJoint).
-  // No spring — only a hard max-length limit with 20% slack so the stabilizer
-  // never pulls bodies together, it only prevents them from drifting too far apart.
+  // Soft spring at slack length + hard max limit. The spring rest length is 20% beyond
+  // the rope chain so it never pulls bodies together when the rope is merely sagging.
   const first = bodyA ?? anchorA!;
   const last = bodyB ?? end;
   if (first !== last && (isDynamic(first) || isDynamic(last))) {
@@ -148,6 +148,9 @@ export function createRopeBetween(
     const slack = dist * 1.2;
     const mainJoint = createDistanceJoint(pw, first, last, anchor1, anchor2, {
       length: slack,
+      enableSpring: true,
+      hertz: 0.5,
+      dampingRatio: 1,
       enableLimit: true,
       minLength: 0,
       maxLength: slack,
