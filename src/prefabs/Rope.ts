@@ -48,6 +48,7 @@ export function createRopeBetween(
     prev.createFixture({ shape: planck.Circle(0.15) });
   }
 
+  const chainLinks: planck.Body[] = [];
   for (let i = 1; i < links; i++) {
     const lx = x1 + stepX * i;
     const ly = y1 + stepY * i;
@@ -64,6 +65,7 @@ export function createRopeBetween(
     const jx = x1 + stepX * (i - 0.5);
     const jy = y1 + stepY * (i - 0.5);
     world.createJoint(planck.RevoluteJoint({ collideConnected: true }, prev, link, planck.Vec2(jx, jy)));
+    chainLinks.push(link);
     prev = link;
   }
 
@@ -96,6 +98,47 @@ export function createRopeBetween(
         userData: { ropeStabilizer: true, restLength: dist },
       } as planck.RopeJointDef),
     );
+
+    // Add midpoint (and quarter-point for longer ropes) stabilizer joints.
+    // These constrain sub-spans of the rope so the middle can't stretch freely.
+    // The slack factor allows natural catenary sag before the spring engages.
+    const SLACK = 1.15; // 15% slack before spring force kicks in
+    const interiorPoints = chainLinks.length >= 8 ? [0.25, 0.5, 0.75] : [0.5];
+    for (const frac of interiorPoints) {
+      const idx = Math.floor((chainLinks.length - 1) * frac);
+      const mid = chainLinks[idx];
+      if (!mid) continue;
+
+      // Joint from first endpoint to this interior point
+      if (first !== mid && (first.isDynamic() || mid.isDynamic())) {
+        world.createJoint(
+          new planck.RopeJoint({
+            bodyA: first,
+            bodyB: mid,
+            localAnchorA: localA,
+            localAnchorB: planck.Vec2(0, 0),
+            maxLength: dist * frac * SLACK,
+            collideConnected: true,
+            userData: { ropeStabilizer: true, restLength: dist * frac * SLACK },
+          } as planck.RopeJointDef),
+        );
+      }
+
+      // Joint from this interior point to last endpoint
+      if (last !== mid && (last.isDynamic() || mid.isDynamic())) {
+        world.createJoint(
+          new planck.RopeJoint({
+            bodyA: mid,
+            bodyB: last,
+            localAnchorA: planck.Vec2(0, 0),
+            localAnchorB: localB,
+            maxLength: dist * (1 - frac) * SLACK,
+            collideConnected: true,
+            userData: { ropeStabilizer: true, restLength: dist * (1 - frac) * SLACK },
+          } as planck.RopeJointDef),
+        );
+      }
+    }
   }
 }
 
