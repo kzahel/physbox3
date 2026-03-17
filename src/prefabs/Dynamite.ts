@@ -1,14 +1,26 @@
-import * as planck from "planck";
+import type { Body } from "box2d3";
 import { type DynamiteData, getBodyUserData, isDynamite } from "../engine/BodyUserData";
+import { b2 } from "../engine/Box2D";
 import { forEachBodyByLabel, markDestroyed } from "../engine/Physics";
+import type { PhysWorld } from "../engine/PhysWorld";
 
 const DYNAMITE_EXPLOSION_RADIUS = 8;
 const DYNAMITE_EXPLOSION_FORCE = 30;
 
-export function createDynamite(world: planck.World, x: number, y: number, fuseTime = 3): planck.Body {
-  const body = world.createBody({ type: "dynamic", position: planck.Vec2(x, y) });
-  body.createFixture({ shape: planck.Box(0.25, 0.4), density: 2, friction: 0.5 });
-  body.setUserData({
+export function createDynamite(pw: PhysWorld, x: number, y: number, fuseTime = 3): Body {
+  const B2 = b2();
+  const bodyDef = B2.b2DefaultBodyDef();
+  bodyDef.type = B2.b2BodyType.b2_dynamicBody;
+  bodyDef.position = new B2.b2Vec2(x, y);
+  const body = pw.createBody(bodyDef);
+
+  const shapeDef = B2.b2DefaultShapeDef();
+  shapeDef.density = 2;
+  shapeDef.material.friction = 0.5;
+  shapeDef.enableHitEvents = true;
+  body.CreatePolygonShape(shapeDef, B2.b2MakeBox(0.25, 0.4));
+
+  pw.setUserData(body, {
     fill: "rgba(255,50,30,0.9)",
     label: "dynamite",
     fuseRemaining: fuseTime,
@@ -19,21 +31,21 @@ export function createDynamite(world: planck.World, x: number, y: number, fuseTi
 
 /** Advance dynamite fuses by dt and explode when they reach zero. Called from Game.stepPhysics. */
 export function tickDynamite(
-  world: planck.World,
+  pw: PhysWorld,
   dt: number,
   explodeAt: (wx: number, wy: number, radius: number, force: number) => void,
 ) {
-  const toExplode: planck.Body[] = [];
-  forEachBodyByLabel(world, isDynamite, (b, ud) => {
+  const toExplode: Body[] = [];
+  forEachBodyByLabel(pw, isDynamite, (b, ud) => {
     ud.fuseRemaining -= dt;
     if (ud.fuseRemaining <= 0) toExplode.push(b);
   });
   for (const b of toExplode) {
-    const ud = getBodyUserData(b);
+    const ud = getBodyUserData(pw, b);
     if (ud?.destroyed) continue;
-    const pos = b.getPosition();
+    const pos = b.GetPosition();
     explodeAt(pos.x, pos.y, DYNAMITE_EXPLOSION_RADIUS, DYNAMITE_EXPLOSION_FORCE);
-    markDestroyed(b);
-    world.destroyBody(b);
+    markDestroyed(pw, b);
+    pw.destroyBody(b);
   }
 }

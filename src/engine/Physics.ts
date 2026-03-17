@@ -1,4 +1,4 @@
-import type { Body, b2JointId, b2ShapeId } from "box2d3";
+import type { Body, b2JointId, b2ShapeId, Joint } from "box2d3";
 import { playExplosion } from "./Audio";
 import { type BodyUserData, getBodyUserData } from "./BodyUserData";
 import { b2 } from "./Box2D";
@@ -305,6 +305,179 @@ export function bodyRadius(body: Body): number {
   }
 
   return maxR;
+}
+
+// ── Joint creation helpers ──
+// These handle world-space anchor → local frame conversion, OOP/flat API fallback, and pw.addJoint tracking.
+
+/** Create a revolute joint (hinge/pin) at a world-space anchor point. */
+export function createRevoluteJoint(
+  pw: PhysWorld,
+  bodyA: Body,
+  bodyB: Body,
+  worldAnchor: { x: number; y: number },
+  opts?: {
+    collideConnected?: boolean;
+    enableLimit?: boolean;
+    lowerAngle?: number;
+    upperAngle?: number;
+    enableMotor?: boolean;
+    motorSpeed?: number;
+    maxMotorTorque?: number;
+  },
+): Joint {
+  const B2 = b2();
+  const def = B2.b2DefaultRevoluteJointDef();
+  const anchorVec = new B2.b2Vec2(worldAnchor.x, worldAnchor.y);
+
+  def.base.bodyIdA = bodyA.GetPointer();
+  def.base.bodyIdB = bodyB.GetPointer();
+
+  const frameA = new B2.b2Transform();
+  frameA.p = bodyA.GetLocalPoint(anchorVec);
+  frameA.q = B2.b2Rot_identity;
+  def.base.localFrameA = frameA;
+
+  const frameB = new B2.b2Transform();
+  frameB.p = bodyB.GetLocalPoint(anchorVec);
+  frameB.q = B2.b2Rot_identity;
+  def.base.localFrameB = frameB;
+
+  if (opts?.collideConnected) def.base.collideConnected = true;
+  if (opts?.enableLimit) {
+    def.enableLimit = true;
+    if (opts.lowerAngle != null) def.lowerAngle = opts.lowerAngle;
+    if (opts.upperAngle != null) def.upperAngle = opts.upperAngle;
+  }
+  if (opts?.enableMotor) {
+    def.enableMotor = true;
+    if (opts.motorSpeed != null) def.motorSpeed = opts.motorSpeed;
+    if (opts.maxMotorTorque != null) def.maxMotorTorque = opts.maxMotorTorque;
+  }
+
+  // biome-ignore lint/suspicious/noExplicitAny: .d.ts incomplete — CreateRevoluteJoint exists per reference
+  const world = pw.world as any;
+  const joint: Joint =
+    typeof world.CreateRevoluteJoint === "function"
+      ? world.CreateRevoluteJoint(def)
+      : B2.b2CreateRevoluteJoint(pw.world.GetPointer(), def);
+  pw.addJoint(joint);
+  return joint;
+}
+
+/** Create a distance joint between two world-space anchor points, optionally with spring. */
+export function createDistanceJoint(
+  pw: PhysWorld,
+  bodyA: Body,
+  bodyB: Body,
+  worldAnchorA: { x: number; y: number },
+  worldAnchorB: { x: number; y: number },
+  opts?: {
+    length?: number;
+    collideConnected?: boolean;
+    enableSpring?: boolean;
+    hertz?: number;
+    dampingRatio?: number;
+    enableLimit?: boolean;
+    maxLength?: number;
+  },
+): Joint {
+  const B2 = b2();
+  const def = B2.b2DefaultDistanceJointDef();
+  const ancA = new B2.b2Vec2(worldAnchorA.x, worldAnchorA.y);
+  const ancB = new B2.b2Vec2(worldAnchorB.x, worldAnchorB.y);
+
+  def.base.bodyIdA = bodyA.GetPointer();
+  def.base.bodyIdB = bodyB.GetPointer();
+
+  const frameA = new B2.b2Transform();
+  frameA.p = bodyA.GetLocalPoint(ancA);
+  frameA.q = B2.b2Rot_identity;
+  def.base.localFrameA = frameA;
+
+  const frameB = new B2.b2Transform();
+  frameB.p = bodyB.GetLocalPoint(ancB);
+  frameB.q = B2.b2Rot_identity;
+  def.base.localFrameB = frameB;
+
+  def.length = opts?.length ?? B2.b2Distance(ancA, ancB);
+  if (opts?.collideConnected) def.base.collideConnected = true;
+  if (opts?.enableSpring) {
+    def.enableSpring = true;
+    if (opts.hertz != null) def.hertz = opts.hertz;
+    if (opts.dampingRatio != null) def.dampingRatio = opts.dampingRatio;
+  }
+  if (opts?.enableLimit) {
+    def.enableLimit = true;
+    if (opts.maxLength != null) def.maxLength = opts.maxLength;
+  }
+
+  // biome-ignore lint/suspicious/noExplicitAny: .d.ts incomplete — CreateDistanceJoint exists per reference
+  const world = pw.world as any;
+  const joint: Joint =
+    typeof world.CreateDistanceJoint === "function"
+      ? world.CreateDistanceJoint(def)
+      : B2.b2CreateDistanceJoint(pw.world.GetPointer(), def);
+  pw.addJoint(joint);
+  return joint;
+}
+
+/** Create a wheel joint for vehicle suspension. Axis is in world space (typically (0,1) for vertical). */
+export function createWheelJoint(
+  pw: PhysWorld,
+  chassis: Body,
+  wheel: Body,
+  wheelWorldPos: { x: number; y: number },
+  worldAxis: { x: number; y: number },
+  opts?: {
+    enableSpring?: boolean;
+    hertz?: number;
+    dampingRatio?: number;
+    enableMotor?: boolean;
+    motorSpeed?: number;
+    maxMotorTorque?: number;
+  },
+): Joint {
+  const B2 = b2();
+  const def = B2.b2DefaultWheelJointDef();
+  const posVec = new B2.b2Vec2(wheelWorldPos.x, wheelWorldPos.y);
+
+  def.base.bodyIdA = chassis.GetPointer();
+  def.base.bodyIdB = wheel.GetPointer();
+
+  // Axis direction encoded in localFrameA rotation
+  const localAxis = chassis.GetLocalVector(new B2.b2Vec2(worldAxis.x, worldAxis.y));
+  const axisAngle = Math.atan2(localAxis.y, localAxis.x);
+
+  const frameA = new B2.b2Transform();
+  frameA.p = chassis.GetLocalPoint(posVec);
+  frameA.q = B2.b2MakeRot(axisAngle);
+  def.base.localFrameA = frameA;
+
+  const frameB = new B2.b2Transform();
+  frameB.p = new B2.b2Vec2(0, 0);
+  frameB.q = B2.b2Rot_identity;
+  def.base.localFrameB = frameB;
+
+  if (opts?.enableSpring !== false) {
+    def.enableSpring = true;
+    def.hertz = opts?.hertz ?? 3;
+    def.dampingRatio = opts?.dampingRatio ?? 0.7;
+  }
+  if (opts?.enableMotor) {
+    def.enableMotor = true;
+    if (opts.motorSpeed != null) def.motorSpeed = opts.motorSpeed;
+    if (opts.maxMotorTorque != null) def.maxMotorTorque = opts.maxMotorTorque;
+  }
+
+  // biome-ignore lint/suspicious/noExplicitAny: .d.ts incomplete — CreateWheelJoint exists per reference
+  const world = pw.world as any;
+  const joint: Joint =
+    typeof world.CreateWheelJoint === "function"
+      ? world.CreateWheelJoint(def)
+      : B2.b2CreateWheelJoint(pw.world.GetPointer(), def);
+  pw.addJoint(joint);
+  return joint;
 }
 
 export function clearDynamic(pw: PhysWorld): void {

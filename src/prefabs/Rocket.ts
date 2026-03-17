@@ -1,57 +1,75 @@
-import * as planck from "planck";
+import type { Body } from "box2d3";
 import { isRocket, type RocketData } from "../engine/BodyUserData";
+import { b2 } from "../engine/Box2D";
 import type { IRenderer } from "../engine/IRenderer";
-import { forEachBodyByLabel } from "../engine/Physics";
+import { bodyAngle, forEachBodyByLabel } from "../engine/Physics";
+import type { PhysWorld } from "../engine/PhysWorld";
 
-export function createRocket(world: planck.World, x: number, y: number, angle = 0): planck.Body {
-  const body = world.createBody({ type: "dynamic", position: planck.Vec2(x, y), angle });
-  body.createFixture({ shape: planck.Box(0.3, 0.8), density: 1.5, friction: 0.3 });
-  body.createFixture({
-    shape: planck.Polygon([planck.Vec2(-0.3, 0.8), planck.Vec2(0.3, 0.8), planck.Vec2(0, 1.4)]),
-    density: 0.5,
-  });
-  body.createFixture({
-    shape: planck.Polygon([planck.Vec2(-0.3, -0.8), planck.Vec2(-0.7, -1.0), planck.Vec2(-0.3, -0.3)]),
-    density: 0.3,
-  });
-  body.createFixture({
-    shape: planck.Polygon([planck.Vec2(0.3, -0.8), planck.Vec2(0.7, -1.0), planck.Vec2(0.3, -0.3)]),
-    density: 0.3,
-  });
-  body.setUserData({ fill: "rgba(200,200,220,0.9)", label: "rocket", thrust: 40, fuel: 20 } satisfies RocketData);
+export function createRocket(pw: PhysWorld, x: number, y: number, angle = 0): Body {
+  const B2 = b2();
+  const bodyDef = B2.b2DefaultBodyDef();
+  bodyDef.type = B2.b2BodyType.b2_dynamicBody;
+  bodyDef.position = new B2.b2Vec2(x, y);
+  bodyDef.rotation = B2.b2MakeRot(angle);
+  const body = pw.createBody(bodyDef);
+
+  const shapeDef = B2.b2DefaultShapeDef();
+  shapeDef.enableHitEvents = true;
+
+  // Main body
+  shapeDef.density = 1.5;
+  shapeDef.material.friction = 0.3;
+  body.CreatePolygonShape(shapeDef, B2.b2MakeBox(0.3, 0.8));
+
+  // Nose cone
+  shapeDef.density = 0.5;
+  const noseHull = B2.b2ComputeHull([new B2.b2Vec2(-0.3, 0.8), new B2.b2Vec2(0.3, 0.8), new B2.b2Vec2(0, 1.4)]);
+  body.CreatePolygonShape(shapeDef, B2.b2MakePolygon(noseHull, 0));
+
+  // Left fin
+  shapeDef.density = 0.3;
+  const lFinHull = B2.b2ComputeHull([new B2.b2Vec2(-0.3, -0.8), new B2.b2Vec2(-0.7, -1.0), new B2.b2Vec2(-0.3, -0.3)]);
+  body.CreatePolygonShape(shapeDef, B2.b2MakePolygon(lFinHull, 0));
+
+  // Right fin
+  const rFinHull = B2.b2ComputeHull([new B2.b2Vec2(0.3, -0.8), new B2.b2Vec2(0.7, -1.0), new B2.b2Vec2(0.3, -0.3)]);
+  body.CreatePolygonShape(shapeDef, B2.b2MakePolygon(rFinHull, 0));
+
+  pw.setUserData(body, { fill: "rgba(200,200,220,0.9)", label: "rocket", thrust: 40, fuel: 20 } satisfies RocketData);
   return body;
 }
 
 /** Apply thrust forces and deplete fuel. Must be called inside the fixed timestep loop. */
-export function applyRocketThrust(world: planck.World, dt: number): void {
+export function applyRocketThrust(pw: PhysWorld, dt: number): void {
+  const B2 = b2();
   forEachBodyByLabel(
-    world,
+    pw,
     isRocket,
     (b, ud) => {
       if (ud.fuel <= 0) return;
       ud.fuel -= dt;
 
-      const angle = b.getAngle();
-      const fx = -Math.sin(angle) * ud.thrust * b.getMass();
-      const fy = Math.cos(angle) * ud.thrust * b.getMass();
-      b.applyForceToCenter(planck.Vec2(fx, fy), true);
+      const a = bodyAngle(b);
+      const fx = -Math.sin(a) * ud.thrust * b.GetMass();
+      const fy = Math.cos(a) * ud.thrust * b.GetMass();
+      b.ApplyForceToCenter(new B2.b2Vec2(fx, fy), true);
     },
     true,
   );
 }
 
 /** Spawn exhaust particles for active rockets. Called once per render frame. */
-export function spawnRocketParticles(world: planck.World, renderer: IRenderer): void {
+export function spawnRocketParticles(pw: PhysWorld, renderer: IRenderer): void {
   forEachBodyByLabel(
-    world,
+    pw,
     isRocket,
     (b, ud) => {
       if (ud.fuel <= 0) return;
-      const angle = b.getAngle();
-      const pos = b.getPosition();
-      const exhaustX = pos.x + Math.sin(angle) * 1.0;
-      const exhaustY = pos.y - Math.cos(angle) * 1.0;
-      renderer.particles.spawnFlame(exhaustX, exhaustY, angle);
+      const a = bodyAngle(b);
+      const pos = b.GetPosition();
+      const exhaustX = pos.x + Math.sin(a) * 1.0;
+      const exhaustY = pos.y - Math.cos(a) * 1.0;
+      renderer.particles.spawnFlame(exhaustX, exhaustY, a);
     },
     true,
   );

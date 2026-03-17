@@ -1,26 +1,25 @@
-import * as planck from "planck";
-import { type ConveyorData, getBodyUserData, isConveyor } from "../engine/BodyUserData";
-import { createWorldListener } from "../engine/Physics";
+import type { Body } from "box2d3";
+import type { ConveyorData } from "../engine/BodyUserData";
+import { b2 } from "../engine/Box2D";
+import type { PhysWorld } from "../engine/PhysWorld";
 
-const ensureConveyorListener = createWorldListener((world) => {
-  world.on("pre-solve", (contact) => {
-    const bA = contact.getFixtureA().getBody();
-    const bB = contact.getFixtureB().getBody();
-    const udA = getBodyUserData(bA);
-    const udB = getBodyUserData(bB);
-    if (isConveyor(udA)) {
-      contact.setTangentSpeed(udA.speed);
-    } else if (isConveyor(udB)) {
-      contact.setTangentSpeed(udB.speed);
-    }
-  });
-});
+/**
+ * In box2d3, conveyor belt behavior is built into the surface material's tangentSpeed property.
+ * No pre-solve callback is needed — the physics engine handles it automatically.
+ */
+export function createConveyor(pw: PhysWorld, x: number, y: number, w = 6, speed = 3, angle = 0): Body {
+  const B2 = b2();
+  const bodyDef = B2.b2DefaultBodyDef();
+  bodyDef.type = B2.b2BodyType.b2_kinematicBody;
+  bodyDef.position = new B2.b2Vec2(x, y);
+  bodyDef.rotation = B2.b2MakeRot(angle);
+  const body = pw.createBody(bodyDef);
 
-export function createConveyor(world: planck.World, x: number, y: number, w = 6, speed = 3, angle = 0): planck.Body {
-  ensureConveyorListener(world);
-  const body = world.createBody({ type: "kinematic", position: planck.Vec2(x, y), angle });
-  const fixture = body.createFixture({ shape: planck.Box(w / 2, 0.2), friction: 1 });
-  fixture.setUserData({ fill: "rgba(200,160,50,0.8)", stroke: "rgba(200,160,50,0.5)" });
-  body.setUserData({ fill: "rgba(200,160,50,0.8)", label: "conveyor", speed } satisfies ConveyorData);
+  const shapeDef = B2.b2DefaultShapeDef();
+  shapeDef.material.friction = 1;
+  shapeDef.material.tangentSpeed = speed;
+  body.CreatePolygonShape(shapeDef, B2.b2MakeBox(w / 2, 0.2));
+
+  pw.setUserData(body, { fill: "rgba(200,160,50,0.8)", label: "conveyor", speed } satisfies ConveyorData);
   return body;
 }

@@ -2,22 +2,22 @@
 
 2D physics sandbox. Migrating from Planck.js (Box2D v2.4) to box2d3-wasm (Box2D v3, WASM+SIMD).
 
-## Status: MIGRATION IN PROGRESS — Phase 2 + 3A Complete
+## Status: MIGRATION IN PROGRESS — Phase 3 Complete
 
 See `docs/migration-plan.md` for the full plan and `docs/box2d3-wasm-reference.md` for the complete API reference.
 
 **Phase 1 done:** Game.ts, Physics.ts, Interpolation.ts, IRenderer.ts, main.ts — all migrated, 0 TS errors.
 **Phase 2 done:** Renderer.ts, OverlayRenderer.ts, ThreeJSRenderer.ts, PrefabOverlays.ts, SelectionButtons.ts — all migrated, 0 TS errors.
-**Phase 3A done:** Ball.ts, Box.ts, Platform.ts, Polygon.ts — simple prefabs migrated, 0 TS errors. **First visual test milestone reached.**
-**Next:** Phase 3B-D (remaining prefabs), then Phase 4 (GrabTool spike + tools).
-**Remaining errors:** 157 TS errors in unmigrated files (complex prefabs, tools, water, scene store).
+**Phase 3 done:** All 18 prefabs migrated, 0 TS errors. Includes joint helpers in Physics.ts (createRevoluteJoint, createDistanceJoint, createWheelJoint).
+**Next:** Phase 4 (GrabTool spike — MotorJoint replaces MouseJoint), then remaining tools.
+**Remaining errors:** 124 TS errors in unmigrated files (tools, water, scene store, tests, settings).
 
 ## Build & Dev
 
 - `npm run dev` — start dev server
 - `npm run build` — production build
 - `npm run lint` — biome check (formatting + linting)
-- `npx tsc --noEmit` — type check (157 errors remain in unmigrated files)
+- `npx tsc --noEmit` — type check (124 errors remain in unmigrated files)
 
 ## Key Documentation
 
@@ -107,6 +107,17 @@ joint.GetType().value === B2.b2JointType.b2_distanceJoint.value
 // Joint userData (for rope stabilizers etc.)
 pw.setJointData(joint, { ropeStabilizer: true });
 pw.getJointData(joint)?.ropeStabilizer
+
+// Joint creation helpers (Physics.ts) — handle anchor conversion, OOP/flat fallback, pw.addJoint
+createRevoluteJoint(pw, bodyA, bodyB, { x, y }, { enableLimit: true, lowerAngle: -PI/3, upperAngle: PI/3 })
+createDistanceJoint(pw, bodyA, bodyB, anchorA, anchorB, { enableSpring: true, hertz: 5, dampingRatio: 0.3 })
+createWheelJoint(pw, chassis, wheel, wheelPos, { x: 0, y: 1 }, { enableMotor: true, motorSpeed: 4, maxMotorTorque: 200 })
+
+// Conveyor belt: tangentSpeed is built into b2SurfaceMaterial (no pre-solve callback needed)
+shapeDef.material.tangentSpeed = speed;
+
+// Ragdoll foot contacts: polled via body.GetContactData() instead of event listeners
+// Cannonball impacts: polled via body.GetContactData() instead of begin-contact listener
 ```
 
 ### Mobile / Touch is First Class
