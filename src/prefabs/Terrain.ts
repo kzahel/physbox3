@@ -4,8 +4,8 @@ import type { PhysWorld } from "../engine/PhysWorld";
 
 /** Minimum distance between consecutive points (world units) */
 const MIN_SEGMENT_LEN = 0.15;
-/** Small margin below lowest point for the backstop box */
-const BACKSTOP_MARGIN = 0.5;
+/** Small margin below lowest point for the loop bottom */
+const LOOP_MARGIN = 0.5;
 
 /**
  * Douglas-Peucker polyline simplification.
@@ -48,7 +48,7 @@ function simplifyPolyline(pts: { x: number; y: number }[], epsilon: number): { x
 
 /**
  * Create a terrain body from freeform drawn points.
- * Uses a chain shape for the surface + a large backstop box underneath.
+ * Uses a closed-loop chain shape (surface + flat bottom) for solid collision.
  * Returns the body and chainId (for serialization/cleanup).
  */
 export function createTerrain(
@@ -79,71 +79,41 @@ export function createTerrain(
 
   const B2 = b2();
 
-  // Box2D v3 chain shapes are one-sided: the solid side is to the RIGHT of
-  // the edge direction (in Y-up coords). For terrain where objects should rest
-  // ON TOP, we need the chain to go from right-to-left so the right-hand
-  // normal points upward. Ensure consistent winding by checking x-direction.
+  // Compute bounding box of the surface points
+  let minY = Infinity;
+  for (const p of simplified) minY = Math.min(minY, p.y);
+
+  // Build a closed-loop chain: surface points (right-to-left for upward-facing
+  // normals), then close along the bottom at minY. A closed loop has no
+  // endpoints, so there are no ghost vertex / endpoint collision issues.
+  // Box2D v3 one-sided chains collide on the RIGHT of the edge direction
+  // (Y-up), so the surface must go right-to-left for upward normals.
   if (simplified[simplified.length - 1].x > simplified[0].x) {
     simplified.reverse();
   }
 
-  // Extend endpoints with ghost points to prevent fall-through at the ends.
-  // Each ghost extends the first/last segment direction by a short distance.
-  const ghostLen = 2;
-  const first = simplified[0];
-  const second = simplified[1];
-  const dxF = first.x - second.x;
-  const dyF = first.y - second.y;
-  const lenF = Math.hypot(dxF, dyF) || 1;
-  simplified.unshift({ x: first.x + (dxF / lenF) * ghostLen, y: first.y + (dyF / lenF) * ghostLen });
+  // Close the loop: from last surface point, drop to minY, across, back up
+  const loopBottom = minY - LOOP_MARGIN;
+  const firstPt = simplified[0];
+  const lastPt = simplified[simplified.length - 1];
+  const loopPoints = [...simplified, { x: lastPt.x, y: loopBottom }, { x: firstPt.x, y: loopBottom }];
 
-  const last = simplified[simplified.length - 1];
-  const prev = simplified[simplified.length - 2];
-  const dxL = last.x - prev.x;
-  const dyL = last.y - prev.y;
-  const lenL = Math.hypot(dxL, dyL) || 1;
-  simplified.push({ x: last.x + (dxL / lenL) * ghostLen, y: last.y + (dyL / lenL) * ghostLen });
-
-  // Compute bounding box of the terrain surface
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minY = Infinity;
-  for (const p of simplified) {
-    minX = Math.min(minX, p.x);
-    maxX = Math.max(maxX, p.x);
-    minY = Math.min(minY, p.y);
-  }
-
-  // Create a static body at origin (chain points are in world space relative to body)
+  // Create a static body at origin
   const bodyDef = B2.b2DefaultBodyDef();
   bodyDef.type = B2.b2BodyType.b2_staticBody;
   bodyDef.position = new B2.b2Vec2(0, 0);
   const body = pw.createBody(bodyDef);
 
-  // Create chain shape for the surface
+  // Create closed-loop chain shape
   const chainDef = B2.b2DefaultChainDef();
-  chainDef.SetPoints(simplified);
-  chainDef.isLoop = false;
+  chainDef.SetPoints(loopPoints);
+  chainDef.isLoop = true;
   const surfaceMat = B2.b2DefaultSurfaceMaterial();
   surfaceMat.friction = 0.6;
   surfaceMat.restitution = 0.1;
   chainDef.SetMaterials([surfaceMat]);
   const chain = body.CreateChain(chainDef)!;
   const chainId: b2ChainId = chain.GetPointer() as unknown as b2ChainId;
-
-  // Create a thin backstop box just below the lowest terrain point to prevent
-  // objects tunneling underneath the chain surface.
-  const halfW = (maxX - minX) / 2 + 1;
-  const halfH = BACKSTOP_MARGIN / 2;
-  const centerX = (minX + maxX) / 2;
-  const centerY = minY - halfH;
-
-  const shapeDef = B2.b2DefaultShapeDef();
-  shapeDef.material.friction = 0.6;
-  shapeDef.material.restitution = 0.1;
-
-  const backstopBox = B2.b2MakeOffsetBox(halfW, halfH, new B2.b2Vec2(centerX, centerY), B2.b2Rot_identity);
-  body.CreatePolygonShape(shapeDef, backstopBox);
 
   // Store terrain points in userData for rendering/serialization
   pw.setUserData(body, {
