@@ -20,8 +20,6 @@ const MIN_DEPTH = 0.02;
 const FLOW_RATE = 0.25;
 /** Number of flow iterations per tick (more = faster settling) */
 const FLOW_ITERS = 3;
-/** How far above the column top to start the floor raycast */
-const RAY_ABOVE = 50;
 /** Buoyancy multiplier (water density × gravity scale) */
 const BUOYANCY_SCALE = 2.5;
 /** Stagger: only re-raycast a fraction of columns each frame */
@@ -60,7 +58,7 @@ export class WaterSystem {
       col = {
         x: idx * COL_WIDTH,
         level: wy,
-        floor: wy - amount / COL_WIDTH,
+        floor: wy, // approximate — first raycast will find actual ground
         volume: 0,
         wallLeft: false,
         wallRight: false,
@@ -183,8 +181,12 @@ export class WaterSystem {
       // Stagger raycasts: only update a fraction each frame
       if ((idx + this.frameCount) % RAYCAST_STAGGER !== 0) continue;
 
-      const from = planck.Vec2(col.x, col.level + RAY_ABOVE);
-      const to = planck.Vec2(col.x, col.level - 200);
+      // Raycast downward from just above the current floor — NOT from the water
+      // surface.  This way a platform placed *into* the water (above the floor)
+      // is invisible to floor detection.  The floor can drop (ground broke) but
+      // never jump upward due to something inserted above it.
+      const from = planck.Vec2(col.x, col.floor + 0.05);
+      const to = planck.Vec2(col.x, col.floor - 200);
       let bestY = -1000; // default floor if nothing hit
 
       world.rayCast(from, to, (fixture, point, _normal, fraction) => {
