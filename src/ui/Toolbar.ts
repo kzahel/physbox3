@@ -30,6 +30,7 @@ const ICONS: Record<Tool, string> = {
   unglue: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><path d="M9 2v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="6" y="6" width="6" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M7 10v3q2 2 4 0v-3" fill="none" stroke="currentColor" stroke-width="1.3"/><line x1="4" y1="4" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
   train: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><rect x="1" y="7" width="6" height="4" rx="0.5" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="1" y="5" width="3" height="2" rx="0.3" fill="none" stroke="currentColor" stroke-width="1"/><rect x="8" y="6" width="4" height="5" rx="0.3" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="13" y="6" width="4" height="5" rx="0.3" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="7" y1="9" x2="8" y2="9" stroke="currentColor" stroke-width="0.8"/><line x1="12" y1="9" x2="13" y2="9" stroke="currentColor" stroke-width="0.8"/><circle cx="2.5" cy="12.5" r="1.3" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="5.5" cy="12.5" r="1.3" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="10" cy="12.5" r="1.3" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="15" cy="12.5" r="1.3" fill="none" stroke="currentColor" stroke-width="1"/></svg>`,
   draw: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><path d="M3 15L5 5l3 4 3-6 3 8 2-3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 15l2-10 3 4 3-6 3 8 2-3" fill="rgba(120,200,160,0.3)" stroke="none"/></svg>`,
+  water: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><path d="M3 10q3-3 6 0t6 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M3 14q3-3 6 0t6 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M3 14q3-3 6 0t6 0V18H3z" fill="rgba(60,140,255,0.3)" stroke="none"/></svg>`,
 };
 
 const TOOLS: { id: Tool; label: string }[] = [
@@ -52,6 +53,7 @@ const TOOLS: { id: Tool; label: string }[] = [
   { id: "dynamite", label: "TNT" },
   { id: "ropetool", label: "Tie" },
   { id: "spring", label: "Spring" },
+  { id: "water", label: "Water" },
   { id: "erase", label: "Erase" },
   { id: "glue", label: "Glue" },
   { id: "unglue", label: "Unglue" },

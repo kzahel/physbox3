@@ -323,7 +323,7 @@ export class ThreeJSRenderer implements IRenderer {
     this.overlay.setToolInfo(input);
   }
 
-  drawWorld(world: planck.World, camera: Camera) {
+  drawWorld(world: planck.World, camera: Camera, _water?: unknown) {
     const cw = this.glCanvas.clientWidth;
     const ch = this.glCanvas.clientHeight;
 

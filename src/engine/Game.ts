@@ -22,6 +22,7 @@ import { Camera } from "./Camera";
 import type { IRenderer } from "./IRenderer";
 import { clamp, clearDynamic, destroyBodyAt, explodeAt, forEachBody, markDestroyed, scaleBody } from "./Physics";
 import { Renderer } from "./Renderer";
+import { WaterSystem } from "./WaterSystem";
 
 export const KILL_Y = -100;
 export const KILL_Y_TOP = 200;
@@ -50,6 +51,7 @@ export class Game {
   velocityIterations = 8;
   positionIterations = 3;
   inputManager: InputManager | null = null;
+  water = new WaterSystem();
   ragdolls: RagdollData[] = [];
   followSelected = false;
   followBody: planck.Body | null = null;
@@ -313,6 +315,7 @@ export class Game {
     this.bindBounciness();
     this.bindCollisionSounds();
     this.ragdolls.length = 0;
+    this.water.clear();
     this.followBody = null;
     this.accumulator = 0;
     if (this.inputManager) {
@@ -343,7 +346,7 @@ export class Game {
 
     this.removeOutOfBoundsBodies();
     this.updateCameraFollow();
-    this.renderer.drawWorld(this.world, this.camera);
+    this.renderer.drawWorld(this.world, this.camera, this.water);
   }
 
   private updateFPS(dt: number) {
@@ -368,6 +371,8 @@ export class Game {
       applyFanForce(this.world);
       applyMotorTorque(this.world);
       applyRopeStabilization(this.world);
+      this.water.tick(this.world);
+      this.water.applyBuoyancy(this.world, this.gravity);
       this.world.step(TIMESTEP, this.velocityIterations, this.positionIterations);
       this.accumulator -= TIMESTEP;
     }
