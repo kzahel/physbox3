@@ -1,4 +1,4 @@
-import type * as planck from "planck";
+import type { Body } from "box2d3";
 import { clamp } from "../../engine/Physics";
 import type { ToolContext, ToolHandler } from "../ToolHandler";
 
@@ -6,7 +6,7 @@ export class ScaleTool implements ToolHandler {
   immediateTouch = true as const;
   touchDragMode = "drag" as const;
   /** Visible to Renderer for preview ring */
-  scaleDrag: { body: planck.Body; startScreenY: number; currentScale: number } | null = null;
+  scaleDrag: { body: Body; startScreenY: number; currentScale: number } | null = null;
   private ctx: ToolContext;
 
   constructor(ctx: ToolContext) {

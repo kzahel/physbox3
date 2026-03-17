@@ -2,15 +2,16 @@
 
 2D physics sandbox. Migrating from Planck.js (Box2D v2.4) to box2d3-wasm (Box2D v3, WASM+SIMD).
 
-## Status: MIGRATION IN PROGRESS — Phase 3 Complete
+## Status: MIGRATION IN PROGRESS — Phase 4 Complete
 
 See `docs/migration-plan.md` for the full plan and `docs/box2d3-wasm-reference.md` for the complete API reference.
 
 **Phase 1 done:** Game.ts, Physics.ts, Interpolation.ts, IRenderer.ts, main.ts — all migrated, 0 TS errors.
 **Phase 2 done:** Renderer.ts, OverlayRenderer.ts, ThreeJSRenderer.ts, PrefabOverlays.ts, SelectionButtons.ts — all migrated, 0 TS errors.
 **Phase 3 done:** All 18 prefabs migrated, 0 TS errors. Includes joint helpers in Physics.ts (createRevoluteJoint, createDistanceJoint, createWheelJoint).
-**Next:** Phase 4 (GrabTool spike — MotorJoint replaces MouseJoint), then remaining tools.
-**Remaining errors:** 124 TS errors in unmigrated files (tools, water, scene store, tests, settings).
+**Phase 4 done:** All tools migrated (GrabTool with MotorJoint, AttractTool with polled contacts, EndpointDragHandler with flat shape API), ToolHandler.ts, InputManager.ts, RagdollController.ts, SettingsPane.ts — 0 TS errors.
+**Next:** Phase 5 (WaterSystem — raycasting, AABB queries), then Phase 6 (SceneStore clean rewrite + tests).
+**Remaining errors:** 70 TS errors in unmigrated files (WaterSystem, SceneStore, test files).
 
 ## Build & Dev
 
@@ -52,7 +53,7 @@ See `docs/migration-plan.md` for the full plan and `docs/box2d3-wasm-reference.m
 - Joint userData stored in `PhysWorld.setJointData()` / `getJointData()` (external Map)
 - Body/joint iteration via `PhysWorld.forEachBody()` / `forEachJoint()` (tracked Set)
 - Events polled after `world.Step()` via `PhysWorld.processEvents()`
-- No MouseJoint in v3 — use MotorJoint for grab tool
+- No MouseJoint in v3 — GrabTool uses MotorJoint (spring-based targeting with SetLinearVelocity each frame)
 
 ### Critical: ID arrays vs OOP wrappers
 

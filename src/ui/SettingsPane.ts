@@ -13,7 +13,6 @@ export class SettingsPane {
       <label>Gravity <input type="range" id="s-gravity" min="-30" max="10" step="0.5" value="${game.gravity}"></label>
       <label>Speed <input type="range" id="s-speed" min="0" max="3" step="0.1" value="${game.timeScale}"></label>
       <label>Bounce <input type="range" id="s-bounce" min="0" max="1" step="0.05" value="${game.bounciness}"></label>
-      <label>Solver Iters <input type="range" id="s-iters" min="1" max="20" step="1" value="${game.positionIterations}"> <span id="s-iters-val">${game.positionIterations}</span></label>
       <label>Physics Hz <input type="range" id="s-physics-hz" min="10" max="120" step="10" value="${game.physicsHz}"> <span id="s-physics-hz-val">${game.physicsHz}</span></label>
 
       <div class="section-title">Actions</div>
@@ -43,16 +42,6 @@ export class SettingsPane {
       game.timeScale = v;
     });
     bindSlider("#s-bounce", (v) => game.setBounciness(v));
-    const itersVal = container.querySelector<HTMLSpanElement>("#s-iters-val")!;
-    bindSlider(
-      "#s-iters",
-      (v) => {
-        game.positionIterations = v;
-        game.velocityIterations = Math.max(v * 2, 4);
-        itersVal.textContent = String(v);
-      },
-      (s) => parseInt(s, 10),
-    );
     const hzVal = container.querySelector<HTMLSpanElement>("#s-physics-hz-val")!;
     bindSlider(
       "#s-physics-hz",

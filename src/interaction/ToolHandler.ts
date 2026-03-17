@@ -1,12 +1,12 @@
-import type * as planck from "planck";
+import type { Body } from "box2d3";
 import type { Game } from "../engine/Game";
 
 /** Shared context passed to every tool handler */
 export interface ToolContext {
   game: Game;
-  groundBody: planck.Body;
+  groundBody: Body;
   /** Find the nearest body at world coords within a screen-pixel radius */
-  findBodyAt(wx: number, wy: number, radiusPx?: number): planck.Body | null;
+  findBodyAt(wx: number, wy: number, radiusPx?: number): Body | null;
 }
 
 /**
@@ -43,10 +43,10 @@ export interface ToolHandler {
 export interface ToolRenderInfo {
   readonly tool: Tool;
   readonly toolCursor: { x: number; y: number } | null;
-  readonly selectedBody: planck.Body | null;
-  readonly attachPending: { body: planck.Body; world: { x: number; y: number } } | null;
-  readonly ropePending: { body: planck.Body | null; x: number; y: number } | null;
-  readonly scaleDrag: { body: planck.Body; startScreenY: number; currentScale: number } | null;
+  readonly selectedBody: Body | null;
+  readonly attachPending: { body: Body; world: { x: number; y: number } } | null;
+  readonly ropePending: { body: Body | null; x: number; y: number } | null;
+  readonly scaleDrag: { body: Body; startScreenY: number; currentScale: number } | null;
   readonly platformDraw: { start: { x: number; y: number }; end: { x: number; y: number } } | null;
   readonly drawPoints: readonly { x: number; y: number }[];
 }

@@ -1,10 +1,10 @@
-import * as planck from "planck";
+import type { Body } from "box2d3";
 import { createWeldJoint } from "../../engine/Physics";
 import type { ToolContext, ToolHandler } from "../ToolHandler";
 
 export class AttachTool implements ToolHandler {
   /** Visible to Renderer for highlight */
-  attachPending: { body: planck.Body; world: { x: number; y: number } } | null = null;
+  attachPending: { body: Body; world: { x: number; y: number } } | null = null;
   private ctx: ToolContext;
 
   constructor(ctx: ToolContext) {
@@ -21,7 +21,7 @@ export class AttachTool implements ToolHandler {
       if (body !== this.attachPending.body) {
         const midX = (this.attachPending.world.x + wx) / 2;
         const midY = (this.attachPending.world.y + wy) / 2;
-        createWeldJoint(this.ctx.game.world, this.attachPending.body, body, planck.Vec2(midX, midY));
+        createWeldJoint(this.ctx.game.pw, this.attachPending.body, body, { x: midX, y: midY });
       }
       this.attachPending = null;
     }

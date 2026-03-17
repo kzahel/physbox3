@@ -34,7 +34,7 @@ export class DrawTool implements ToolHandler {
     this.drawing = false;
 
     if (this.drawPoints.length >= 3) {
-      createPolygon(this.ctx.game.world, this.drawPoints);
+      createPolygon(this.ctx.game.pw, this.drawPoints);
     }
     this.drawPoints = [];
   }

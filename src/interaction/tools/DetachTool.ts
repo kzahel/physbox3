@@ -1,3 +1,5 @@
+import type { Joint } from "box2d3";
+import { b2 } from "../../engine/Box2D";
 import type { ToolContext, ToolHandler } from "../ToolHandler";
 
 export class DetachTool implements ToolHandler {
@@ -11,12 +13,15 @@ export class DetachTool implements ToolHandler {
     const body = this.ctx.findBodyAt(wx, wy);
     if (!body) return;
 
-    const toRemove: import("planck").Joint[] = [];
-    for (let j = this.ctx.game.world.getJointList(); j; j = j.getNext()) {
-      if (j.getType() === "weld-joint" && (j.getBodyA() === body || j.getBodyB() === body)) {
-        toRemove.push(j);
+    const B2 = b2();
+    const pw = this.ctx.game.pw;
+    const toRemove: Joint[] = [];
+    pw.forEachJoint((joint) => {
+      if (joint.GetType().value !== B2.b2JointType.b2_weldJoint.value) return;
+      if (joint.GetBodyA() === body || joint.GetBodyB() === body) {
+        toRemove.push(joint);
       }
-    }
-    for (const j of toRemove) this.ctx.game.world.destroyJoint(j);
+    });
+    for (const j of toRemove) pw.destroyJoint(j);
   }
 }

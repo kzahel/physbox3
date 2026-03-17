@@ -1,4 +1,4 @@
-import type * as planck from "planck";
+import type { Body } from "box2d3";
 import { executeButtonAction, getSelectionButtons, hitButton } from "../SelectionButtons";
 import type { ToolContext, ToolHandler } from "../ToolHandler";
 
@@ -7,7 +7,7 @@ export { getBodyLabel, hasMotor, isDirectional } from "../SelectionButtons";
 
 export class SelectTool implements ToolHandler {
   /** Visible to Renderer for UI overlay */
-  selectedBody: planck.Body | null = null;
+  selectedBody: Body | null = null;
   private ctx: ToolContext;
 
   constructor(ctx: ToolContext) {
@@ -16,12 +16,12 @@ export class SelectTool implements ToolHandler {
 
   onDown(wx: number, wy: number, sx: number, sy: number) {
     if (this.selectedBody) {
-      const pos = this.selectedBody.getPosition();
+      const pos = this.selectedBody.GetPosition();
       const sp = this.ctx.game.camera.toScreen(pos.x, pos.y, this.ctx.game.container);
 
-      for (const btn of getSelectionButtons(this.selectedBody)) {
+      for (const btn of getSelectionButtons(this.ctx.game.pw, this.selectedBody)) {
         if (hitButton(sx, sy, sp.x, sp.y - btn.offsetY)) {
-          executeButtonAction(btn.id, this.selectedBody, this.ctx.game.world);
+          executeButtonAction(btn.id, this.ctx.game.pw, this.selectedBody);
           return;
         }
       }

@@ -1,4 +1,5 @@
-import type * as planck from "planck";
+import type { Body } from "box2d3";
+import { b2 } from "../engine/Box2D";
 import type { Game } from "../engine/Game";
 import { distance, findClosestBody } from "../engine/Physics";
 import { RagdollController } from "./RagdollController";
@@ -61,7 +62,7 @@ export class InputManager implements ToolRenderInfo {
   // Keyboard state
   private keys = new Set<string>();
   private game: Game;
-  private groundBody: planck.Body;
+  private groundBody: Body;
 
   // Pan state
   private isPanning = false;
@@ -92,7 +93,11 @@ export class InputManager implements ToolRenderInfo {
 
   constructor(game: Game) {
     this.game = game;
-    this.groundBody = game.world.createBody({ type: "static" });
+    // Create a static ground body for tools that need an anchor (GrabTool MotorJoint)
+    const B2 = b2();
+    const groundDef = B2.b2DefaultBodyDef();
+    groundDef.type = B2.b2BodyType.b2_staticBody;
+    this.groundBody = game.pw.createBody(groundDef);
 
     const ctx: ToolContext = {
       game,
@@ -137,7 +142,6 @@ export class InputManager implements ToolRenderInfo {
     this.handlers = h as Record<Tool, ToolHandler>;
 
     this.ragdollController = new RagdollController(game, this.keys);
-    this.attractTool.ensureContactListener();
     this.bind();
   }
 
@@ -160,7 +164,7 @@ export class InputManager implements ToolRenderInfo {
     return this.attachTool.attachPending;
   }
 
-  get ropePending(): { body: planck.Body | null; x: number; y: number } | null {
+  get ropePending(): { body: Body | null; x: number; y: number } | null {
     if (this.tool === "spring") return this.springTool.ropePending;
     return this.ropeTool.ropePending;
   }
@@ -196,13 +200,14 @@ export class InputManager implements ToolRenderInfo {
   }
 
   resetGroundBody() {
-    this.groundBody = this.game.world.createBody({ type: "static" });
+    const B2 = b2();
+    const groundDef = B2.b2DefaultBodyDef();
+    groundDef.type = B2.b2BodyType.b2_staticBody;
+    this.groundBody = this.game.pw.createBody(groundDef);
     // Update context for all handlers — handlers store a reference to the ctx object
     // which has groundBody as a property, so we update the shared ctx
     const ctx = (this.grabTool as unknown as { ctx: ToolContext }).ctx;
     ctx.groundBody = this.groundBody;
-    this.attractTool.rebindContactListener();
-    this.attractTool.ensureContactListener();
   }
 
   // ── Event binding ──
@@ -421,8 +426,8 @@ export class InputManager implements ToolRenderInfo {
 
   // ── Helpers ──
 
-  private findBodyAt(wx: number, wy: number, radiusPx = 10): planck.Body | null {
+  private findBodyAt(wx: number, wy: number, radiusPx = 10): Body | null {
     const radius = radiusPx / this.game.camera.zoom;
-    return findClosestBody(this.game.world, wx, wy, radius);
+    return findClosestBody(this.game.pw, wx, wy, radius);
   }
 }

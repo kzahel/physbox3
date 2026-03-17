@@ -1,4 +1,4 @@
-import type * as planck from "planck";
+import type { Body } from "box2d3";
 import type { ToolContext, ToolHandler } from "../ToolHandler";
 
 /**
@@ -7,7 +7,7 @@ import type { ToolContext, ToolHandler } from "../ToolHandler";
  */
 abstract class TwoPointJointTool implements ToolHandler {
   /** Visible to Renderer for pending highlight */
-  ropePending: { body: planck.Body | null; x: number; y: number } | null = null;
+  ropePending: { body: Body | null; x: number; y: number } | null = null;
   protected ctx: ToolContext;
 
   constructor(ctx: ToolContext) {
@@ -37,33 +37,19 @@ abstract class TwoPointJointTool implements ToolHandler {
     y1: number,
     x2: number,
     y2: number,
-    bodyA: planck.Body | null,
-    bodyB: planck.Body | null,
+    bodyA: Body | null,
+    bodyB: Body | null,
   ): void;
 }
 
 export class RopeTool extends TwoPointJointTool {
-  protected createJoint(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    bodyA: planck.Body | null,
-    bodyB: planck.Body | null,
-  ) {
+  protected createJoint(x1: number, y1: number, x2: number, y2: number, bodyA: Body | null, bodyB: Body | null) {
     this.ctx.game.addRopeBetween(x1, y1, x2, y2, bodyA, bodyB);
   }
 }
 
 export class SpringTool extends TwoPointJointTool {
-  protected createJoint(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    bodyA: planck.Body | null,
-    bodyB: planck.Body | null,
-  ) {
+  protected createJoint(x1: number, y1: number, x2: number, y2: number, bodyA: Body | null, bodyB: Body | null) {
     this.ctx.game.addSpring(x1, y1, x2, y2, bodyA, bodyB);
   }
 }

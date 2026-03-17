@@ -1,22 +1,21 @@
-import * as planck from "planck";
+import type { Body, b2ShapeId } from "box2d3";
 import { getBodyUserData } from "../../engine/BodyUserData";
+import { b2 } from "../../engine/Box2D";
 import type { ToolContext } from "../ToolHandler";
 
 const ENDPOINT_SNAP_PX = 24;
 const PLATFORM_LABELS = new Set(["platform", "conveyor"]);
 
 export interface EndpointDrag {
-  body: planck.Body;
+  body: Body;
   /** The endpoint that stays fixed (world coords) */
-  fixedEnd: planck.Vec2;
-  /** Original fixture half-height (thickness) */
+  fixedEnd: { x: number; y: number };
+  /** Original shape half-height (thickness) */
   halfHeight: number;
-  /** Original fixture friction */
+  /** Original shape friction */
   friction: number;
-  /** Original body userData */
-  userData: unknown;
-  /** Original fixture userData (conveyor stripe data etc.) */
-  fixtureUserData: unknown;
+  /** Original shape tangent speed (conveyor) */
+  tangentSpeed: number;
 }
 
 export class EndpointDragHandler {
@@ -32,7 +31,7 @@ export class EndpointDragHandler {
   }
 
   /** Try to start an endpoint drag. Returns true if started. */
-  tryStart(body: planck.Body, wx: number, wy: number): boolean {
+  tryStart(body: Body, wx: number, wy: number): boolean {
     const drag = this.detect(body, wx, wy);
     if (drag) {
       this.drag = drag;
@@ -44,6 +43,7 @@ export class EndpointDragHandler {
   /** Move the dragged endpoint to (wx, wy). */
   move(wx: number, wy: number): void {
     if (!this.drag) return;
+    const B2 = b2();
     const fixed = this.drag.fixedEnd;
     const dx = wx - fixed.x;
     const dy = wy - fixed.y;
@@ -56,17 +56,24 @@ export class EndpointDragHandler {
     const halfWidth = len / 2;
 
     // Update body transform
-    this.drag.body.setPosition(planck.Vec2(cx, cy));
-    this.drag.body.setAngle(angle);
+    const rot = new B2.b2Rot();
+    rot.SetAngle(angle);
+    this.drag.body.SetTransform(new B2.b2Vec2(cx, cy), rot);
 
-    // Replace the fixture with the new size
-    const oldFixture = this.drag.body.getFixtureList();
-    if (oldFixture) this.drag.body.destroyFixture(oldFixture);
-    const newFixture = this.drag.body.createFixture({
-      shape: planck.Box(halfWidth, this.drag.halfHeight),
-      friction: this.drag.friction,
-    });
-    if (this.drag.fixtureUserData) newFixture.setUserData(this.drag.fixtureUserData);
+    // Destroy old shapes and recreate with new size
+    const shapeIds: b2ShapeId[] = this.drag.body.GetShapes() ?? [];
+    for (const sid of shapeIds) {
+      B2.b2DestroyShape(sid, false);
+    }
+
+    const shapeDef = B2.b2DefaultShapeDef();
+    shapeDef.material.friction = this.drag.friction;
+    if (this.drag.tangentSpeed !== 0) {
+      shapeDef.material.tangentSpeed = this.drag.tangentSpeed;
+    }
+    const box = B2.b2MakeBox(halfWidth, this.drag.halfHeight);
+    this.drag.body.CreatePolygonShape(shapeDef, box);
+    this.drag.body.ApplyMassFromShapes();
   }
 
   release(): void {
@@ -74,39 +81,56 @@ export class EndpointDragHandler {
   }
 
   /** Detect if the click is near an endpoint of a platform/conveyor. */
-  private detect(body: planck.Body, wx: number, wy: number): EndpointDrag | null {
-    const ud = getBodyUserData(body);
+  private detect(body: Body, wx: number, wy: number): EndpointDrag | null {
+    const B2 = b2();
+    const ud = getBodyUserData(this.ctx.game.pw, body);
     if (!ud?.label || !PLATFORM_LABELS.has(ud.label)) return null;
 
-    const fixture = body.getFixtureList();
-    if (!fixture) return null;
-    const shape = fixture.getShape();
-    if (shape.getType() !== "polygon") return null;
+    const shapeIds: b2ShapeId[] = body.GetShapes() ?? [];
+    if (shapeIds.length === 0) return null;
 
-    const poly = shape as planck.PolygonShape;
-    const verts = poly.m_vertices;
-    const halfWidth = Math.abs(verts[1].x);
-    const halfHeight = Math.abs(verts[0].y);
+    const shapeId = shapeIds[0];
+    const shapeType = B2.b2Shape_GetType(shapeId);
+    if (shapeType.value !== B2.b2ShapeType.b2_polygonShape.value) return null;
 
-    const endA = body.getWorldPoint(planck.Vec2(-halfWidth, 0));
-    const endB = body.getWorldPoint(planck.Vec2(halfWidth, 0));
+    const poly = B2.b2Shape_GetPolygon(shapeId);
+    // For a box shape, vertices are at corners. Extract half-extents from AABB-like analysis.
+    let maxX = 0;
+    let maxY = 0;
+    for (let i = 0; i < poly.count; i++) {
+      const v = poly.GetVertex(i);
+      maxX = Math.max(maxX, Math.abs(v.x));
+      maxY = Math.max(maxY, Math.abs(v.y));
+    }
+    const halfWidth = maxX;
+    const halfHeight = maxY;
+
+    const endA = body.GetWorldPoint(new B2.b2Vec2(-halfWidth, 0));
+    const endB = body.GetWorldPoint(new B2.b2Vec2(halfWidth, 0));
 
     const snapRadius = ENDPOINT_SNAP_PX / this.ctx.game.camera.zoom;
-    const distA = planck.Vec2.lengthOf(planck.Vec2.sub(planck.Vec2(wx, wy), endA));
-    const distB = planck.Vec2.lengthOf(planck.Vec2.sub(planck.Vec2(wx, wy), endB));
+    const distA = Math.hypot(wx - endA.x, wy - endA.y);
+    const distB = Math.hypot(wx - endB.x, wy - endB.y);
 
     const minDist = Math.min(distA, distB);
     if (minDist > snapRadius) return null;
 
     const fixedEnd = distA < distB ? endB : endA;
 
+    // Get friction and tangent speed from shape material
+    const friction = B2.b2Shape_GetFriction(shapeId);
+    // tangentSpeed stored in material — read via flat API if available
+    let tangentSpeed = 0;
+    if (ud.label === "conveyor" && "speed" in ud) {
+      tangentSpeed = (ud as { speed: number }).speed;
+    }
+
     return {
       body,
-      fixedEnd: planck.Vec2(fixedEnd.x, fixedEnd.y),
+      fixedEnd: { x: fixedEnd.x, y: fixedEnd.y },
       halfHeight,
-      friction: fixture.getFriction(),
-      userData: ud,
-      fixtureUserData: fixture.getUserData(),
+      friction,
+      tangentSpeed,
     };
   }
 }

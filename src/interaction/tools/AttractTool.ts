@@ -1,13 +1,13 @@
-import * as planck from "planck";
-import { createWeldJoint } from "../../engine/Physics";
+import type { Body } from "box2d3";
+import { b2 } from "../../engine/Box2D";
+import { createWeldJoint, isDynamic } from "../../engine/Physics";
 import type { ToolContext, ToolHandler } from "../ToolHandler";
 
 export class AttractTool implements ToolHandler {
   /** Visible externally — two bodies being pulled together */
-  attracting: { bodyA: planck.Body; bodyB: planck.Body } | null = null;
-  private pending: { body: planck.Body; world: { x: number; y: number } } | null = null;
+  attracting: { bodyA: Body; bodyB: Body } | null = null;
+  private pending: { body: Body; world: { x: number; y: number } } | null = null;
   private ctx: ToolContext;
-  private contactBound = false;
 
   constructor(ctx: ToolContext) {
     this.ctx = ctx;
@@ -27,7 +27,6 @@ export class AttractTool implements ToolHandler {
     } else {
       if (body !== this.pending.body) {
         this.attracting = { bodyA: this.pending.body, bodyB: body };
-        this.ensureContactListener();
       }
       this.pending = null;
     }
@@ -38,45 +37,46 @@ export class AttractTool implements ToolHandler {
     this.pending = null;
   }
 
-  /** Apply per-frame attraction forces — called from InputManager.update() */
+  /** Apply per-frame attraction forces + check for contact to weld.
+   *  Called from InputManager.update() every physics tick. */
   update() {
     if (!this.attracting) return;
+    const B2 = b2();
     const { bodyA, bodyB } = this.attracting;
-    const dir = planck.Vec2.sub(bodyA.getPosition(), bodyB.getPosition());
-    const len = planck.Vec2.lengthOf(dir);
+
+    // Apply attraction forces
+    const posA = bodyA.GetPosition();
+    const posB = bodyB.GetPosition();
+    const dx = posA.x - posB.x;
+    const dy = posA.y - posB.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
     if (len < 0.01) return;
-    const force = planck.Vec2.mul(dir, (50 * bodyB.getMass()) / len);
-    bodyB.applyForceToCenter(force, true);
-    if (bodyA.isDynamic()) {
-      bodyA.applyForceToCenter(planck.Vec2.mul(force, -1), true);
+
+    const massB = bodyB.GetMass();
+    const fx = (dx / len) * 50 * massB;
+    const fy = (dy / len) * 50 * massB;
+    bodyB.ApplyForceToCenter(new B2.b2Vec2(fx, fy), true);
+    if (isDynamic(bodyA)) {
+      bodyA.ApplyForceToCenter(new B2.b2Vec2(-fx, -fy), true);
     }
-  }
 
-  /** Bind contact listener (once) to weld on collision */
-  ensureContactListener() {
-    if (this.contactBound) return;
-    this.contactBound = true;
-    this.ctx.game.world.on("begin-contact", (contact) => {
-      if (!this.attracting) return;
-      const { bodyA, bodyB } = this.attracting;
-      const cA = contact.getFixtureA().getBody();
-      const cB = contact.getFixtureB().getBody();
-      const match = (cA === bodyA && cB === bodyB) || (cA === bodyB && cB === bodyA);
-      if (!match) return;
-
-      const manifold = contact.getWorldManifold(null);
-      const wp = manifold?.points[0] ?? bodyA.getPosition();
-      const weldPoint = planck.Vec2(wp.x, wp.y);
-      setTimeout(() => {
-        if (!this.attracting) return;
-        createWeldJoint(this.ctx.game.world, bodyA, bodyB, weldPoint);
+    // Check for contact between the two bodies — poll contact data
+    const contacts = bodyB.GetContactData();
+    for (const cd of contacts) {
+      const bodyIdA = B2.b2Shape_GetBody(cd.shapeIdA);
+      const bodyIdB = B2.b2Shape_GetBody(cd.shapeIdB);
+      const ptrA = bodyA.GetPointer();
+      const ptrB = bodyB.GetPointer();
+      const matchA = B2.B2_ID_EQUALS(bodyIdA, ptrA) || B2.B2_ID_EQUALS(bodyIdA, ptrB);
+      const matchB = B2.B2_ID_EQUALS(bodyIdB, ptrA) || B2.B2_ID_EQUALS(bodyIdB, ptrB);
+      if (matchA && matchB) {
+        // Contact found — weld at contact point
+        const mp = cd.manifold.pointCount > 0 ? cd.manifold.GetPoint(0) : null;
+        const wp = mp ? { x: mp.point.x, y: mp.point.y } : { x: (posA.x + posB.x) / 2, y: (posA.y + posB.y) / 2 };
+        createWeldJoint(this.ctx.game.pw, bodyA, bodyB, wp);
         this.attracting = null;
-      }, 0);
-    });
-  }
-
-  /** Re-bind after world reset */
-  rebindContactListener() {
-    this.contactBound = false;
+        return;
+      }
+    }
   }
 }
