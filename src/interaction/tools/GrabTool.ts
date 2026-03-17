@@ -24,6 +24,8 @@ interface EndpointDrag {
 }
 
 export class GrabTool implements ToolHandler {
+  immediateTouch = true as const;
+  touchDragMode = "drag" as const;
   private mouseJoint: planck.MouseJoint | null = null;
   private grabbedStatic: planck.Body | null = null;
   private endpointDrag: EndpointDrag | null = null;
@@ -85,7 +87,7 @@ export class GrabTool implements ToolHandler {
       }
 
       const point = planck.Vec2(wx, wy);
-      if (target.isDynamic()) {
+      if (target.isDynamic() && !this.ctx.game.paused) {
         this.mouseJoint = this.ctx.game.world.createJoint(
           planck.MouseJoint({ maxForce: 1000 * target.getMass() }, this.ctx.groundBody, target, point),
         ) as planck.MouseJoint;
