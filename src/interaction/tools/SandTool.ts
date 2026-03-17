@@ -7,8 +7,6 @@ const BRUSH_RADIUS_PX = 15;
 const PARTICLES_PER_TICK = 3;
 /** Radius of each sand grain in world units */
 const GRAIN_RADIUS = 0.06;
-/** Max sand particles in the world */
-const MAX_SAND = 1000;
 
 const SAND_COLORS = ["rgba(210,180,100,0.9)", "rgba(194,164,90,0.9)", "rgba(220,190,110,0.9)", "rgba(180,155,85,0.9)"];
 
@@ -70,8 +68,8 @@ export class SandTool implements ToolHandler {
     }
   }
 
-  private enforceLimit(game: { sandBodies: Body[]; pw: { destroyBody(b: Body): void } }) {
-    while (game.sandBodies.length + PARTICLES_PER_TICK > MAX_SAND) {
+  private enforceLimit(game: { sandBodies: Body[]; maxSand: number; pw: { destroyBody(b: Body): void } }) {
+    while (game.sandBodies.length + PARTICLES_PER_TICK > game.maxSand) {
       const oldest = game.sandBodies.shift();
       if (oldest?.IsValid()) {
         game.pw.destroyBody(oldest);

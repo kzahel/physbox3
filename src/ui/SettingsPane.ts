@@ -14,6 +14,7 @@ export class SettingsPane {
       <label>Speed <input type="range" id="s-speed" min="0" max="3" step="0.1" value="${game.timeScale}"></label>
       <label>Bounce <input type="range" id="s-bounce" min="0" max="1" step="0.05" value="${game.bounciness}"></label>
       <label>Physics Hz <input type="range" id="s-physics-hz" min="10" max="120" step="10" value="${game.physicsHz}"> <span id="s-physics-hz-val">${game.physicsHz}</span></label>
+      <label>Sand Limit <input type="range" id="s-max-sand" min="100" max="5000" step="100" value="${game.maxSand}"> <span id="s-max-sand-val">${game.maxSand}</span></label>
 
       <div class="section-title">Actions</div>
       <label><button id="s-clear">Clear Dynamic</button></label>
@@ -48,6 +49,16 @@ export class SettingsPane {
       (v) => {
         game.physicsHz = v;
         hzVal.textContent = String(v);
+      },
+      (s) => parseInt(s, 10),
+    );
+
+    const sandVal = container.querySelector<HTMLSpanElement>("#s-max-sand-val")!;
+    bindSlider(
+      "#s-max-sand",
+      (v) => {
+        game.maxSand = v;
+        sandVal.textContent = String(v);
       },
       (s) => parseInt(s, 10),
     );
@@ -123,7 +134,7 @@ export class SettingsPane {
     // Stats update
     const statsEl = container.querySelector("#stats")!;
     setInterval(() => {
-      statsEl.textContent = `FPS: ${game.fps} | Bodies: ${game.bodyCount}`;
+      statsEl.textContent = `FPS: ${game.fps} | Bodies: ${game.bodyCount} | Sand: ${game.sandBodies.length}`;
     }, 500);
   }
 

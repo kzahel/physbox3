@@ -58,6 +58,7 @@ export class Game {
   inputManager: InputManager | null = null;
   water = new WaterSystem();
   sandBodies: Body[] = [];
+  maxSand = 1000;
   ragdolls: RagdollData[] = [];
   followSelected = false;
   followBody: Body | null = null;
