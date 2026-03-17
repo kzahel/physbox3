@@ -1,30 +1,16 @@
 # PhysBox 3
 
-2D physics sandbox. Migrating from Planck.js (Box2D v2.4) to box2d3-wasm (Box2D v3, WASM+SIMD).
-
-## Status: MIGRATION COMPLETE — All Phases Done
-
-See `docs/migration-plan.md` for the full plan and `docs/box2d3-wasm-reference.md` for the complete API reference.
-
-**Phase 1 done:** Game.ts, Physics.ts, Interpolation.ts, IRenderer.ts, main.ts.
-**Phase 2 done:** Renderer.ts, OverlayRenderer.ts, ThreeJSRenderer.ts, PrefabOverlays.ts, SelectionButtons.ts.
-**Phase 3 done:** All 18 prefabs migrated.
-**Phase 4 done:** All tools migrated (GrabTool, AttractTool, EndpointDragHandler), ToolHandler.ts, InputManager.ts, RagdollController.ts, SettingsPane.ts.
-**Phase 5 done:** WaterSystem.ts — raycasts via pw.castRayClosest(), body AABB via flat Shape API.
-**Phase 6 done:** SceneStore.ts clean rewrite (shapes not fixtures, flat API for joint serialization), all test files migrated (64/64 pass).
-**GetPointer fix:** Fixed systemic bug where body.GetPointer()/world.GetPointer() returned just index1 numbers instead of full ID structs. Added JointHandle class, PhysWorld.getBodyId/worldId.
-**0 TS errors, 0 lint errors, 64/64 tests pass.**
+2D physics sandbox using box2d3-wasm (Box2D v3, WASM+SIMD).
 
 ## Build & Dev
 
 - `npm run dev` — start dev server
 - `npm run build` — production build
 - `npm run lint` — biome check (formatting + linting)
-- `npx tsc --noEmit` — type check (0 errors)
+- `npx tsc --noEmit` — type check
 
 ## Key Documentation
 
-- `docs/migration-plan.md` — phased migration plan with status, gotchas, and order of work
 - `docs/box2d3-wasm-reference.md` — **complete API reference** for box2d3-wasm. Covers all types, classes, methods, enums, events, and ID types. Use this as the authoritative source for API signatures — the auto-generated `.d.ts` is incomplete (e.g., missing `world.Create*Joint()` OOP methods).
 
 ## Architecture
@@ -33,12 +19,12 @@ See `docs/migration-plan.md` for the full plan and `docs/box2d3-wasm-reference.m
 - `src/engine/PhysWorld.ts` — World wrapper (body/joint tracking, userData, events)
 - `src/engine/Game.ts` — game loop, prefab delegates (`Game.pw` is a `PhysWorld`)
 - `src/engine/Physics.ts` — body queries, explosions, scaling, joint helpers (all take `PhysWorld`)
-- `src/engine/Interpolation.ts` — frame interpolation (uses box2d3 Body type)
+- `src/engine/Interpolation.ts` — frame interpolation
 - `src/engine/IRenderer.ts` — renderer interface (`drawWorld` takes `PhysWorld`)
-- `src/engine/Renderer.ts` — canvas rendering (migrated, uses flat shape API + PhysWorld)
-- `src/engine/OverlayRenderer.ts` — tool overlays, selection UI (migrated, takes PhysWorld)
-- `src/engine/ThreeJSRenderer.ts` — 3D WebGL renderer (migrated, same patterns as Renderer.ts)
-- `src/engine/PrefabOverlays.ts` — conveyor/balloon/dynamite overlays (migrated)
+- `src/engine/Renderer.ts` — canvas rendering (flat shape API + PhysWorld)
+- `src/engine/OverlayRenderer.ts` — tool overlays, selection UI
+- `src/engine/ThreeJSRenderer.ts` — 3D WebGL renderer
+- `src/engine/PrefabOverlays.ts` — conveyor/balloon/dynamite overlays
 - `src/engine/Camera.ts` — world/screen coordinate transforms, zoom, pan
 - `src/interaction/InputManager.ts` — input handling, tool logic
 - `src/ui/Toolbar.ts` — tool selection buttons + keyboard shortcuts
@@ -62,10 +48,10 @@ See `docs/migration-plan.md` for the full plan and `docs/box2d3-wasm-reference.m
 - `body.GetShapes()` returns **`b2ShapeId[]`** (plain ID structs), NOT `Shape[]` OOP wrappers. Use flat API: `b2Shape_GetType(id)`, `b2Shape_GetCircle(id)`, `b2Shape_TestPoint(id, point)`, etc.
 - `body.GetJoints()` returns **`b2JointId[]`** (plain ID structs), NOT `Joint[]` OOP wrappers. Use flat API: `b2Joint_GetType(id)`, `b2Joint_GetBodyA(id)`, etc.
 - **`body.GetPointer()` / `world.GetPointer()` return ONLY `index1` (a number)**, NOT full ID structs. Do NOT use these for `bodyIdA`/`bodyIdB` on joint defs or `B2_ID_EQUALS` comparisons. Use `pw.getBodyId(body)` and `pw.worldId` instead.
-- **`JointHandle`** (in PhysWorld.ts) wraps `b2JointId` with OOP-like methods via flat API. The WASM build doesn't expose joint creation on World, so joints are created via flat API (`b2CreateWeldJoint` etc.) which returns `b2JointId`. `JointHandle` provides `GetBodyA()`, `GetBodyB()`, `GetType()`, `IsValid()`, `Destroy()`, etc. Use `pw.addJointId(id)` to create and track a JointHandle.
+- **`JointHandle`** (in PhysWorld.ts) wraps `b2JointId` with OOP-like methods via flat API. Joints are created via flat API (`b2CreateWeldJoint` etc.) which returns `b2JointId`. `JointHandle` provides `GetBodyA()`, `GetBodyB()`, `GetType()`, `IsValid()`, `Destroy()`, etc. Use `pw.addJointId(id)` to create and track a JointHandle.
 - `jointHandle.GetBodyA()` / `GetBodyB()` return `Body` directly (resolved via PhysWorld tracking). No cast needed.
 
-### Established Migration Patterns
+### Code Patterns
 
 ```typescript
 // Body creation
@@ -112,16 +98,15 @@ joint.GetType().value === B2.b2JointType.b2_distanceJoint.value
 pw.setJointData(joint, { ropeStabilizer: true });
 pw.getJointData(joint)?.ropeStabilizer
 
-// Joint creation helpers (Physics.ts) — handle anchor conversion, OOP/flat fallback, pw.addJoint
+// Joint creation helpers (Physics.ts)
 createRevoluteJoint(pw, bodyA, bodyB, { x, y }, { enableLimit: true, lowerAngle: -PI/3, upperAngle: PI/3 })
 createDistanceJoint(pw, bodyA, bodyB, anchorA, anchorB, { enableSpring: true, hertz: 5, dampingRatio: 0.3 })
 createWheelJoint(pw, chassis, wheel, wheelPos, { x: 0, y: 1 }, { enableMotor: true, motorSpeed: 4, maxMotorTorque: 200 })
 
-// Conveyor belt: tangentSpeed is built into b2SurfaceMaterial (no pre-solve callback needed)
+// Conveyor belt: tangentSpeed is built into b2SurfaceMaterial
 shapeDef.material.tangentSpeed = speed;
 
-// Ragdoll foot contacts: polled via body.GetContactData() instead of event listeners
-// Cannonball impacts: polled via body.GetContactData() instead of begin-contact listener
+// Contacts: polled via body.GetContactData()
 ```
 
 ### Mobile / Touch is First Class
