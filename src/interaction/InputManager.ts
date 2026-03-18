@@ -25,14 +25,10 @@ export type { Tool, ToolRenderInfo } from "./ToolHandler";
 
 const PAN_SPEED = 8;
 const WASD_DIRECTIONS: [string, number, number][] = [
-  ["w", 0, 1],
-  ["W", 0, 1],
-  ["s", 0, -1],
-  ["S", 0, -1],
-  ["a", -1, 0],
-  ["A", -1, 0],
-  ["d", 1, 0],
-  ["D", 1, 0],
+  ["KeyW", 0, 1],
+  ["KeyS", 0, -1],
+  ["KeyA", -1, 0],
+  ["KeyD", 1, 0],
 ];
 
 const CREATION_TOOL_IDS: Tool[] = [
@@ -238,14 +234,14 @@ export class InputManager implements ToolRenderInfo {
     el.addEventListener("touchcancel", (e) => this.onTouchEnd(e as TouchEvent));
 
     window.addEventListener("keydown", (e) => {
-      this.keys.add(e.key);
-      if (e.key === " ") {
+      this.keys.add(e.code);
+      if (e.code === "Space") {
         e.preventDefault();
         this.game.paused = !this.game.paused;
       }
-      if (e.key.startsWith("Arrow")) e.preventDefault();
+      if (e.code.startsWith("Arrow")) e.preventDefault();
     });
-    window.addEventListener("keyup", (e) => this.keys.delete(e.key));
+    window.addEventListener("keyup", (e) => this.keys.delete(e.code));
 
     // Camera pan with WASD
     const tick = () => {

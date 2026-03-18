@@ -81,10 +81,11 @@ export class WasmParticleSystem {
     center: { x: number; y: number },
     radius = DEFAULT_SPAWN_RADIUS,
     spacing = DEFAULT_SPAWN_SPACING,
+    rejectOverlap = true,
   ): number {
     if (!this.system) return 0;
     const B2 = b2();
-    return this.system.SpawnParticlesInCircle(new B2.b2Vec2(center.x, center.y), radius, spacing, new B2.b2Vec2(0, 0));
+    return this.system.SpawnParticlesInCircle(new B2.b2Vec2(center.x, center.y), radius, spacing, new B2.b2Vec2(0, 0), rejectOverlap);
   }
 
   destroyCircle(center: { x: number; y: number }, radius: number): number {

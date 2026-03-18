@@ -24,6 +24,31 @@ Hosted at **https://kzahel.com/physbox/** via Cloudflare R2 + Worker.
 
 The Worker (`worker/index.js`) serves static files from the `physbox` R2 bucket and sets COOP/COEP headers required for SharedArrayBuffer (WASM multithreading). Config in `worker/wrangler.toml`.
 
+## Local WASM Dev Workflow
+
+To iterate on the WASM particle system (or any C++ changes in `reference/box2d3-wasm/`) without publishing to npm:
+
+```bash
+# 1. Build WASM from source
+bash scripts/build-box2d-wasm.sh
+
+# 2. Link local build into physbox3
+pnpm link ./reference/box2d3-wasm/box2d3-wasm
+# This modifies pnpm-lock.yaml to point at the local path.
+
+# 3. Dev or deploy — both use the local WASM binary
+pnpm dev          # local dev server with local WASM
+npm run deploy    # builds + deploys to production with local WASM
+
+# 4. When done, restore the published package
+git checkout pnpm-lock.yaml && pnpm install
+```
+
+**Notes:**
+- `pnpm link` rewrites `pnpm-lock.yaml` (version → `link:reference/...`). Don't commit that change unless you intend to keep the local link.
+- After linking, rebuilding WASM (`bash scripts/build-box2d-wasm.sh`) is instantly reflected — no re-link needed. The symlink means vite/tsc resolve directly to the build output.
+- The build script auto-generates the `.d.ts` via emscripten `--emit-tsd`, so new C++ parameters are picked up automatically.
+
 ## Key Documentation
 
 - `docs/box2d3-wasm-reference.md` — **complete API reference** for box2d3-wasm. Covers all types, classes, methods, enums, events, and ID types. Use this as the authoritative source for API signatures — the auto-generated `.d.ts` is incomplete (e.g., missing `world.Create*Joint()` OOP methods).
@@ -167,4 +192,4 @@ Preserve these very carefully while iterating on the particle system:
 
 ### Workflow
 
-- After completing any feature change, commit and push immediately without waiting to be asked.
+- After completing any feature change, commit immediately without waiting to be asked. Do not push — we deploy manually via `npm run deploy`.
