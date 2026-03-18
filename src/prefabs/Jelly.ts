@@ -23,7 +23,7 @@ export function createJelly(pw: PhysWorld, x: number, y: number): Body {
     for (let c = 0; c < cols; c++) {
       const bx = x - halfW + c * spacing;
       const by = y - halfH + r * spacing;
-      const body = makeBody(pw, bx, by, { linearDamping: 0.3 });
+      const body = makeBody(pw, bx, by, { linearDamping: 0.3, fixedRotation: true });
       const shapeDef = makeShapeDef({ density: 1.5, friction: 0.5, restitution: 0.1 });
       body.CreateCircleShape(shapeDef, makeCircle(nodeRadius));
 
