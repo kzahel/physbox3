@@ -38,6 +38,7 @@ import {
 } from "./Physics";
 import { type PhysProfile, PhysWorld } from "./PhysWorld";
 import { Renderer } from "./Renderer";
+import { WasmParticleSystem } from "./WasmParticleSystem";
 import { WaterSystem } from "./WaterSystem";
 
 export const KILL_Y = -100;
@@ -69,6 +70,7 @@ export class Game {
   physicsHz = DEFAULT_PHYSICS_HZ;
   inputManager: InputManager | null = null;
   water = new WaterSystem();
+  particleSystem: WasmParticleSystem;
   sandBodies: Body[] = [];
   maxSand = 1000;
   ragdolls: RagdollData[] = [];
@@ -104,6 +106,7 @@ export class Game {
     this.canvas = canvas;
     this.container = canvas.parentElement!;
     this.pw = new PhysWorld(0, this.gravity);
+    this.particleSystem = new WasmParticleSystem(this.pw.world);
     this.camera = new Camera();
     this.renderer = new Renderer(canvas);
 
@@ -367,8 +370,10 @@ export class Game {
   }
 
   reset() {
+    this.particleSystem.destroy();
     this.pw.destroy();
     this.pw = new PhysWorld(0, this.gravity);
+    this.particleSystem = new WasmParticleSystem(this.pw.world);
     this.applyBounciness();
     this.bindCollisionSounds();
     this.ragdolls.length = 0;
@@ -405,7 +410,7 @@ export class Game {
     this.removeOutOfBoundsBodies();
     this.updateCameraFollow();
     const interp: Interpolation = { alpha: this.interpAlpha, prev: this.prevStates };
-    this.renderer.drawWorld(this.pw, this.camera, this.water, interp);
+    this.renderer.drawWorld(this.pw, this.camera, this.water, interp, this.particleSystem);
   }
 
   private updateFPS(dt: number) {
@@ -435,6 +440,7 @@ export class Game {
       applyRopeStabilization(this.pw);
       this.water.tick(this.pw);
       this.water.applyBuoyancy(this.pw, this.gravity);
+      this.particleSystem.step(timestep);
       this.pw.step(timestep, SUB_STEPS);
       this.accumulator -= timestep;
     }
@@ -442,6 +448,10 @@ export class Game {
     this.profile = this.pw.getProfile();
     spawnRocketParticles(this.pw, this.renderer);
     spawnFanParticles(this.pw, this.renderer);
+  }
+
+  spawnParticleBurst(wx: number, wy: number): number {
+    return this.particleSystem.spawnBurstAtPoint({ x: wx, y: wy });
   }
 
   private removeOutOfBoundsBodies() {

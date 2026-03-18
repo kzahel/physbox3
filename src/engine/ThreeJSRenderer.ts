@@ -15,6 +15,7 @@ import type { JointHandle, PhysWorld } from "./PhysWorld";
 import { computeSpringCoilPath } from "./SpringGeometry";
 import { computeTerrainFillPath } from "./TerrainGeometry";
 import { createPolygonGeometry, EXTRUDE_DEPTH } from "./ThreeGeometryUtils";
+import type { WasmParticleSystem } from "./WasmParticleSystem";
 
 function rgbaToThreeColor(color: string): THREE.Color {
   const c = parseColor(color);
@@ -77,6 +78,9 @@ export class ThreeJSRenderer implements IRenderer {
   private pointsGeometry: THREE.BufferGeometry;
   private pointsMaterial: THREE.PointsMaterial;
   private pointsMesh: THREE.Points;
+  private wasmPointsGeometry: THREE.BufferGeometry;
+  private wasmPointsMaterial: THREE.PointsMaterial;
+  private wasmPointsMesh: THREE.Points;
 
   // The container element holding canvases
   private container: HTMLElement;
@@ -170,6 +174,20 @@ export class ThreeJSRenderer implements IRenderer {
     this.pointsMesh.position.z = 1;
     this.scene.add(this.pointsMesh);
 
+    this.wasmPointsGeometry = new THREE.BufferGeometry();
+    this.wasmPointsMaterial = new THREE.PointsMaterial({
+      size: 7,
+      sizeAttenuation: false,
+      color: 0x4a96ff,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+      depthTest: false,
+    });
+    this.wasmPointsMesh = new THREE.Points(this.wasmPointsGeometry, this.wasmPointsMaterial);
+    this.wasmPointsMesh.position.z = 1.2;
+    this.scene.add(this.wasmPointsMesh);
+
     // Overlay canvas for 2D UI (tool cursors, buttons, text)
     this.overlayCanvas = document.createElement("canvas");
     this.overlayCanvas.style.cssText =
@@ -203,6 +221,8 @@ export class ThreeJSRenderer implements IRenderer {
 
     this.pointsGeometry.dispose();
     this.pointsMaterial.dispose();
+    this.wasmPointsGeometry.dispose();
+    this.wasmPointsMaterial.dispose();
 
     this.glRenderer.dispose();
     this.overlayCanvas.remove();
@@ -230,7 +250,13 @@ export class ThreeJSRenderer implements IRenderer {
     this.overlay.setToolInfo(input);
   }
 
-  drawWorld(pw: PhysWorld, camera: Camera, _water?: unknown, interp?: Interpolation) {
+  drawWorld(
+    pw: PhysWorld,
+    camera: Camera,
+    _water?: unknown,
+    interp?: Interpolation,
+    wasmParticles?: WasmParticleSystem | null,
+  ) {
     const i = interp ?? NO_INTERP;
     const cw = this.glCanvas.clientWidth;
     const ch = this.glCanvas.clientHeight;
@@ -270,6 +296,7 @@ export class ThreeJSRenderer implements IRenderer {
     // Update particles
     this.particles.tick();
     this.syncParticles();
+    this.syncWasmParticles(wasmParticles ?? null);
 
     // Debug bounding spheres
     this.syncDebug();
@@ -680,6 +707,22 @@ export class ThreeJSRenderer implements IRenderer {
     this.pointsGeometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
     this.pointsGeometry.setDrawRange(0, count);
     this.pointsGeometry.computeBoundingSphere();
+  }
+
+  private syncWasmParticles(wasmParticles: WasmParticleSystem | null) {
+    const positions2d = wasmParticles?.getPositionBuffer() ?? new Float32Array(0);
+    const count = positions2d.length / 2;
+    const positions = new Float32Array(count * 3);
+
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = positions2d[i * 2];
+      positions[i * 3 + 1] = positions2d[i * 2 + 1];
+      positions[i * 3 + 2] = 1.2;
+    }
+
+    this.wasmPointsGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    this.wasmPointsGeometry.setDrawRange(0, count);
+    this.wasmPointsGeometry.computeBoundingSphere();
   }
 
   // ── Debug bounding spheres ──

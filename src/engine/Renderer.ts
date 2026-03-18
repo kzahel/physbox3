@@ -12,6 +12,7 @@ import { forEachBody, isCapsuleShape, isCircleShape, isPolygonShape, isSegmentSh
 import type { PhysWorld } from "./PhysWorld";
 import { computeSpringCoilPath } from "./SpringGeometry";
 import { computeTerrainFillPath } from "./TerrainGeometry";
+import type { WasmParticleSystem } from "./WasmParticleSystem";
 import type { WaterSystem } from "./WaterSystem";
 
 // Ocean wave parameters (frequency, amplitude pairs)
@@ -59,7 +60,7 @@ export class Renderer implements IRenderer {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
-  drawWorld(pw: PhysWorld, camera: Camera, water?: WaterSystem, interp?: Interpolation) {
+  drawWorld(pw: PhysWorld, camera: Camera, water?: WaterSystem, interp?: Interpolation, wasmParticles?: WasmParticleSystem | null) {
     const i = interp ?? NO_INTERP;
     this.clear();
     this.drawOcean(camera);
@@ -69,6 +70,7 @@ export class Renderer implements IRenderer {
     this.drawBodies(pw, camera, i);
     this.drawJoints(pw, camera, i);
     if (water) this.drawWater(water, camera);
+    if (wasmParticles) this.drawWasmParticles(wasmParticles, camera);
     this.particles.tick();
     this.drawParticles(camera);
     this.overlay.drawOverlays(pw, camera, i);
@@ -339,6 +341,22 @@ export class Renderer implements IRenderer {
       ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha.toFixed(2)})`;
       ctx.fill();
     }
+  }
+
+  private drawWasmParticles(wasmParticles: WasmParticleSystem, camera: Camera) {
+    const positions = wasmParticles.getPositionBuffer();
+    if (positions.length === 0) return;
+
+    const ctx = this.ctx;
+    const r = Math.max(1.5, wasmParticles.getParticleRadius() * camera.zoom);
+    ctx.beginPath();
+    for (let i = 0; i < positions.length; i += 2) {
+      const sp = camera.toScreen(positions[i], positions[i + 1], this.canvas);
+      ctx.moveTo(sp.x + r, sp.y);
+      ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+    }
+    ctx.fillStyle = "rgba(70,150,255,0.85)";
+    ctx.fill();
   }
 
   private drawWater(water: WaterSystem, camera: Camera) {

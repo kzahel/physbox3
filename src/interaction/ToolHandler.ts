@@ -82,6 +82,7 @@ export type Tool =
   | "draw"
   | "terrain"
   | "water"
+  | "fluid"
   | "sand"
   | "jelly"
   | "slime";

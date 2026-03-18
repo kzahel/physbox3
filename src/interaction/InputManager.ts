@@ -10,6 +10,7 @@ import { CreationTool } from "./tools/CreationTool";
 import { DetachTool } from "./tools/DetachTool";
 import { DrawTool } from "./tools/DrawTool";
 import { EraseTool } from "./tools/EraseTool";
+import { FluidParticleTool } from "./tools/FluidParticleTool";
 import { GlueTool, UnGlueTool } from "./tools/GlueTool";
 import { GrabTool } from "./tools/GrabTool";
 import { PlatformDrawTool } from "./tools/PlatformDrawTool";
@@ -141,6 +142,7 @@ export class InputManager implements ToolRenderInfo {
       draw: this.drawTool,
       terrain: this.terrainTool,
       water: new WaterTool(ctx),
+      fluid: new FluidParticleTool(ctx),
       sand: new SandTool(ctx),
     };
     for (const [id, tool] of this.platformTools) h[id] = tool;
