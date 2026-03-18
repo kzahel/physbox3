@@ -61,8 +61,22 @@ export function createJelly(pw: PhysWorld, x: number, y: number): Body {
     }
   }
 
-  // Return the center-ish body
-  return grid[Math.floor(rows / 2)][Math.floor(cols / 2)];
+  // Build ordered perimeter: bottom→right→top→left
+  const perimeter: Body[] = [];
+  for (let c = 0; c < cols; c++) perimeter.push(grid[0][c]); // bottom row L→R
+  for (let r = 1; r < rows; r++) perimeter.push(grid[r][cols - 1]); // right col up
+  for (let c = cols - 2; c >= 0; c--) perimeter.push(grid[rows - 1][c]); // top row R→L
+  for (let r = rows - 2; r >= 1; r--) perimeter.push(grid[r][0]); // left col down
+
+  // Store perimeter on center body for rendering
+  const center = grid[Math.floor(rows / 2)][Math.floor(cols / 2)];
+  pw.setUserData(center, {
+    fill: "rgba(50,180,50,0.85)",
+    label: "jelly",
+    jellyPerimeter: perimeter,
+  });
+
+  return center;
 }
 
 function link(pw: PhysWorld, a: Body, b: Body, hertz: number, dampingRatio: number) {

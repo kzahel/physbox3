@@ -1,7 +1,7 @@
 import type { Body, b2ShapeId } from "box2d3";
 import * as THREE from "three";
 import type { ToolRenderInfo } from "../interaction/ToolHandler";
-import { getBodyUserData, isSand, isTerrain } from "./BodyUserData";
+import { getBodyUserData, isJelly, isSand, isTerrain } from "./BodyUserData";
 import { b2 } from "./Box2D";
 import type { Camera } from "./Camera";
 import { colorOpacity, parseColor } from "./ColorUtils";
@@ -66,6 +66,8 @@ export class ThreeJSRenderer implements IRenderer {
   private bodyMeshes = new Map<Body, { group: THREE.Group; key: string }>();
   // Joint -> line sync
   private jointLines = new Map<JointHandle, THREE.Group>();
+  // Jelly fill meshes (keyed by center body)
+  private jellyMeshes = new Map<Body, THREE.Mesh>();
 
   // Environment
   private oceanMesh: THREE.Mesh;
@@ -192,6 +194,12 @@ export class ThreeJSRenderer implements IRenderer {
       this.scene.remove(group);
     }
     this.jointLines.clear();
+    for (const [, mesh] of this.jellyMeshes) {
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+      if (mesh.material instanceof THREE.Material) mesh.material.dispose();
+    }
+    this.jellyMeshes.clear();
 
     this.pointsGeometry.dispose();
     this.pointsMaterial.dispose();
@@ -253,6 +261,9 @@ export class ThreeJSRenderer implements IRenderer {
     // Reconcile bodies
     this.syncBodies(pw, i);
 
+    // Reconcile jelly fills
+    this.syncJellyFills(pw, i);
+
     // Reconcile joints
     this.syncJoints(pw, i);
 
@@ -313,6 +324,83 @@ export class ThreeJSRenderer implements IRenderer {
           }
         });
         this.bodyMeshes.delete(body);
+      }
+    }
+  }
+
+  private syncJellyFills(pw: PhysWorld, interp: Interpolation) {
+    const seen = new Set<Body>();
+
+    forEachBody(pw, (body) => {
+      const ud = pw.getUserData(body);
+      if (!isJelly(ud) || !ud.jellyPerimeter) return;
+      seen.add(body);
+
+      const perim = ud.jellyPerimeter;
+      const pts: { x: number; y: number }[] = [];
+      for (const b of perim) {
+        if (!b.IsValid()) return;
+        const { x, y } = lerpBody(b, interp);
+        pts.push({ x, y });
+      }
+      if (pts.length < 3) return;
+
+      // Build smooth perimeter using quadratic midpoints
+      const smooth: { x: number; y: number }[] = [];
+      const n = pts.length;
+      const segments = 4; // subdivisions per edge for smoothness
+      for (let i = 0; i < n; i++) {
+        const prev = pts[(i - 1 + n) % n];
+        const curr = pts[i];
+        const next = pts[(i + 1) % n];
+        const mx0 = (prev.x + curr.x) / 2;
+        const my0 = (prev.y + curr.y) / 2;
+        const mx1 = (curr.x + next.x) / 2;
+        const my1 = (curr.y + next.y) / 2;
+        for (let s = 0; s < segments; s++) {
+          const t = s / segments;
+          const x = (1 - t) * (1 - t) * mx0 + 2 * (1 - t) * t * curr.x + t * t * mx1;
+          const y = (1 - t) * (1 - t) * my0 + 2 * (1 - t) * t * curr.y + t * t * my1;
+          smooth.push({ x, y });
+        }
+      }
+
+      const existing = this.jellyMeshes.get(body);
+      if (existing) {
+        // Update geometry in-place
+        const shape = new THREE.Shape();
+        shape.moveTo(smooth[0].x, smooth[0].y);
+        for (let i = 1; i < smooth.length; i++) shape.lineTo(smooth[i].x, smooth[i].y);
+        shape.closePath();
+        existing.geometry.dispose();
+        existing.geometry = new THREE.ShapeGeometry(shape);
+      } else {
+        const shape = new THREE.Shape();
+        shape.moveTo(smooth[0].x, smooth[0].y);
+        for (let i = 1; i < smooth.length; i++) shape.lineTo(smooth[i].x, smooth[i].y);
+        shape.closePath();
+        const geo = new THREE.ShapeGeometry(shape);
+        const mat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color(0.24, 0.78, 0.24),
+          transparent: true,
+          opacity: 0.5,
+          roughness: 0.6,
+          metalness: 0.1,
+          side: THREE.DoubleSide,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.z = -EXTRUDE_DEPTH / 4;
+        this.scene.add(mesh);
+        this.jellyMeshes.set(body, mesh);
+      }
+    });
+
+    for (const [body, mesh] of this.jellyMeshes) {
+      if (!seen.has(body)) {
+        this.scene.remove(mesh);
+        mesh.geometry.dispose();
+        if (mesh.material instanceof THREE.Material) mesh.material.dispose();
+        this.jellyMeshes.delete(body);
       }
     }
   }

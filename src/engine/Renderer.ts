@@ -1,6 +1,6 @@
 import type { b2ShapeId } from "box2d3";
 import type { ToolRenderInfo } from "../interaction/ToolHandler";
-import { isTerrain } from "./BodyUserData";
+import { isJelly, isTerrain } from "./BodyUserData";
 import { b2 } from "./Box2D";
 import type { Camera } from "./Camera";
 import { KILL_Y, KILL_Y_TOP } from "./Game";
@@ -65,6 +65,7 @@ export class Renderer implements IRenderer {
     this.drawOcean(camera);
     this.drawSky(camera);
     this.drawTerrain(pw, camera);
+    this.drawJellyFills(pw, camera, i);
     this.drawBodies(pw, camera, i);
     this.drawJoints(pw, camera, i);
     if (water) this.drawWater(water, camera);
@@ -116,6 +117,52 @@ export class Renderer implements IRenderer {
       ctx.lineCap = "round";
       ctx.stroke();
 
+      ctx.restore();
+    });
+  }
+
+  private drawJellyFills(pw: PhysWorld, camera: Camera, interp: Interpolation) {
+    const ctx = this.ctx;
+
+    forEachBody(pw, (body) => {
+      const ud = pw.getUserData(body);
+      if (!isJelly(ud) || !ud.jellyPerimeter) return;
+
+      const perim = ud.jellyPerimeter;
+      if (perim.length < 3) return;
+
+      // Collect interpolated screen positions of perimeter nodes
+      const pts: { x: number; y: number }[] = [];
+      for (const b of perim) {
+        if (!b.IsValid()) return;
+        const { x, y } = lerpBody(b, interp);
+        pts.push(camera.toScreen(x, y, this.canvas));
+      }
+
+      // Draw filled shape with smooth bezier curves through perimeter
+      ctx.save();
+      ctx.fillStyle = "rgba(60,200,60,0.45)";
+      ctx.strokeStyle = "rgba(40,160,40,0.7)";
+      ctx.lineWidth = Math.max(1.5, 0.06 * camera.zoom);
+      ctx.lineJoin = "round";
+
+      ctx.beginPath();
+      const n = pts.length;
+      // Start at midpoint between last and first point
+      const mx0 = (pts[n - 1].x + pts[0].x) / 2;
+      const my0 = (pts[n - 1].y + pts[0].y) / 2;
+      ctx.moveTo(mx0, my0);
+
+      for (let i = 0; i < n; i++) {
+        const next = (i + 1) % n;
+        const mx = (pts[i].x + pts[next].x) / 2;
+        const my = (pts[i].y + pts[next].y) / 2;
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+      }
+
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
       ctx.restore();
     });
   }

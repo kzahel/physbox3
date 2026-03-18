@@ -55,6 +55,11 @@ export interface ConveyorData extends BodyDataBase {
   speed: number;
 }
 
+export interface JellyData extends BodyDataBase {
+  label: "jelly";
+  jellyPerimeter?: Body[];
+}
+
 export interface SandData extends BodyDataBase {
   label: "sand";
 }
@@ -77,6 +82,7 @@ export type BodyUserData =
   | CannonData
   | CannonballData
   | ConveyorData
+  | JellyData
   | SandData
   | TerrainData
   | GenericBodyData;
@@ -114,6 +120,10 @@ export function isCannonball(ud: BodyUserData | null): ud is CannonballData {
 
 export function isConveyor(ud: BodyUserData | null): ud is ConveyorData {
   return ud?.label === "conveyor";
+}
+
+export function isJelly(ud: BodyUserData | null): ud is JellyData {
+  return ud?.label === "jelly";
 }
 
 export function isSand(ud: BodyUserData | null): ud is SandData {
