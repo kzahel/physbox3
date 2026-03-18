@@ -420,7 +420,8 @@ export class Game {
     const physMs = physEnd - physStart;
     const renderMs = renderEnd - physEnd;
     const totalMs = renderEnd - frameStart;
-    const idleMs = Math.max(0, 1000 / 60 - totalMs);
+    const frameBudgetMs = dt * 1000; // actual time between rAF callbacks
+    const idleMs = Math.max(0, frameBudgetMs - totalMs);
     // Exponential moving average (α ≈ 0.1)
     const a = 0.1;
     const ft = this.frameTiming;
