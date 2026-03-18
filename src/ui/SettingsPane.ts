@@ -16,6 +16,7 @@ export class SettingsPane {
       <label>Bounce <input type="range" id="s-bounce" min="0" max="1" step="0.05" value="${game.bounciness}"></label>
       <label>Physics Hz <input type="range" id="s-physics-hz" min="10" max="120" step="10" value="${game.physicsHz}"> <span id="s-physics-hz-val">${game.physicsHz}</span></label>
       <label>Sand Limit <input type="range" id="s-max-sand" min="100" max="5000" step="100" value="${game.maxSand}"> <span id="s-max-sand-val">${game.maxSand}</span></label>
+      <label>Fluid Limit <input type="range" id="s-max-fluid" min="500" max="12000" step="100" value="${game.maxFluidParticles}"> <span id="s-max-fluid-val">${game.maxFluidParticles}</span></label>
 
       <div class="section-title">Actions</div>
       <label><button id="s-clear">Clear Dynamic</button></label>
@@ -35,6 +36,8 @@ export class SettingsPane {
       <div id="debug-panel" class="debug-panel" style="display:none">
         <div class="debug-row" id="d-engine"></div>
         <div class="debug-row" id="d-fps"></div>
+        <div class="debug-row" id="d-fluid"></div>
+        <div class="debug-row" id="d-render"></div>
         <div class="debug-row" id="d-step"></div>
         <div class="debug-bar-section">
           <div class="debug-label">Step breakdown (ms)</div>
@@ -71,6 +74,16 @@ export class SettingsPane {
       (v) => {
         game.maxSand = v;
         sandVal.textContent = String(v);
+      },
+      (s) => parseInt(s, 10),
+    );
+
+    const fluidVal = container.querySelector<HTMLSpanElement>("#s-max-fluid-val")!;
+    bindSlider(
+      "#s-max-fluid",
+      (v) => {
+        game.setMaxFluidParticles(v);
+        fluidVal.textContent = String(game.maxFluidParticles);
       },
       (s) => parseInt(s, 10),
     );
@@ -160,6 +173,8 @@ export class SettingsPane {
 
     // Stats update
     const fpsEl = container.querySelector<HTMLElement>("#d-fps")!;
+    const fluidEl = container.querySelector<HTMLElement>("#d-fluid")!;
+    const renderEl = container.querySelector<HTMLElement>("#d-render")!;
     const stepEl = container.querySelector<HTMLElement>("#d-step")!;
     const barsEl = container.querySelector<HTMLElement>("#d-bars")!;
     const countsEl = container.querySelector<HTMLElement>("#d-counts")!;
@@ -174,7 +189,14 @@ export class SettingsPane {
 
     setInterval(() => {
       const p = game.profile;
+      const fluidCount = game.particleSystem.getCount();
+      const fluidLimit = game.particleSystem.getMaxParticles();
+      const fluidBufferKB = (game.particleSystem.getPositionBuffer().byteLength / 1024).toFixed(1);
+      const rendererMode = game.renderer.constructor.name === "ThreeJSRenderer" ? "3D points" : "2D circles";
+
       fpsEl.textContent = `FPS: ${game.fps} | Bodies: ${game.bodyCount} | Sand: ${game.sandBodies.length}`;
+      fluidEl.textContent = `Fluid: ${fluidCount}/${fluidLimit || "∞"} | Radius: ${game.particleSystem.getParticleRadius().toFixed(2)} | Buffer: ${fluidBufferKB}KB`;
+      renderEl.textContent = `Render: ${rendererMode} | Step: combined WASM | Hz: ${game.physicsHz} x ${game.physicsSubSteps}`;
       if (!p) return;
 
       stepEl.textContent = `Step: ${p.step.toFixed(2)}ms | Awake: ${p.awakeBodyCount}`;

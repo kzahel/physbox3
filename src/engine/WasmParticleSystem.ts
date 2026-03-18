@@ -4,20 +4,25 @@ import { b2 } from "./Box2D";
 const DEFAULT_PARTICLE_RADIUS = 0.09;
 const DEFAULT_SPAWN_RADIUS = 0.7;
 const DEFAULT_SPAWN_SPACING = 0.16;
-const DEFAULT_MAX_PARTICLES = 4000;
+export const DEFAULT_MAX_FLUID_PARTICLES = 4000;
+
+interface WasmParticleSystemOptions {
+  maxParticles?: number;
+}
 
 export class WasmParticleSystem {
   private system: ParticleSystem | null;
   private readonly particleRadius: number;
+  private maxParticles: number;
 
-  constructor(world: World) {
+  constructor(world: World, options: WasmParticleSystemOptions = {}) {
     const B2 = b2();
     const def: ParticleSystemDef = new B2.ParticleSystemDef();
     def.radius = DEFAULT_PARTICLE_RADIUS;
     def.density = 1.0;
     def.gravityScale = 1.0;
     def.initialCapacity = 512;
-    def.maxParticles = DEFAULT_MAX_PARTICLES;
+    def.maxParticles = options.maxParticles ?? DEFAULT_MAX_FLUID_PARTICLES;
 
     this.system = B2.createParticleSystem(world, def);
     if (!this.system) {
@@ -25,6 +30,7 @@ export class WasmParticleSystem {
     }
 
     this.particleRadius = def.radius;
+    this.maxParticles = def.maxParticles;
   }
 
   destroy() {
@@ -45,8 +51,18 @@ export class WasmParticleSystem {
     return this.particleRadius;
   }
 
+  getMaxParticles(): number {
+    return this.maxParticles;
+  }
+
   getPositionBuffer(): Float32Array {
     return (this.system?.GetPositionBuffer() as Float32Array | undefined) ?? new Float32Array(0);
+  }
+
+  setMaxParticles(maxParticles: number) {
+    const next = Math.max(0, Math.floor(maxParticles));
+    this.system?.SetMaxParticles(next);
+    this.maxParticles = next;
   }
 
   step(timeStep: number) {

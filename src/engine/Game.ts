@@ -38,7 +38,7 @@ import {
 } from "./Physics";
 import { type PhysProfile, PhysWorld } from "./PhysWorld";
 import { Renderer } from "./Renderer";
-import { WasmParticleSystem } from "./WasmParticleSystem";
+import { DEFAULT_MAX_FLUID_PARTICLES, WasmParticleSystem } from "./WasmParticleSystem";
 import { WaterSystem } from "./WaterSystem";
 
 export const KILL_Y = -100;
@@ -68,9 +68,11 @@ export class Game {
   bounciness = 0.5;
   timeScale = 1;
   physicsHz = DEFAULT_PHYSICS_HZ;
+  readonly physicsSubSteps = SUB_STEPS;
   inputManager: InputManager | null = null;
   water = new WaterSystem();
   particleSystem: WasmParticleSystem;
+  maxFluidParticles = DEFAULT_MAX_FLUID_PARTICLES;
   sandBodies: Body[] = [];
   maxSand = 1000;
   ragdolls: RagdollData[] = [];
@@ -106,7 +108,7 @@ export class Game {
     this.canvas = canvas;
     this.container = canvas.parentElement!;
     this.pw = new PhysWorld(0, this.gravity);
-    this.particleSystem = new WasmParticleSystem(this.pw.world);
+    this.particleSystem = new WasmParticleSystem(this.pw.world, { maxParticles: this.maxFluidParticles });
     this.camera = new Camera();
     this.renderer = new Renderer(canvas);
 
@@ -373,7 +375,7 @@ export class Game {
     this.particleSystem.destroy();
     this.pw.destroy();
     this.pw = new PhysWorld(0, this.gravity);
-    this.particleSystem = new WasmParticleSystem(this.pw.world);
+    this.particleSystem = new WasmParticleSystem(this.pw.world, { maxParticles: this.maxFluidParticles });
     this.applyBounciness();
     this.bindCollisionSounds();
     this.ragdolls.length = 0;
@@ -456,6 +458,11 @@ export class Game {
 
   eraseParticlesAt(wx: number, wy: number, radius: number): number {
     return this.particleSystem.destroyCircle({ x: wx, y: wy }, radius);
+  }
+
+  setMaxFluidParticles(limit: number) {
+    this.maxFluidParticles = Math.max(0, Math.floor(limit));
+    this.particleSystem.setMaxParticles(this.maxFluidParticles);
   }
 
   private removeOutOfBoundsBodies() {
