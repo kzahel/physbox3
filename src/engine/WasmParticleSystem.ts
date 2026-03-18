@@ -72,6 +72,12 @@ export class WasmParticleSystem {
     );
   }
 
+  destroyCircle(center: { x: number; y: number }, radius: number): number {
+    if (!this.system || radius <= 0) return 0;
+    const B2 = b2();
+    return this.system.DestroyParticlesInCircle(new B2.b2Vec2(center.x, center.y), radius);
+  }
+
   spawnBurstAtPoint(center: { x: number; y: number }): number {
     return this.spawnCircle(center);
   }

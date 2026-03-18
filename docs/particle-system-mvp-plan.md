@@ -47,6 +47,7 @@ Implemented baseline as of the current repo state:
   - body impulse application
 - the main app is already wired to exercise this path:
   - `Fluid` tool spawns WASM particles
+  - the existing `Erase` tool now removes WASM particles with the same brush flow
   - the main physics loop now uses a single combined sidecar+world step entry point
   - particles render in both 2D and 3D renderers
   - default fluid bursts are tuned slightly denser so the reduced solver reads more clearly
@@ -58,7 +59,6 @@ What this means in practice:
 - the current result is **basic fluid-like particle motion with rigid-body collision**, not yet a polished water solver
 
 Still missing for the MVP goal:
-- erase path for WASM particles
 - bridge-focused tests and scenario tests
 - further tuning if the demo still needs more convincing water feel in sandbox scenes
 
@@ -434,7 +434,7 @@ Deliverable:
 
 Status:
 - partially complete
-- the app has a `Fluid` tool and renderer integration
+- the app has `Fluid` spawn, `Erase`, and renderer integration
 - current experience is for visual exercise/testing, not yet a convincing water sandbox
 
 ### Phase 6: Harden and profile

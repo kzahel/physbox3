@@ -454,6 +454,10 @@ export class Game {
     return this.particleSystem.spawnBurstAtPoint({ x: wx, y: wy });
   }
 
+  eraseParticlesAt(wx: number, wy: number, radius: number): number {
+    return this.particleSystem.destroyCircle({ x: wx, y: wy }, radius);
+  }
+
   private removeOutOfBoundsBodies() {
     const toRemove: Body[] = [];
     let count = 0;
