@@ -15,6 +15,15 @@
 - `source scripts/use-emsdk.sh` — expose repo-local `emcc` / `emmake` / `emcmake` in the current shell
 - `scripts/use-emsdk.sh emcc --version` — run one emsdk-backed command without modifying the current shell
 
+## Deploy
+
+Hosted at **https://kzahel.com/physbox/** via Cloudflare R2 + Worker.
+
+- `npm run deploy` — build + upload to R2 + deploy worker
+- `npm run deploy:worker` — redeploy worker only (no rebuild)
+
+The Worker (`worker/index.js`) serves static files from the `physbox` R2 bucket and sets COOP/COEP headers required for SharedArrayBuffer (WASM multithreading). Config in `worker/wrangler.toml`.
+
 ## Key Documentation
 
 - `docs/box2d3-wasm-reference.md` — **complete API reference** for box2d3-wasm. Covers all types, classes, methods, enums, events, and ID types. Use this as the authoritative source for API signatures — the auto-generated `.d.ts` is incomplete (e.g., missing `world.Create*Joint()` OOP methods).
