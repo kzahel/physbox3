@@ -449,7 +449,7 @@ Status:
 
 Status:
 - partially complete
-- app-side regression coverage now includes initial WASM particle bridge/scenario tests
+- app-side regression coverage now includes WASM particle bridge/scenario tests for spawn blocking, runtime cap changes, settle/erase, and light body pushing
 - broader coverage and feel/perf work are still pending
 
 ## Files Expected To Change
