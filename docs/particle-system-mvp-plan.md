@@ -47,7 +47,7 @@ Implemented baseline as of the current repo state:
   - body impulse application
 - the main app is already wired to exercise this path:
   - `Fluid` tool spawns WASM particles
-  - particles step during the normal physics loop
+  - the main physics loop now uses a single combined sidecar+world step entry point
   - particles render in both 2D and 3D renderers
   - default fluid bursts are tuned slightly denser so the reduced solver reads more clearly
 
@@ -59,7 +59,6 @@ What this means in practice:
 
 Still missing for the MVP goal:
 - erase path for WASM particles
-- combined single-WASM orchestration path
 - bridge-focused tests and scenario tests
 - further tuning if the demo still needs more convincing water feel in sandbox scenes
 
@@ -420,8 +419,8 @@ Deliverable:
 - one stable stepping entry point for the sandbox
 
 Status:
-- not complete
-- particles are currently stepped from the app loop before `pw.step(...)`, not from one internal WASM-owned combined step path
+- complete in reduced-MVP form
+- sandbox runtime now uses one sidecar-owned combined stepping entry point; JS still does post-step event/tracking sync
 
 ### Phase 5: Sandbox integration
 

@@ -303,6 +303,11 @@ export class PhysWorld {
 
   step(dt: number, subSteps: number): void {
     this.world.Step(dt, subSteps);
+    this.syncAfterStep();
+  }
+
+  /** Sync JS-side event/tracking state after a world step that happened inside WASM. */
+  syncAfterStep(): void {
     this.processEvents();
     this.pruneInvalid();
   }

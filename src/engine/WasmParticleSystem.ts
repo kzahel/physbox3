@@ -53,6 +53,10 @@ export class WasmParticleSystem {
     this.system?.Step(timeStep);
   }
 
+  stepWithWorld(timeStep: number, subSteps: number) {
+    this.system?.StepWithWorld(timeStep, subSteps);
+  }
+
   clear() {
     this.system?.Clear();
   }

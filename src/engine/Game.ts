@@ -440,8 +440,8 @@ export class Game {
       applyRopeStabilization(this.pw);
       this.water.tick(this.pw);
       this.water.applyBuoyancy(this.pw, this.gravity);
-      this.particleSystem.step(timestep);
-      this.pw.step(timestep, SUB_STEPS);
+      this.particleSystem.stepWithWorld(timestep, SUB_STEPS);
+      this.pw.syncAfterStep();
       this.accumulator -= timestep;
     }
     this.interpAlpha = this.accumulator / timestep;
