@@ -40,6 +40,10 @@ export class SettingsPane {
         <div class="debug-row" id="d-render"></div>
         <div class="debug-row" id="d-step"></div>
         <div class="debug-bar-section">
+          <div class="debug-label">Frame breakdown (ms)</div>
+          <div class="debug-bars" id="d-frame-bars"></div>
+        </div>
+        <div class="debug-bar-section">
           <div class="debug-label">Step breakdown (ms)</div>
           <div class="debug-bars" id="d-bars"></div>
         </div>
@@ -176,10 +180,16 @@ export class SettingsPane {
     const fluidEl = container.querySelector<HTMLElement>("#d-fluid")!;
     const renderEl = container.querySelector<HTMLElement>("#d-render")!;
     const stepEl = container.querySelector<HTMLElement>("#d-step")!;
+    const frameBarsEl = container.querySelector<HTMLElement>("#d-frame-bars")!;
     const barsEl = container.querySelector<HTMLElement>("#d-bars")!;
     const countsEl = container.querySelector<HTMLElement>("#d-counts")!;
     const memEl = container.querySelector<HTMLElement>("#d-mem")!;
 
+    const frameBarColors: Record<string, string> = {
+      physics: "#e88",
+      render: "#8be",
+      idle: "#5a5a6a",
+    };
     const barColors: Record<string, string> = {
       collide: "#e88",
       solve: "#8be",
@@ -197,6 +207,25 @@ export class SettingsPane {
       fpsEl.textContent = `FPS: ${game.fps} | Bodies: ${game.bodyCount} | Sand: ${game.sandBodies.length}`;
       fluidEl.textContent = `Fluid: ${fluidCount}/${fluidLimit || "∞"} | Radius: ${game.particleSystem.getParticleRadius().toFixed(2)} | Buffer: ${fluidBufferKB}KB`;
       renderEl.textContent = `Render: ${rendererMode} | Step: combined WASM | Hz: ${game.physicsHz} x ${game.physicsSubSteps}`;
+
+      // Frame breakdown bar
+      const ft = game.frameTiming;
+      const frameParts = [
+        { key: "physics", val: ft.physics },
+        { key: "render", val: ft.render },
+        { key: "idle", val: ft.idle },
+      ];
+      const frameTotal = Math.max(
+        frameParts.reduce((s, x) => s + x.val, 0),
+        0.01,
+      );
+      frameBarsEl.innerHTML = frameParts
+        .map((x) => {
+          const pct = Math.max((x.val / frameTotal) * 100, 0);
+          return `<div class="debug-bar" style="width:${pct.toFixed(1)}%;background:${frameBarColors[x.key]}" title="${x.key}: ${x.val.toFixed(2)}ms"></div>`;
+        })
+        .join("");
+
       if (!p) return;
 
       stepEl.textContent = `Step: ${p.step.toFixed(2)}ms | Awake: ${p.awakeBodyCount}`;

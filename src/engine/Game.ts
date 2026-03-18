@@ -92,6 +92,8 @@ export class Game {
   bodyCount = 0;
   /** Latest physics profiling snapshot (updated each physics step). */
   profile: PhysProfile | null = null;
+  /** Frame-level timing (ms), updated every frame. */
+  frameTiming = { physics: 0, render: 0, idle: 0, total: 0 };
 
   private lastTime = 0;
   private accumulator = 0;
@@ -397,19 +399,35 @@ export class Game {
   private loop(time: number) {
     requestAnimationFrame((t) => this.loop(t));
 
+    const frameStart = performance.now();
     const dt = Math.min((time - this.lastTime) / 1000, 0.1);
     this.lastTime = time;
 
     this.updateFPS(dt);
 
+    const physStart = performance.now();
     if (!this.paused) {
       this.stepPhysics(dt);
     }
-
     this.removeOutOfBoundsBodies();
+    const physEnd = performance.now();
+
     this.updateCameraFollow();
     const interp: Interpolation = { alpha: this.interpAlpha, prev: this.prevStates };
     this.renderer.drawWorld(this.pw, this.camera, interp, this.particleSystem);
+    const renderEnd = performance.now();
+
+    const physMs = physEnd - physStart;
+    const renderMs = renderEnd - physEnd;
+    const totalMs = renderEnd - frameStart;
+    const idleMs = Math.max(0, 1000 / 60 - totalMs);
+    // Exponential moving average (α ≈ 0.1)
+    const a = 0.1;
+    const ft = this.frameTiming;
+    ft.physics = ft.physics * (1 - a) + physMs * a;
+    ft.render = ft.render * (1 - a) + renderMs * a;
+    ft.idle = ft.idle * (1 - a) + idleMs * a;
+    ft.total = ft.total * (1 - a) + totalMs * a;
   }
 
   private updateFPS(dt: number) {
