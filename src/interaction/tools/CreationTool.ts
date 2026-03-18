@@ -14,6 +14,7 @@ const CREATORS: Partial<Record<Tool, PlaceFn>> = {
   ragdoll: (g, x, y) => g.addRagdoll(x, y),
   dynamite: (g, x, y) => g.addDynamite(x, y),
   train: (g, x, y) => g.addTrain(x, y),
+  jelly: (g, x, y) => g.addJelly(x, y),
 };
 
 /** Simple one-click placement tools (box, ball, rope, car, etc.) */

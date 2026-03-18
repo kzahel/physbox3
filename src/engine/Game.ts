@@ -8,6 +8,7 @@ import { createCar } from "../prefabs/Car";
 import { createConveyor } from "../prefabs/Conveyor";
 import { createDynamite, tickDynamite } from "../prefabs/Dynamite";
 import { applyFanForce, createFan, spawnFanParticles } from "../prefabs/Fan";
+import { createJelly } from "../prefabs/Jelly";
 import { createLauncher } from "../prefabs/Launcher";
 import { createPlatform } from "../prefabs/Platform";
 import { createRagdoll, type RagdollData, updateRagdollFootContacts } from "../prefabs/Ragdoll";
@@ -314,6 +315,10 @@ export class Game {
 
   addDynamite(x: number, y: number, fuseTime = 3) {
     return createDynamite(this.pw, x, y, fuseTime);
+  }
+
+  addJelly(x: number, y: number) {
+    return createJelly(this.pw, x, y);
   }
 
   // --- Physics utilities ---

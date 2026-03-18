@@ -32,6 +32,7 @@ const ICONS: Record<Tool, string> = {
   draw: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><path d="M3 15L5 5l3 4 3-6 3 8 2-3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 15l2-10 3 4 3-6 3 8 2-3" fill="rgba(120,200,160,0.3)" stroke="none"/></svg>`,
   terrain: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><path d="M1 14l3-5 3 2 4-7 3 4 3-2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M1 14l3-5 3 2 4-7 3 4 3-2V18H1z" fill="rgba(80,100,60,0.4)" stroke="none"/></svg>`,
   water: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><path d="M3 10q3-3 6 0t6 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M3 14q3-3 6 0t6 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M3 14q3-3 6 0t6 0V18H3z" fill="rgba(60,140,255,0.3)" stroke="none"/></svg>`,
+  jelly: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><rect x="3" y="5" width="12" height="8" rx="2" fill="rgba(80,220,80,0.3)" stroke="currentColor" stroke-width="1.3"/><path d="M5 5q0-1.5 4-1.5t4 1.5" fill="none" stroke="currentColor" stroke-width="0.8"/><path d="M5 13q0 1.5 4 1.5t4-1.5" fill="none" stroke="currentColor" stroke-width="0.8"/></svg>`,
   sand: `<svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><circle cx="5" cy="14" r="1.5" fill="rgba(210,180,100,0.9)" stroke="currentColor" stroke-width="0.5"/><circle cx="9" cy="15" r="1.5" fill="rgba(194,164,90,0.9)" stroke="currentColor" stroke-width="0.5"/><circle cx="13" cy="14" r="1.5" fill="rgba(220,190,110,0.9)" stroke="currentColor" stroke-width="0.5"/><circle cx="7" cy="11" r="1.5" fill="rgba(210,180,100,0.9)" stroke="currentColor" stroke-width="0.5"/><circle cx="11" cy="11" r="1.5" fill="rgba(194,164,90,0.9)" stroke="currentColor" stroke-width="0.5"/><circle cx="9" cy="8" r="1.5" fill="rgba(220,190,110,0.9)" stroke="currentColor" stroke-width="0.5"/></svg>`,
 };
 
@@ -41,7 +42,8 @@ const TOOLS: { id: Tool; label: string }[] = [
   { id: "ball", label: "Ball" },
   { id: "platform", label: "Platform" },
   { id: "car", label: "Car" },
-  { id: "springball", label: "Jelly" },
+  { id: "springball", label: "Star" },
+  { id: "jelly", label: "Jelly" },
   { id: "launcher", label: "Launch" },
   { id: "seesaw", label: "Seesaw" },
   { id: "rocket", label: "Rocket" },
