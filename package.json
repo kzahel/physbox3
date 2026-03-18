@@ -13,7 +13,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "perf:particles": "node scripts/benchmark-particles.mjs",
-    "ci": "npm run typecheck && npm run lint && npm run test"
+    "ci": "npm run typecheck && npm run lint && npm run test",
+    "deploy": "npm run build && bash scripts/deploy.sh",
+    "deploy:worker": "cd worker && npx wrangler deploy"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.7",
@@ -23,7 +25,7 @@
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "@physbox/box2d3-wasm": "^5.2.0",
+    "@physbox/box2d3-wasm": "^5.2.1",
     "three": "^0.183.2"
   }
 }
