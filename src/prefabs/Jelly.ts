@@ -44,7 +44,7 @@ function createJellyGrid(pw: PhysWorld, x: number, y: number, opts: JellyOpts): 
   const cols = 4;
   const rows = 6;
   const spacing = 0.4;
-  const nodeRadius = 0.12;
+  const nodeRadius = 0.18;
   const hertz = 6;
   const dampingRatio = 0.2;
 
