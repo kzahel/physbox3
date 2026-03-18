@@ -221,8 +221,12 @@ export class Renderer implements IRenderer {
 
       const jointType = joint.GetType();
 
-      // Check for rope stabilizer via joint userData
       const jd = pw.getJointData(joint);
+
+      // Skip hidden joints (e.g. jelly internal springs)
+      if (jd?.hidden) return;
+
+      // Check for rope stabilizer via joint userData
       if (jd?.ropeStabilizer) {
         const ddx = worldB.x - worldA.x;
         const ddy = worldB.y - worldA.y;

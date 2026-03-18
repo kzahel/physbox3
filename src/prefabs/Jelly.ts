@@ -5,8 +5,8 @@ import type { PhysWorld } from "../engine/PhysWorld";
 
 /** Create a rectangular jelly (soft body) — a grid of bodies linked by spring joints. */
 export function createJelly(pw: PhysWorld, x: number, y: number): Body {
-  const cols = 6;
-  const rows = 4;
+  const cols = 4;
+  const rows = 6;
   const spacing = 0.4;
   const nodeRadius = 0.12;
   const hertz = 6;
@@ -69,7 +69,7 @@ function link(pw: PhysWorld, a: Body, b: Body, hertz: number, dampingRatio: numb
   const aPos = a.GetPosition();
   const bPos = b.GetPosition();
   const len = distance(aPos, bPos);
-  createDistanceJoint(
+  const jh = createDistanceJoint(
     pw,
     a,
     b,
@@ -83,4 +83,5 @@ function link(pw: PhysWorld, a: Body, b: Body, hertz: number, dampingRatio: numb
       collideConnected: false,
     },
   );
+  pw.setJointData(jh, { hidden: true });
 }

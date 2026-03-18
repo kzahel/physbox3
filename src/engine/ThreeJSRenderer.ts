@@ -446,6 +446,7 @@ export class ThreeJSRenderer implements IRenderer {
       seen.add(joint);
 
       const jd = pw.getJointData(joint);
+      if (jd?.hidden) return;
       const isStabilizer = !!jd?.ropeStabilizer;
 
       const bodyA = joint.GetBodyA();
