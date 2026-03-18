@@ -2,6 +2,10 @@
 
 2D physics sandbox using box2d3-wasm (Box2D v3, WASM+SIMD).
 
+## Agent Instructions
+
+- Do NOT use the auto-memory system (`~/.claude/projects/.../memory/`). Store all persistent project context in this file (`CLAUDE.md`) and in `docs/` instead.
+
 ## Build & Dev
 
 - `npm run dev` — start dev server
@@ -12,6 +16,8 @@
 ## Key Documentation
 
 - `docs/box2d3-wasm-reference.md` — **complete API reference** for box2d3-wasm. Covers all types, classes, methods, enums, events, and ID types. Use this as the authoritative source for API signatures — the auto-generated `.d.ts` is incomplete (e.g., missing `world.Create*Joint()` OOP methods).
+- `docs/particle-system-mvp-plan.md` — **primary particle system plan**. Narrow sidecar/MVP plan for a LiquidFun-derived SPH-style solver coupled to Box2D v3 inside the same WASM module.
+- `docs/particle-system-plan.md` — **historical full-scope particle plan**. Earlier full LiquidFun-port analysis, useful as background but not the current source of truth for MVP implementation.
 
 ## Architecture
 
@@ -122,6 +128,17 @@ Tools are defined by: adding to the `Tool` union type in ToolHandler.ts, adding 
 - box2d3-wasm world with Y-up coordinate system
 - Joint types in use: MotorJoint (grab), RevoluteJoint (ropes), WeldJoint (attach)
 - Bodies store style via `PhysWorld.setUserData(body, { fill, label })`
+
+### Particle System (In Progress)
+
+Building a narrow particle sidecar inside a forked `box2d3-wasm` (`kzahel/box2d3-wasm`, branch `particle-system`). The solver is LiquidFun-derived, but the goal is not full LiquidFun API parity. Particle stepping and rigid-body coupling run inside the same WASM module as Box2D v3 — no JS↔WASM boundary crossings in the hot path. Start with `docs/particle-system-mvp-plan.md`; use `docs/particle-system-plan.md` as historical background only.
+
+**Reference repos:**
+- `reference/box2d3-wasm/` — our fork (submodule → `kzahel/box2d3-wasm`), particle files in `box2d3-wasm/csrc/particle/`
+- `reference/liquidfun/` — Google's LiquidFun (Box2D v2 + particles), source of particle system C++
+- `reference/box2d3-wasm/box2d/` — upstream Box2D v3 C source (submodule of box2d3-wasm)
+
+**Build:** `bash scripts/build-box2d-wasm.sh` rebuilds the WASM module from source (requires emsdk).
 
 ### Workflow
 
