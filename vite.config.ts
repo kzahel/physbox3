@@ -1,9 +1,12 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 const box2dWasmEntry = new URL('./reference/box2d3-wasm/box2d3-wasm/build/dist/es/entry.mjs', import.meta.url).pathname;
 
 export default defineConfig({
     base: '/physbox3/',
+    test: {
+        include: ['src/**/*.test.ts'],
+    },
     resolve: {
         alias: {
             'box2d3-wasm': box2dWasmEntry,

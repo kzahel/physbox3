@@ -59,7 +59,7 @@ What this means in practice:
 - the current result is **basic fluid-like particle motion with rigid-body collision**, not yet a polished water solver
 
 Still missing for the MVP goal:
-- bridge-focused tests and scenario tests
+- broader bridge-focused tests and scenario tests
 - further tuning if the demo still needs more convincing water feel in sandbox scenes
 
 ## Scope
@@ -446,6 +446,11 @@ Status:
   - strict-contact improvements
   - more particle modes
   - SOA redesign
+
+Status:
+- partially complete
+- app-side regression coverage now includes initial WASM particle bridge/scenario tests
+- broader coverage and feel/perf work are still pending
 
 ## Files Expected To Change
 
