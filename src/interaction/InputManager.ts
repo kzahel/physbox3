@@ -47,6 +47,7 @@ const CREATION_TOOL_IDS: Tool[] = [
   "dynamite",
   "train",
   "jelly",
+  "slime",
 ];
 
 const PLATFORM_TOOL_IDS: Tool[] = ["platform", "conveyor", "fan", "cannon", "rocket"];

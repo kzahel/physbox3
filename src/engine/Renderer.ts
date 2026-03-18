@@ -141,8 +141,9 @@ export class Renderer implements IRenderer {
 
       // Draw filled shape with smooth bezier curves through perimeter
       ctx.save();
-      ctx.fillStyle = "rgba(60,200,60,0.45)";
-      ctx.strokeStyle = "rgba(40,160,40,0.7)";
+      const fill = ud.jellyFill ?? "rgba(60,200,60,0.45)";
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = fill.replace(/[\d.]+\)$/, "0.8)");
       ctx.lineWidth = Math.max(1.5, 0.06 * camera.zoom);
       ctx.lineJoin = "round";
 

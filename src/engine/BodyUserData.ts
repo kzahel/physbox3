@@ -58,6 +58,7 @@ export interface ConveyorData extends BodyDataBase {
 export interface JellyData extends BodyDataBase {
   label: "jelly";
   jellyPerimeter?: Body[];
+  jellyFill?: string;
 }
 
 export interface SandData extends BodyDataBase {
