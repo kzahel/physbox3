@@ -24,7 +24,9 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
     "paths": {
-      "box2d3": ["./node_modules/box2d3-wasm/build/dist/es/deluxe/Box2D.deluxe.d.ts"]
+      "box2d3": [
+        "./reference/box2d3-wasm/box2d3-wasm/build/dist/es/deluxe/Box2D.deluxe.d.ts"
+      ]
     }
   },
   "include": [

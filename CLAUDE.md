@@ -12,6 +12,8 @@
 - `npm run build` — production build
 - `npm run lint` — biome check (formatting + linting)
 - `npx tsc --noEmit` — type check
+- `source scripts/use-emsdk.sh` — expose repo-local `emcc` / `emmake` / `emcmake` in the current shell
+- `scripts/use-emsdk.sh emcc --version` — run one emsdk-backed command without modifying the current shell
 
 ## Key Documentation
 
@@ -138,7 +140,21 @@ Building a narrow particle sidecar inside a forked `box2d3-wasm` (`kzahel/box2d3
 - `reference/liquidfun/` — Google's LiquidFun (Box2D v2 + particles), source of particle system C++
 - `reference/box2d3-wasm/box2d/` — upstream Box2D v3 C source (submodule of box2d3-wasm)
 
-**Build:** `bash scripts/build-box2d-wasm.sh` rebuilds the WASM module from source (requires emsdk).
+**Build:** `bash scripts/build-box2d-wasm.sh` rebuilds the WASM module from source. To expose `emcc` manually, use `source scripts/use-emsdk.sh`.
+
+### Particle Performance Invariants
+
+Preserve these very carefully while iterating on the particle system:
+
+- Keep the dependency direction one-way: particle solver -> Box2D bridge -> Box2D v3. Do not let Box2D-facing code leak throughout solver internals.
+- Keep particle stepping and particle↔rigid-body coupling inside WASM. Do not move hot-path orchestration back into JS.
+- Keep particle data array-based and contiguous in the hot path. Avoid per-particle heap objects or pointer-heavy ownership models.
+- Avoid JS callbacks in the hot path.
+- Avoid per-step heap allocation in solver passes. Reuse buffers / scratch storage where possible.
+- Keep the Box2D bridge thin, flat, and data-oriented. Avoid virtual dispatch or overly object-heavy wrappers in the hot path.
+- Keep the public JS API minimal and batch-oriented.
+- Protect the bridge contract with tests so later memory-layout work (including a future SOA redesign) can change internals without changing the external behavior beyond tolerances.
+- Profile before doing SIMD- or threading-specific rewrites. The first-order win is same-WASM-module execution, not premature micro-optimization.
 
 ### Workflow
 

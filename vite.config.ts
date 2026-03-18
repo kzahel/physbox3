@@ -1,7 +1,14 @@
 import { defineConfig } from 'vite';
 
+const box2dWasmEntry = new URL('./reference/box2d3-wasm/box2d3-wasm/build/dist/es/entry.mjs', import.meta.url).pathname;
+
 export default defineConfig({
     base: '/physbox3/',
+    resolve: {
+        alias: {
+            'box2d3-wasm': box2dWasmEntry,
+        },
+    },
     optimizeDeps: {
         exclude: ['box2d3-wasm'],
     },
@@ -9,6 +16,7 @@ export default defineConfig({
         format: 'es',
     },
     server: {
+        port: 8900,
         headers: {
             // Required for SharedArrayBuffer (box2d3-wasm threading)
             'Cross-Origin-Opener-Policy': 'same-origin',
