@@ -22,7 +22,7 @@
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "box2d3-wasm": "^5.2.0",
+    "box2d3-wasm": "file:reference/box2d3-wasm/box2d3-wasm",
     "three": "^0.183.2"
   }
 }
