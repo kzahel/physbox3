@@ -35,7 +35,9 @@ Implemented baseline as of the current repo state:
   - particle count
   - zero-copy position buffer
   - circle-batch spawning
-  - trivial gravity integration
+  - neighbor broadphase and particle-particle contact generation
+  - reduced pressure relaxation and pair damping
+  - gravity integration
   - rigid-body collision projection and impulse application
 - the Box2D bridge currently covers:
   - world gravity
@@ -47,18 +49,19 @@ Implemented baseline as of the current repo state:
   - `Fluid` tool spawns WASM particles
   - particles step during the normal physics loop
   - particles render in both 2D and 3D renderers
+  - default fluid bursts are tuned slightly denser so the reduced solver reads more clearly
 
 What this means in practice:
 - Phase 1 is complete
+- Phase 2 is complete in reduced-MVP form
 - early Box2D bridge work from later phases is complete enough for visual demos
-- the current result is **visible particles with rigid-body collision**, not fluid
+- the current result is **basic fluid-like particle motion with rigid-body collision**, not yet a polished water solver
 
 Still missing for the MVP goal:
-- particle-particle contact generation
-- pressure / damping / viscosity-like solve
 - erase path for WASM particles
 - combined single-WASM orchestration path
 - bridge-focused tests and scenario tests
+- further tuning if the demo still needs more convincing water feel in sandbox scenes
 
 ## Scope
 
@@ -390,9 +393,8 @@ Deliverable:
 - particles move and settle in isolation
 
 Status:
-- partially complete
-- particle creation, zero-copy positions, and trivial integration exist
-- particle-particle contacts and pressure / damping do not exist yet
+- complete in reduced-MVP form
+- particle creation, zero-copy positions, broadphase/contact generation, reduced pressure / damping, and integration exist
 
 ### Phase 3: Box2D bridge
 
@@ -406,7 +408,7 @@ Deliverable:
 
 Status:
 - partially complete
-- supported shape contact helpers and body impulse coupling already exist for the minimal demo path
+- supported shape contact helpers, body impulse coupling, and rigid-body collision projection already exist for the reduced demo path
 
 ### Phase 4: Combined step path
 

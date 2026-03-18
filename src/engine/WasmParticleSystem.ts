@@ -3,7 +3,7 @@ import { b2 } from "./Box2D";
 
 const DEFAULT_PARTICLE_RADIUS = 0.09;
 const DEFAULT_SPAWN_RADIUS = 0.7;
-const DEFAULT_SPAWN_SPACING = 0.18;
+const DEFAULT_SPAWN_SPACING = 0.16;
 const DEFAULT_MAX_PARTICLES = 4000;
 
 export class WasmParticleSystem {
