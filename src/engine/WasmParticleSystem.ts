@@ -1,4 +1,4 @@
-import type { ParticleSystem, ParticleSystemDef, World, b2Vec2 } from "box2d3";
+import type { b2Vec2, ParticleSystem, ParticleSystemDef, World } from "box2d3";
 import { b2 } from "./Box2D";
 
 const DEFAULT_PARTICLE_RADIUS = 0.09;
@@ -77,15 +77,14 @@ export class WasmParticleSystem {
     this.system?.Clear();
   }
 
-  spawnCircle(center: { x: number; y: number }, radius = DEFAULT_SPAWN_RADIUS, spacing = DEFAULT_SPAWN_SPACING): number {
+  spawnCircle(
+    center: { x: number; y: number },
+    radius = DEFAULT_SPAWN_RADIUS,
+    spacing = DEFAULT_SPAWN_SPACING,
+  ): number {
     if (!this.system) return 0;
     const B2 = b2();
-    return this.system.SpawnParticlesInCircle(
-      new B2.b2Vec2(center.x, center.y),
-      radius,
-      spacing,
-      new B2.b2Vec2(0, 0),
-    );
+    return this.system.SpawnParticlesInCircle(new B2.b2Vec2(center.x, center.y), radius, spacing, new B2.b2Vec2(0, 0));
   }
 
   destroyCircle(center: { x: number; y: number }, radius: number): number {

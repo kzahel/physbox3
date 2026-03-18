@@ -60,7 +60,13 @@ export class Renderer implements IRenderer {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
-  drawWorld(pw: PhysWorld, camera: Camera, water?: WaterSystem, interp?: Interpolation, wasmParticles?: WasmParticleSystem | null) {
+  drawWorld(
+    pw: PhysWorld,
+    camera: Camera,
+    water?: WaterSystem,
+    interp?: Interpolation,
+    wasmParticles?: WasmParticleSystem | null,
+  ) {
     const i = interp ?? NO_INTERP;
     this.clear();
     this.drawOcean(camera);

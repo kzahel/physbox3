@@ -2,8 +2,9 @@
  * Box2D WASM module singleton.
  * Call init() once at startup, then import `b2` everywhere.
  */
+
+import Box2DFactory from "@physbox/box2d3-wasm";
 import type { MainModule } from "box2d3";
-import Box2DFactory from "box2d3-wasm";
 
 export type B2 = MainModule;
 

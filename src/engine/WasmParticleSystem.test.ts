@@ -466,9 +466,9 @@ describe("WasmParticleSystem scenarios", () => {
     const beforeSweep = computeCentroid(system.getPositionBuffer());
     const startX = body.GetPosition().x;
 
-    body.SetLinearVelocity(new (b2()).b2Vec2(1.35, 0));
+    body.SetLinearVelocity(new (b2().b2Vec2)(1.35, 0));
     stepSystem(pw, system, 120);
-    body.SetLinearVelocity(new (b2()).b2Vec2(0, 0));
+    body.SetLinearVelocity(new (b2().b2Vec2)(0, 0));
 
     const buffer = system.getPositionBuffer();
     const afterSweep = computeCentroid(buffer);
