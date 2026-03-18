@@ -25,6 +25,41 @@ Working mental model:
 - `thin Box2D v3 bridge`
 - `minimal embind / JS sandbox API`
 
+## Current Status
+
+Implemented baseline as of the current repo state:
+- fork-side particle code lives under `reference/box2d3-wasm/box2d3-wasm/csrc/particle_sidecar/`
+- `glue.cpp` and `shell/1_build_wasm.sh` are wired to build and expose the sidecar
+- the sidecar has a minimal `ParticleSystem` with:
+  - create / destroy
+  - particle count
+  - zero-copy position buffer
+  - circle-batch spawning
+  - trivial gravity integration
+  - rigid-body collision projection and impulse application
+- the Box2D bridge currently covers:
+  - world gravity
+  - AABB shape query
+  - supported shape contact helper
+  - body point velocity
+  - body impulse application
+- the main app is already wired to exercise this path:
+  - `Fluid` tool spawns WASM particles
+  - particles step during the normal physics loop
+  - particles render in both 2D and 3D renderers
+
+What this means in practice:
+- Phase 1 is complete
+- early Box2D bridge work from later phases is complete enough for visual demos
+- the current result is **visible particles with rigid-body collision**, not fluid
+
+Still missing for the MVP goal:
+- particle-particle contact generation
+- pressure / damping / viscosity-like solve
+- erase path for WASM particles
+- combined single-WASM orchestration path
+- bridge-focused tests and scenario tests
+
 ## Scope
 
 ### In scope for MVP
@@ -336,6 +371,10 @@ Deliverable:
 Deliverable:
 - builds in both target WASM flavors you intend to support
 
+Status:
+- complete
+- implemented as `particle_sidecar/` rather than `csrc/particle/`
+
 ### Phase 2: Core particle solver
 
 - port or reimplement the minimum LiquidFun passes for:
@@ -350,6 +389,11 @@ No rigid-body coupling yet.
 Deliverable:
 - particles move and settle in isolation
 
+Status:
+- partially complete
+- particle creation, zero-copy positions, and trivial integration exist
+- particle-particle contacts and pressure / damping do not exist yet
+
 ### Phase 3: Box2D bridge
 
 - implement world overlap query path
@@ -360,6 +404,10 @@ Deliverable:
 Deliverable:
 - particles collide with rigid bodies and push them
 
+Status:
+- partially complete
+- supported shape contact helpers and body impulse coupling already exist for the minimal demo path
+
 ### Phase 4: Combined step path
 
 - add a single internal step path that runs particles and world in the intended order
@@ -368,6 +416,10 @@ Deliverable:
 
 Deliverable:
 - one stable stepping entry point for the sandbox
+
+Status:
+- not complete
+- particles are currently stepped from the app loop before `pw.step(...)`, not from one internal WASM-owned combined step path
 
 ### Phase 5: Sandbox integration
 
@@ -378,6 +430,11 @@ Deliverable:
 
 Deliverable:
 - playable in the main sandbox
+
+Status:
+- partially complete
+- the app has a `Fluid` tool and renderer integration
+- current experience is for visual exercise/testing, not yet a convincing water sandbox
 
 ### Phase 6: Harden and profile
 
@@ -395,7 +452,7 @@ Deliverable:
 
 - `reference/box2d3-wasm/box2d3-wasm/csrc/glue.cpp`
 - `reference/box2d3-wasm/box2d3-wasm/shell/1_build_wasm.sh`
-- new particle-sidecar sources under `reference/box2d3-wasm/box2d3-wasm/csrc/particle/`
+- new particle-sidecar sources under `reference/box2d3-wasm/box2d3-wasm/csrc/particle_sidecar/`
 
 ### In PhysBox 3
 
