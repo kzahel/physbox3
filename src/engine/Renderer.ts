@@ -13,7 +13,6 @@ import type { PhysWorld } from "./PhysWorld";
 import { computeSpringCoilPath } from "./SpringGeometry";
 import { computeTerrainFillPath } from "./TerrainGeometry";
 import type { WasmParticleSystem } from "./WasmParticleSystem";
-import type { WaterSystem } from "./WaterSystem";
 
 // Ocean wave parameters (frequency, amplitude pairs)
 const OCEAN_WAVE_A = { freq: 0.8, amp: 2 };
@@ -60,13 +59,7 @@ export class Renderer implements IRenderer {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
-  drawWorld(
-    pw: PhysWorld,
-    camera: Camera,
-    water?: WaterSystem,
-    interp?: Interpolation,
-    wasmParticles?: WasmParticleSystem | null,
-  ) {
+  drawWorld(pw: PhysWorld, camera: Camera, interp?: Interpolation, wasmParticles?: WasmParticleSystem | null) {
     const i = interp ?? NO_INTERP;
     this.clear();
     this.drawOcean(camera);
@@ -75,7 +68,6 @@ export class Renderer implements IRenderer {
     this.drawJellyFills(pw, camera, i);
     this.drawBodies(pw, camera, i);
     this.drawJoints(pw, camera, i);
-    if (water) this.drawWater(water, camera);
     if (wasmParticles) this.drawWasmParticles(wasmParticles, camera);
     this.particles.tick();
     this.drawParticles(camera);
@@ -363,85 +355,6 @@ export class Renderer implements IRenderer {
     }
     ctx.fillStyle = "rgba(70,150,255,0.85)";
     ctx.fill();
-  }
-
-  private drawWater(water: WaterSystem, camera: Camera) {
-    const ctx = this.ctx;
-    const cw = this.canvas.clientWidth;
-
-    // Determine visible world X range
-    const leftWorld = (0 - cw / 2) / camera.zoom + camera.x;
-    const rightWorld = (cw - cw / 2) / camera.zoom + camera.x;
-
-    // Collect visible columns into contiguous runs
-    const cols: { x: number; level: number; floor: number }[] = [];
-    for (const col of water.visibleColumns(leftWorld, rightWorld)) {
-      cols.push(col);
-    }
-    if (cols.length === 0) return;
-
-    // Sort by x
-    cols.sort((a, b) => a.x - b.x);
-
-    // Draw filled water regions — group into contiguous runs
-    const COL_WIDTH = 0.2;
-    const GAP_THRESHOLD = COL_WIDTH * 2.5;
-
-    let runStart = 0;
-    for (let i = 0; i <= cols.length; i++) {
-      const endRun = i === cols.length || (i > 0 && cols[i].x - cols[i - 1].x > GAP_THRESHOLD);
-      if (endRun && i > runStart) {
-        this.drawWaterRun(ctx, camera, cols, runStart, i);
-        runStart = i;
-      }
-    }
-  }
-
-  private drawWaterRun(
-    ctx: CanvasRenderingContext2D,
-    camera: Camera,
-    cols: { x: number; level: number; floor: number }[],
-    start: number,
-    end: number,
-  ) {
-    const halfCol = 0.1; // COL_WIDTH / 2
-
-    // Draw water body (filled polygon)
-    ctx.beginPath();
-
-    // Top edge: left to right along water surface
-    for (let i = start; i < end; i++) {
-      const sl = camera.toScreen(cols[i].x - halfCol, cols[i].level, this.canvas);
-      const sr = camera.toScreen(cols[i].x + halfCol, cols[i].level, this.canvas);
-      if (i === start) ctx.moveTo(sl.x, sl.y);
-      else ctx.lineTo(sl.x, sl.y);
-      ctx.lineTo(sr.x, sr.y);
-    }
-
-    // Bottom edge: right to left along floor
-    for (let i = end - 1; i >= start; i--) {
-      const sr = camera.toScreen(cols[i].x + halfCol, cols[i].floor, this.canvas);
-      const sl = camera.toScreen(cols[i].x - halfCol, cols[i].floor, this.canvas);
-      ctx.lineTo(sr.x, sr.y);
-      ctx.lineTo(sl.x, sl.y);
-    }
-
-    ctx.closePath();
-    ctx.fillStyle = "rgba(30, 100, 200, 0.35)";
-    ctx.fill();
-
-    // Draw surface line
-    ctx.beginPath();
-    for (let i = start; i < end; i++) {
-      const sl = camera.toScreen(cols[i].x - halfCol, cols[i].level, this.canvas);
-      const sr = camera.toScreen(cols[i].x + halfCol, cols[i].level, this.canvas);
-      if (i === start) ctx.moveTo(sl.x, sl.y);
-      else ctx.lineTo(sl.x, sl.y);
-      ctx.lineTo(sr.x, sr.y);
-    }
-    ctx.strokeStyle = "rgba(80, 160, 255, 0.7)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
   }
 
   private drawOcean(camera: Camera) {

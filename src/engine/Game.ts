@@ -39,7 +39,6 @@ import {
 import { type PhysProfile, PhysWorld } from "./PhysWorld";
 import { Renderer } from "./Renderer";
 import { DEFAULT_MAX_FLUID_PARTICLES, WasmParticleSystem } from "./WasmParticleSystem";
-import { WaterSystem } from "./WaterSystem";
 
 export const KILL_Y = -100;
 export const KILL_Y_TOP = 200;
@@ -70,7 +69,6 @@ export class Game {
   physicsHz = DEFAULT_PHYSICS_HZ;
   readonly physicsSubSteps = SUB_STEPS;
   inputManager: InputManager | null = null;
-  water = new WaterSystem();
   particleSystem: WasmParticleSystem;
   maxFluidParticles = DEFAULT_MAX_FLUID_PARTICLES;
   sandBodies: Body[] = [];
@@ -380,7 +378,6 @@ export class Game {
     this.bindCollisionSounds();
     this.ragdolls.length = 0;
     this.sandBodies.length = 0;
-    this.water.clear();
     this.followBody = null;
     this.accumulator = 0;
     if (this.inputManager) {
@@ -412,7 +409,7 @@ export class Game {
     this.removeOutOfBoundsBodies();
     this.updateCameraFollow();
     const interp: Interpolation = { alpha: this.interpAlpha, prev: this.prevStates };
-    this.renderer.drawWorld(this.pw, this.camera, this.water, interp, this.particleSystem);
+    this.renderer.drawWorld(this.pw, this.camera, interp, this.particleSystem);
   }
 
   private updateFPS(dt: number) {
@@ -440,8 +437,6 @@ export class Game {
       applyFanForce(this.pw);
       applyMotorTorque(this.pw);
       applyRopeStabilization(this.pw);
-      this.water.tick(this.pw);
-      this.water.applyBuoyancy(this.pw, this.gravity);
       this.particleSystem.stepWithWorld(timestep, SUB_STEPS);
       this.pw.syncAfterStep();
       this.accumulator -= timestep;

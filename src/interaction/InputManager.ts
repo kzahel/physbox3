@@ -19,7 +19,6 @@ import { SandTool } from "./tools/SandTool";
 import { ScaleTool } from "./tools/ScaleTool";
 import { SelectTool } from "./tools/SelectTool";
 import { TerrainTool } from "./tools/TerrainTool";
-import { WaterTool } from "./tools/WaterTool";
 
 // Re-export Tool type that other modules need
 export type { Tool, ToolRenderInfo } from "./ToolHandler";
@@ -141,7 +140,6 @@ export class InputManager implements ToolRenderInfo {
       scale: this.scaleTool,
       draw: this.drawTool,
       terrain: this.terrainTool,
-      water: new WaterTool(ctx),
       fluid: new FluidParticleTool(ctx),
       sand: new SandTool(ctx),
     };

@@ -250,13 +250,7 @@ export class ThreeJSRenderer implements IRenderer {
     this.overlay.setToolInfo(input);
   }
 
-  drawWorld(
-    pw: PhysWorld,
-    camera: Camera,
-    _water?: unknown,
-    interp?: Interpolation,
-    wasmParticles?: WasmParticleSystem | null,
-  ) {
+  drawWorld(pw: PhysWorld, camera: Camera, interp?: Interpolation, wasmParticles?: WasmParticleSystem | null) {
     const i = interp ?? NO_INTERP;
     const cw = this.glCanvas.clientWidth;
     const ch = this.glCanvas.clientHeight;

@@ -81,7 +81,6 @@ export type Tool =
   | "train"
   | "draw"
   | "terrain"
-  | "water"
   | "fluid"
   | "sand"
   | "jelly"
