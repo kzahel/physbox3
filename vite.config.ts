@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-    base: '/physbox3/',
+    base: '/physbox/',
     test: {
         include: ['src/**/*.test.ts'],
     },

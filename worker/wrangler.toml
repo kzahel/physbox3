@@ -1,0 +1,11 @@
+name = "physbox"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "physbox"
+
+[[routes]]
+pattern = "kzahel.com/physbox*"
+zone_id = "2a3fcb6ffcd6645ab6b198b650471742"
