@@ -303,18 +303,8 @@ export class InputManager implements ToolRenderInfo {
 
   private onWheel(e: WheelEvent) {
     e.preventDefault();
-    if (e.ctrlKey || e.metaKey) {
-      // Pinch-to-zoom on trackpad, or Ctrl+scroll with mouse wheel
-      const factor = e.deltaY > 0 ? 0.9 : 1.1;
-      this.game.camera.zoomAt(e.clientX, e.clientY, factor, this.game.container);
-    } else if (e.deltaX !== 0) {
-      // Horizontal scroll component → trackpad two-finger pan
-      this.game.camera.pan(-e.deltaX, -e.deltaY);
-    } else {
-      // Pure vertical scroll (mouse wheel) → zoom
-      const factor = e.deltaY > 0 ? 0.9 : 1.1;
-      this.game.camera.zoomAt(e.clientX, e.clientY, factor, this.game.container);
-    }
+    const factor = e.deltaY > 0 ? 0.9 : 1.1;
+    this.game.camera.zoomAt(e.clientX, e.clientY, factor, this.game.container);
   }
 
   // ── Touch events ──
