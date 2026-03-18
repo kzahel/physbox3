@@ -298,6 +298,23 @@ body {
   transition: width 0.3s ease;
 }
 
+.debug-legend {
+  display: flex;
+  gap: 8px;
+  font-size: 9px;
+  color: #888;
+  margin-top: 2px;
+}
+
+.debug-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 2px;
+  vertical-align: middle;
+}
+
 /* ── Mobile: hamburger + slide-out sidebar ── */
 @media (max-width: 768px) {
   #hamburger {

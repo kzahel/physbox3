@@ -42,10 +42,21 @@ export class SettingsPane {
         <div class="debug-bar-section">
           <div class="debug-label">Frame breakdown (ms)</div>
           <div class="debug-bars" id="d-frame-bars"></div>
+          <div class="debug-legend">
+            <span><i style="background:#e88"></i>physics</span>
+            <span><i style="background:#8be"></i>render</span>
+            <span><i style="background:#5a5a6a"></i>idle</span>
+          </div>
         </div>
         <div class="debug-bar-section">
           <div class="debug-label">Step breakdown (ms)</div>
           <div class="debug-bars" id="d-bars"></div>
+          <div class="debug-legend">
+            <span><i style="background:#e88"></i>collide</span>
+            <span><i style="background:#8be"></i>solve</span>
+            <span><i style="background:#eb8"></i>bullets</span>
+            <span><i style="background:#8e8"></i>sensors</span>
+          </div>
         </div>
         <div class="debug-row" id="d-counts"></div>
         <div class="debug-row" id="d-mem"></div>
