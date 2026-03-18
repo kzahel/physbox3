@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "perf:particles": "node scripts/benchmark-particles.mjs",
     "ci": "npm run typecheck && npm run lint && npm run test"
   },
   "devDependencies": {
