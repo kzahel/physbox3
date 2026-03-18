@@ -207,6 +207,7 @@ export class InputManager implements ToolRenderInfo {
   update() {
     this.ragdollController.update();
     this.attractTool.update();
+    this.grabTool.update();
   }
 
   resetGroundBody() {

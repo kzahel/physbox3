@@ -14,6 +14,9 @@ export class GrabTool implements ToolHandler {
   private motorJoint: JointHandle | null = null;
   private grabbedBody: Body | null = null;
   private grabbedStatic: Body | null = null;
+  /** Grab point in body-local coordinates */
+  private localGrabX = 0;
+  private localGrabY = 0;
   private targetX = 0;
   private targetY = 0;
   private endpointDrag: EndpointDragHandler;
@@ -36,7 +39,6 @@ export class GrabTool implements ToolHandler {
       const world = this.ctx.game.camera.toWorld(screenX, screenY, this.ctx.game.container);
       this.targetX = world.x;
       this.targetY = world.y;
-      this.updateMotorJoint();
     } else if (this.grabbedStatic) {
       const B2 = b2();
       const wdx = dx / this.ctx.game.camera.zoom;
@@ -75,6 +77,30 @@ export class GrabTool implements ToolHandler {
     this.onUp();
   }
 
+  /** Called each physics tick by InputManager.update() to steer grabbed body */
+  update() {
+    if (!this.motorJoint || !this.grabbedBody) return;
+    const B2 = b2();
+
+    // World position of grab point on body
+    const grabWorld = this.grabbedBody.GetWorldPoint(new B2.b2Vec2(this.localGrabX, this.localGrabY));
+
+    // Desired velocity: pull grab point toward cursor
+    const stiffness = 10;
+    let vx = (this.targetX - grabWorld.x) * stiffness;
+    let vy = (this.targetY - grabWorld.y) * stiffness;
+
+    // Clamp max speed to prevent explosion on large gaps
+    const maxSpeed = 50;
+    const speed = Math.hypot(vx, vy);
+    if (speed > maxSpeed) {
+      vx = (vx / speed) * maxSpeed;
+      vy = (vy / speed) * maxSpeed;
+    }
+
+    B2.b2MotorJoint_SetLinearVelocity(this.motorJoint.id, new B2.b2Vec2(vx, vy));
+  }
+
   private startGrab(wx: number, wy: number, radiusPx = 5) {
     this.onUp();
 
@@ -100,43 +126,36 @@ export class GrabTool implements ToolHandler {
     def.base.bodyIdA = pw.getBodyId(this.ctx.groundBody);
     def.base.bodyIdB = pw.getBodyId(target);
 
-    // Set local frames: ground anchor at target position, body anchor at origin
+    // Ground anchor at grab point (world space, since ground is at origin)
     const frameA = new B2.b2Transform();
     frameA.p = new B2.b2Vec2(wx, wy);
     frameA.q = B2.b2Rot_identity;
     def.base.localFrameA = frameA;
 
+    // Body anchor at grab point in body-local space
+    const localPt = target.GetLocalPoint(new B2.b2Vec2(wx, wy));
     const frameB = new B2.b2Transform();
-    frameB.p = target.GetLocalPoint(new B2.b2Vec2(wx, wy));
+    frameB.p = localPt;
     frameB.q = B2.b2Rot_identity;
     def.base.localFrameB = frameB;
 
-    // Velocity-based targeting: compute desired velocity each frame, let the
-    // motor joint apply forces to achieve it. Spring is disabled (hertz=0)
-    // because the spring only pulls toward the initial anchor, not the cursor.
+    this.localGrabX = localPt.x;
+    this.localGrabY = localPt.y;
+
+    // Velocity-based targeting with angular damping
     def.linearHertz = 0;
     def.linearDampingRatio = 0;
     def.maxSpringForce = 0;
     def.maxVelocityForce = 1000 * target.GetMass();
-    def.angularHertz = 0;
-    def.angularDampingRatio = 0;
+    // Gentle angular spring to resist wild spinning
+    def.angularHertz = 2;
+    def.angularDampingRatio = 1;
+    def.maxSpringTorque = 50 * target.GetMass();
 
     const jointId = B2.b2CreateMotorJoint(pw.worldId, def);
     this.motorJoint = pw.addJointId(jointId);
     this.grabbedBody = target;
     this.targetX = wx;
     this.targetY = wy;
-  }
-
-  private updateMotorJoint() {
-    if (!this.motorJoint || !this.grabbedBody) return;
-    const B2 = b2();
-    const pos = this.grabbedBody.GetPosition();
-    // Compute velocity toward target: v = (target - pos) * hertz
-    const hertz = 5;
-    const vx = (this.targetX - pos.x) * hertz;
-    const vy = (this.targetY - pos.y) * hertz;
-    // Use flat API for motor joint velocity control
-    B2.b2MotorJoint_SetLinearVelocity(this.motorJoint.id, new B2.b2Vec2(vx, vy));
   }
 }
